@@ -1,0 +1,11 @@
+logs/
+data/
+
+.env
+
+*.exe
+*.dll
+*.so
+*.dylib
+
+palcontrol
