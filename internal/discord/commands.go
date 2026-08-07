@@ -48,7 +48,6 @@ func RegisterCommands(
 	}
 
 	commands := []discord.ApplicationCommandCreate{
-		buildPalCommand(),
 		buildAMPCommand(instanceChoices),
 	}
 
@@ -69,40 +68,6 @@ func RegisterCommands(
 	}
 
 	return nil
-}
-
-func buildPalCommand() discord.SlashCommandCreate {
-	return discord.SlashCommandCreate{
-		Name:        "pal",
-		Description: "Comandos dos servidores Palworld",
-		Options: []discord.ApplicationCommandOption{
-			discord.ApplicationCommandOptionSubCommand{
-				Name:        "status",
-				Description: "Mostra o status dos servidores Palworld",
-			},
-			discord.ApplicationCommandOptionSubCommand{
-				Name:        "iniciar",
-				Description: "Inicia ou acorda um servidor Palworld",
-				Options: []discord.ApplicationCommandOption{
-					discord.ApplicationCommandOptionString{
-						Name:        "servidor",
-						Description: "Servidor Palworld que será iniciado",
-						Required:    true,
-						Choices: []discord.ApplicationCommandOptionChoiceString{
-							{
-								Name:  "Alamama",
-								Value: "alamama",
-							},
-							{
-								Name:  "Kalaga",
-								Value: "kalaga",
-							},
-						},
-					},
-				},
-			},
-		},
-	}
 }
 
 func buildAMPCommand(

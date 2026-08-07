@@ -337,8 +337,7 @@ func (c *Client) confirmAndStopServer(
 
 	successMessage := fmt.Sprintf(
 		"💤 **%s entrou em modo Idle por inatividade.**\n"+
-			"Use `/pal iniciar servidor:%s` quando quiser jogar novamente.",
-		server.DisplayName,
+			"Use `/amp iniciar` quando quiser jogar novamente.",
 		server.DisplayName,
 	)
 
