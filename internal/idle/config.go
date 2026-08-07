@@ -25,6 +25,13 @@ const (
 	DetectorAMPPlayers    Detector = "amp_players"
 )
 
+type ServerMode string
+
+const (
+	ServerModeObserve ServerMode = "observe"
+	ServerModeActive  ServerMode = "active"
+)
+
 type Config struct {
 	CheckInterval time.Duration
 	Servers       []Server
@@ -34,6 +41,7 @@ type Server struct {
 	Instance        string
 	DisplayName     string
 	Enabled         bool
+	Mode            ServerMode
 	Detector        Detector
 	IdleTimeout     time.Duration
 	StartupGrace    time.Duration
@@ -51,6 +59,7 @@ type rawServer struct {
 	Instance            string         `json:"instance"`
 	DisplayName         string         `json:"display_name"`
 	Enabled             bool           `json:"enabled"`
+	Mode                ServerMode     `json:"mode"`
 	Detector            Detector       `json:"detector"`
 	IdleTimeoutMinutes  int            `json:"idle_timeout_minutes"`
 	StartupGraceMinutes int            `json:"startup_grace_minutes"`
@@ -249,6 +258,20 @@ func buildServer(
 		displayName = instance
 	}
 
+	mode := raw.Mode
+
+	if mode == "" {
+		mode = ServerModeObserve
+	}
+
+	if !isKnownServerMode(mode) {
+		return Server{}, fmt.Errorf(
+			"o modo de Idle %q da instância %s não é reconhecido",
+			mode,
+			instance,
+		)
+	}
+
 	idleTimeoutMinutes := raw.IdleTimeoutMinutes
 
 	if idleTimeoutMinutes == 0 {
@@ -279,6 +302,7 @@ func buildServer(
 		Instance:    instance,
 		DisplayName: displayName,
 		Enabled:     raw.Enabled,
+		Mode:        mode,
 		Detector:    raw.Detector,
 		IdleTimeout: time.Duration(
 			idleTimeoutMinutes,
@@ -350,6 +374,19 @@ func buildServer(
 	return server, nil
 }
 
+func isKnownServerMode(
+	mode ServerMode,
+) bool {
+	switch mode {
+	case ServerModeObserve,
+		ServerModeActive:
+		return true
+
+	default:
+		return false
+	}
+}
+
 func isKnownDetector(
 	detector Detector,
 ) bool {
@@ -390,6 +427,25 @@ func (c Config) EnabledServers() []Server {
 	return servers
 }
 
+func (c Config) ActiveServers() []Server {
+	servers := make(
+		[]Server,
+		0,
+		len(c.Servers),
+	)
+
+	for _, server := range c.Servers {
+		if server.IsActive() {
+			servers = append(
+				servers,
+				server,
+			)
+		}
+	}
+
+	return servers
+}
+
 func (c Config) FindServer(
 	instance string,
 ) (Server, bool) {
@@ -407,6 +463,11 @@ func (c Config) FindServer(
 	}
 
 	return Server{}, false
+}
+
+func (s Server) IsActive() bool {
+	return s.Enabled &&
+		s.Mode == ServerModeActive
 }
 
 func (s Server) RCONPassword() (string, error) {
