@@ -10,7 +10,8 @@ import (
 )
 
 type App struct {
-	Discord *discordClient.Client
+	Discord      *discordClient.Client
+	IdleObserver *idleObserver
 }
 
 func New() (*App, error) {
@@ -41,15 +42,34 @@ func New() (*App, error) {
 		return nil, err
 	}
 
+	idleObserver, err := newIdleObserver(
+		ampAPIClient,
+		log,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	discord.EnableAMPCommandHandling()
 
 	return &App{
-		Discord: discord,
+		Discord:      discord,
+		IdleObserver: idleObserver,
 	}, nil
 }
 
 func (a *App) Start(
 	ctx context.Context,
 ) error {
-	return a.Discord.Start(ctx)
+	if err := a.Discord.Start(ctx); err != nil {
+		return err
+	}
+
+	if a.IdleObserver != nil {
+		go a.IdleObserver.Run(
+			ctx,
+		)
+	}
+
+	return nil
 }
