@@ -284,8 +284,92 @@ func (c *Client) executeAMPControlOperation(
 	applicationID snowflake.ID,
 	interactionToken string,
 	instance amp.ManagedInstance,
-	operation ampCommandOperation,
+	commandOperation ampCommandOperation,
 ) {
+	lease, activeOperation, err :=
+		c.acquireAMPCommandOperation(
+			instance.Name,
+			commandOperation,
+		)
+	if err != nil {
+		c.log.Error().
+			Err(err).
+			Str("instance", instance.Name).
+			Str(
+				"operation",
+				string(commandOperation),
+			).
+			Msg("Não foi possível adquirir o bloqueio da operação AMP")
+
+		c.updateInteractionMessageByToken(
+			applicationID,
+			interactionToken,
+			fmt.Sprintf(
+				"❌ Não foi possível reservar **%s** para a operação.\n"+
+					"Erro: `%s`",
+				ampInstanceDisplayName(instance),
+				sanitizeAMPError(err),
+			),
+		)
+
+		return
+	}
+
+	if lease == nil {
+		activeDescription := "outra operação"
+
+		if activeOperation != nil &&
+			strings.TrimSpace(activeOperation.Operation) != "" {
+			activeDescription = activeOperation.Operation
+		}
+
+		c.log.Warn().
+			Str("instance", instance.Name).
+			Str(
+				"requested_operation",
+				string(commandOperation),
+			).
+			Str(
+				"active_operation",
+				activeDescription,
+			).
+			Msg("Operação AMP recusada porque a instância está ocupada")
+
+		c.updateInteractionMessageByToken(
+			applicationID,
+			interactionToken,
+			fmt.Sprintf(
+				"⏳ **%s** já possui uma operação em andamento.\n"+
+					"Operação atual: `%s`\n"+
+					"Aguarde a conclusão antes de enviar outro comando para esta instância.",
+				ampInstanceDisplayName(instance),
+				activeDescription,
+			),
+		)
+
+		return
+	}
+
+	c.log.Debug().
+		Str("instance", instance.Name).
+		Str(
+			"operation",
+			string(commandOperation),
+		).
+		Msg("Bloqueio exclusivo da instância adquirido")
+
+	defer func() {
+		lease.Release()
+
+		c.log.Debug().
+			Str("instance", instance.Name).
+			Str(
+				"operation",
+				string(commandOperation),
+			).
+			Msg("Bloqueio exclusivo da instância liberado")
+	}()
+
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		ampControlTimeout,
@@ -294,19 +378,25 @@ func (c *Client) executeAMPControlOperation(
 
 	c.log.Info().
 		Str("instance", instance.Name).
-		Str("operation", string(operation)).
+		Str(
+			"operation",
+			string(commandOperation),
+		).
 		Msg("Executando operação AMP")
 
 	resultMessage, err := c.performAMPControlOperation(
 		ctx,
 		instance,
-		operation,
+		commandOperation,
 	)
 	if err != nil {
 		c.log.Error().
 			Err(err).
 			Str("instance", instance.Name).
-			Str("operation", string(operation)).
+			Str(
+				"operation",
+				string(commandOperation),
+			).
 			Msg("Operação AMP falhou")
 
 		c.updateInteractionMessageByToken(
@@ -325,7 +415,10 @@ func (c *Client) executeAMPControlOperation(
 
 	c.log.Info().
 		Str("instance", instance.Name).
-		Str("operation", string(operation)).
+		Str(
+			"operation",
+			string(commandOperation),
+		).
 		Msg("Operação AMP concluída")
 
 	c.updateInteractionMessageByToken(
