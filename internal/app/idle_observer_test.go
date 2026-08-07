@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alabamaamp/palcontrol/internal/amp"
 	"github.com/alabamaamp/palcontrol/internal/idle"
+	"github.com/alabamaamp/palcontrol/internal/operation"
 	"github.com/rs/zerolog"
 )
 
@@ -50,6 +52,7 @@ func TestNewIdleObserverRejectsNilAMPClient(
 
 	_, err := newIdleObserver(
 		nil,
+		operation.NewManager(),
 		zerolog.Nop(),
 	)
 
@@ -62,6 +65,39 @@ func TestNewIdleObserverRejectsNilAMPClient(
 	if !strings.Contains(
 		err.Error(),
 		"cliente AMP",
+	) {
+		t.Fatalf(
+			"erro inesperado: %v",
+			err,
+		)
+	}
+}
+
+func TestNewIdleObserverRejectsNilOperationManager(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	ampClient := amp.NewAPIClient(
+		"usuario-teste",
+		"senha-teste",
+	)
+
+	_, err := newIdleObserver(
+		ampClient,
+		nil,
+		zerolog.Nop(),
+	)
+
+	if err == nil {
+		t.Fatal(
+			"era esperado um erro para gerenciador de operações nulo",
+		)
+	}
+
+	if !strings.Contains(
+		err.Error(),
+		"gerenciador de operações",
 	) {
 		t.Fatalf(
 			"erro inesperado: %v",

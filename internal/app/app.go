@@ -54,6 +54,7 @@ func New() (*App, error) {
 
 	idleObserver, err := newIdleObserver(
 		ampAPIClient,
+		operationManager,
 		log,
 	)
 	if err != nil {

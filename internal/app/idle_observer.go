@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/alabamaamp/palcontrol/internal/amp"
 	"github.com/alabamaamp/palcontrol/internal/idle"
+	"github.com/alabamaamp/palcontrol/internal/operation"
 	"github.com/rs/zerolog"
 )
 
@@ -42,11 +44,18 @@ func (
 
 func newIdleObserver(
 	ampClient *amp.APIClient,
+	operationManager *operation.Manager,
 	log zerolog.Logger,
 ) (*idleObserver, error) {
 	if ampClient == nil {
 		return nil, fmt.Errorf(
 			"o cliente AMP do observador genérico de Idle não foi informado",
+		)
+	}
+
+	if operationManager == nil {
+		return nil, fmt.Errorf(
+			"o gerenciador de operações do observador genérico de Idle não foi informado",
 		)
 	}
 
@@ -78,11 +87,22 @@ func newIdleObserver(
 		)
 	}
 
+	protectedStopper, err := idle.NewLockedStopper(
+		operationManager,
+		observationOnlyStopper{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"não foi possível proteger as paradas automáticas do observador de Idle: %w",
+			err,
+		)
+	}
+
 	engine, err := idle.NewEngine(
 		idleConfig,
 		detectors,
 		ampAdapter,
-		observationOnlyStopper{},
+		protectedStopper,
 		buildIdleObservationEventHandler(
 			log,
 		),
@@ -236,9 +256,33 @@ func buildIdleObservationEventHandler(
 					"idle_elapsed",
 					event.IdleElapsed,
 				).
-				Msg("Modo observação: o limite foi atingido e Core.Stop seria executado")
+				Msg("Modo observação: o limite foi atingido e uma parada automática seria tentada")
 
 		case idle.EventStopFailed:
+			var busyError *idle.OperationBusyError
+
+			if errors.As(
+				event.Err,
+				&busyError,
+			) {
+				activeOperation := strings.TrimSpace(
+					busyError.Active.Operation,
+				)
+
+				if activeOperation == "" {
+					activeOperation = "operação não identificada"
+				}
+
+				eventLog.Info().
+					Str(
+						"active_operation",
+						activeOperation,
+					).
+					Msg("Modo observação: parada automática adiada porque a instância está ocupada")
+
+				return
+			}
+
 			if errors.Is(
 				event.Err,
 				errIdleObservationOnly,
