@@ -18,11 +18,18 @@ var errIdleObservationOnly = errors.New(
 	"modo de observação: Core.Stop não foi executado",
 )
 
-// idleObserver executa o novo motor genérico sem permitir
-// que ele pare aplicações reais.
+// idleObserver executa o motor genérico de Idle.
 //
-// O monitor antigo permanece responsável pelas paradas enquanto
-// comparamos o comportamento das duas implementações.
+// A autoridade de parada é definida individualmente pela configuração
+// de cada servidor:
+//
+//   - observe: o motor executa todas as verificações, mas Core.Stop
+//     permanece bloqueado;
+//   - active: o motor pode executar a parada real através do AMP,
+//     sempre protegido pelo bloqueio compartilhado da instância.
+//
+// Servidores sem mode explícito são carregados como observe pelo
+// pacote idle.
 type idleObserver struct {
 	engine *idle.Engine
 	config idle.Config
@@ -40,6 +47,62 @@ func (
 	idle.Server,
 ) error {
 	return errIdleObservationOnly
+}
+
+// modeAwareStopper seleciona a autoridade de parada de acordo
+// com o mode configurado individualmente para cada servidor.
+//
+// Somente ServerModeActive pode chegar ao stopper real.
+//
+// Mode vazio também é tratado como observe como proteção adicional,
+// embora o loader de configuração já normalize esse caso.
+type modeAwareStopper struct {
+	activeStopper idle.ApplicationStopper
+}
+
+func newModeAwareStopper(
+	activeStopper idle.ApplicationStopper,
+) (*modeAwareStopper, error) {
+	if activeStopper == nil {
+		return nil, fmt.Errorf(
+			"o mecanismo de parada do modo active não foi informado",
+		)
+	}
+
+	return &modeAwareStopper{
+		activeStopper: activeStopper,
+	}, nil
+}
+
+func (s *modeAwareStopper) StopApplication(
+	ctx context.Context,
+	server idle.Server,
+) error {
+	if s == nil ||
+		s.activeStopper == nil {
+		return fmt.Errorf(
+			"o mecanismo de parada do modo active não está disponível",
+		)
+	}
+
+	switch server.Mode {
+	case "",
+		idle.ServerModeObserve:
+		return errIdleObservationOnly
+
+	case idle.ServerModeActive:
+		return s.activeStopper.StopApplication(
+			ctx,
+			server,
+		)
+
+	default:
+		return fmt.Errorf(
+			"o servidor %s possui modo de Idle não reconhecido: %q",
+			server.Instance,
+			server.Mode,
+		)
+	}
 }
 
 func newIdleObserver(
@@ -87,13 +150,23 @@ func newIdleObserver(
 		)
 	}
 
-	protectedStopper, err := idle.NewLockedStopper(
+	protectedActiveStopper, err := idle.NewLockedStopper(
 		operationManager,
-		observationOnlyStopper{},
+		ampAdapter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível proteger as paradas automáticas do observador de Idle: %w",
+			"não foi possível proteger as paradas automáticas do modo active: %w",
+			err,
+		)
+	}
+
+	configuredStopper, err := newModeAwareStopper(
+		protectedActiveStopper,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"não foi possível configurar a autoridade do motor genérico de Idle: %w",
 			err,
 		)
 	}
@@ -102,14 +175,15 @@ func newIdleObserver(
 		idleConfig,
 		detectors,
 		ampAdapter,
-		protectedStopper,
-		buildIdleObservationEventHandler(
+		configuredStopper,
+		buildIdleEventHandler(
+			idleConfig,
 			log,
 		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar o motor genérico de Idle em observação: %w",
+			"não foi possível criar o motor genérico de Idle: %w",
 			err,
 		)
 	}
@@ -131,33 +205,51 @@ func (o *idleObserver) Run(
 	}
 
 	enabledServers := o.config.EnabledServers()
+	activeServers := o.config.ActiveServers()
+	observeServers := len(enabledServers) - len(activeServers)
 
 	o.log.Info().
-		Str("idle_mode", "observation").
+		Str("idle_mode", "per_server").
 		Str("config_path", idleObserverConfigPath).
 		Int("registered_servers", len(o.config.Servers)).
 		Int("enabled_servers", len(enabledServers)).
+		Int("observe_servers", observeServers).
+		Int("active_servers", len(activeServers)).
 		Dur("check_interval", o.config.CheckInterval).
-		Msg("Observador genérico de Idle iniciado")
+		Msg("Motor genérico de Idle iniciado")
 
 	o.engine.Run(
 		ctx,
 	)
 
 	o.log.Info().
-		Str("idle_mode", "observation").
-		Msg("Observador genérico de Idle encerrado")
+		Str("idle_mode", "per_server").
+		Msg("Motor genérico de Idle encerrado")
 }
 
-func buildIdleObservationEventHandler(
+func buildIdleEventHandler(
+	config idle.Config,
 	log zerolog.Logger,
 ) idle.EventHandler {
 	return func(
 		_ context.Context,
 		event idle.Event,
 	) {
+		mode := idle.ServerModeObserve
+
+		if server, exists := config.FindServer(
+			event.Instance,
+		); exists {
+			if server.Mode != "" {
+				mode = server.Mode
+			}
+		}
+
 		eventLog := log.With().
-			Str("idle_mode", "observation").
+			Str(
+				"idle_mode",
+				string(mode),
+			).
 			Str("server", event.Instance).
 			Str("display_name", event.DisplayName).
 			Str(
@@ -170,11 +262,11 @@ func buildIdleObservationEventHandler(
 		case idle.EventRuntimeUnavailable:
 			eventLog.Warn().
 				Err(event.Err).
-				Msg("Observador não conseguiu consultar o estado da aplicação")
+				Msg("Motor de Idle não conseguiu consultar o estado da aplicação")
 
 		case idle.EventRuntimeNotOnline:
 			eventLog.Debug().
-				Msg("Observador ignorou aplicação que não está Online")
+				Msg("Motor de Idle ignorou aplicação que não está Online")
 
 		case idle.EventStartupGraceStarted:
 			eventLog.Info().
@@ -182,7 +274,7 @@ func buildIdleObservationEventHandler(
 					"grace_remaining",
 					event.GraceRemaining,
 				).
-				Msg("Observador iniciou a proteção após a aplicação ficar Online")
+				Msg("Motor de Idle iniciou a proteção após a aplicação ficar Online")
 
 		case idle.EventStartupGraceActive:
 			eventLog.Debug().
@@ -194,12 +286,12 @@ func buildIdleObservationEventHandler(
 					"grace_remaining",
 					event.GraceRemaining,
 				).
-				Msg("Observador mantém a proteção inicial ativa")
+				Msg("Motor de Idle mantém a proteção inicial ativa")
 
 		case idle.EventDetectorFailed:
 			eventLog.Warn().
 				Err(event.Err).
-				Msg("Observador não conseguiu consultar os jogadores")
+				Msg("Motor de Idle não conseguiu consultar os jogadores")
 
 		case idle.EventPlayersPresent:
 			eventLog.Debug().
@@ -207,7 +299,7 @@ func buildIdleObservationEventHandler(
 					"players",
 					event.PlayerCount,
 				).
-				Msg("Observador encontrou jogadores conectados")
+				Msg("Motor de Idle encontrou jogadores conectados")
 
 		case idle.EventIdleTimerStarted:
 			eventLog.Info().
@@ -215,7 +307,7 @@ func buildIdleObservationEventHandler(
 					"idle_remaining",
 					event.IdleRemaining,
 				).
-				Msg("Observador iniciou o contador individual de inatividade")
+				Msg("Motor de Idle iniciou o contador individual de inatividade")
 
 		case idle.EventIdleTimerActive:
 			eventLog.Debug().
@@ -227,7 +319,7 @@ func buildIdleObservationEventHandler(
 					"idle_remaining",
 					event.IdleRemaining,
 				).
-				Msg("Observador mantém o contador de inatividade ativo")
+				Msg("Motor de Idle mantém o contador de inatividade ativo")
 
 		case idle.EventFinalCheckFailed:
 			eventLog.Warn().
@@ -236,7 +328,7 @@ func buildIdleObservationEventHandler(
 					"idle_elapsed",
 					event.IdleElapsed,
 				).
-				Msg("Observador cancelou a decisão por falha na confirmação final")
+				Msg("Motor de Idle cancelou a decisão por falha na confirmação final")
 
 		case idle.EventStopCancelledPlayers:
 			eventLog.Info().
@@ -244,19 +336,30 @@ func buildIdleObservationEventHandler(
 					"players",
 					event.PlayerCount,
 				).
-				Msg("Observador cancelou a parada porque jogadores entraram")
+				Msg("Motor de Idle cancelou a parada porque jogadores entraram")
 
 		case idle.EventStopCancelledState:
 			eventLog.Info().
-				Msg("Observador cancelou a parada porque o estado da aplicação mudou")
+				Msg("Motor de Idle cancelou a parada porque o estado da aplicação mudou")
 
 		case idle.EventStopStarting:
+			if mode == idle.ServerModeActive {
+				eventLog.Info().
+					Dur(
+						"idle_elapsed",
+						event.IdleElapsed,
+					).
+					Msg("Modo active: limite atingido; parada automática será tentada")
+
+				return
+			}
+
 			eventLog.Info().
 				Dur(
 					"idle_elapsed",
 					event.IdleElapsed,
 				).
-				Msg("Modo observação: o limite foi atingido e uma parada automática seria tentada")
+				Msg("Modo observe: limite atingido; parada automática seria tentada")
 
 		case idle.EventStopFailed:
 			var busyError *idle.OperationBusyError
@@ -278,7 +381,7 @@ func buildIdleObservationEventHandler(
 						"active_operation",
 						activeOperation,
 					).
-					Msg("Modo observação: parada automática adiada porque a instância está ocupada")
+					Msg("Parada automática adiada porque a instância está ocupada")
 
 				return
 			}
@@ -288,18 +391,25 @@ func buildIdleObservationEventHandler(
 				errIdleObservationOnly,
 			) {
 				eventLog.Debug().
-					Msg("Modo observação: Core.Stop foi intencionalmente bloqueado")
+					Msg("Modo observe: Core.Stop foi intencionalmente bloqueado")
 
 				return
 			}
 
 			eventLog.Error().
 				Err(event.Err).
-				Msg("Observador encontrou uma falha inesperada na simulação da parada")
+				Msg("Motor de Idle não conseguiu concluir a parada automática")
 
 		case idle.EventStopSucceeded:
+			if mode == idle.ServerModeActive {
+				eventLog.Info().
+					Msg("Modo active: parada automática concluída")
+
+				return
+			}
+
 			eventLog.Warn().
-				Msg("Observador registrou uma parada concluída inesperadamente")
+				Msg("Modo observe registrou uma parada concluída inesperadamente")
 
 		default:
 			eventLog.Debug().
@@ -307,7 +417,7 @@ func buildIdleObservationEventHandler(
 					"event_type",
 					string(event.Type),
 				).
-				Msg("Evento do observador genérico de Idle")
+				Msg("Evento do motor genérico de Idle")
 		}
 	}
 }
