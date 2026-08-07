@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alabamaamp/palcontrol/internal/amp"
 	"github.com/alabamaamp/palcontrol/internal/config"
 	discordClient "github.com/alabamaamp/palcontrol/internal/discord"
+	"github.com/alabamaamp/palcontrol/internal/idle"
 	"github.com/alabamaamp/palcontrol/internal/logger"
 	"github.com/alabamaamp/palcontrol/internal/operation"
 )
@@ -33,6 +35,31 @@ func New() (*App, error) {
 
 	operationManager := operation.NewManager()
 
+	idleConfig, err := idle.Load(
+		idleObserverConfigPath,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"não foi possível carregar a configuração compartilhada do Idle: %w",
+			err,
+		)
+	}
+
+	activeServers := idleConfig.ActiveServers()
+
+	legacyIdleTransferredInstances := make(
+		[]string,
+		0,
+		len(activeServers),
+	)
+
+	for _, server := range activeServers {
+		legacyIdleTransferredInstances = append(
+			legacyIdleTransferredInstances,
+			server.Instance,
+		)
+	}
+
 	discord, err := discordClient.New(
 		cfg.DiscordToken,
 		ampAPIClient,
@@ -40,6 +67,7 @@ func New() (*App, error) {
 		cfg.KalagaRCONPassword,
 		cfg.DiscordNotificationChannelID,
 		cfg.IdleTimeout,
+		legacyIdleTransferredInstances,
 		log,
 	)
 	if err != nil {
@@ -56,6 +84,7 @@ func New() (*App, error) {
 		ampAPIClient,
 		operationManager,
 		discord,
+		idleConfig,
 		log,
 	)
 	if err != nil {

@@ -64,6 +64,7 @@ func TestNewIdleObserverRejectsNilAMPClient(
 		nil,
 		operation.NewManager(),
 		noopIdleNotifier{},
+		idle.Config{},
 		zerolog.Nop(),
 	)
 
@@ -98,6 +99,7 @@ func TestNewIdleObserverRejectsNilOperationManager(
 		ampClient,
 		nil,
 		noopIdleNotifier{},
+		idle.Config{},
 		zerolog.Nop(),
 	)
 
@@ -132,6 +134,7 @@ func TestNewIdleObserverRejectsNilNotifier(
 		ampClient,
 		operation.NewManager(),
 		nil,
+		idle.Config{},
 		zerolog.Nop(),
 	)
 

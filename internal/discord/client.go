@@ -42,6 +42,7 @@ func New(
 	kalagaRCONPassword string,
 	notificationChannelID string,
 	idleTimeout time.Duration,
+	legacyIdleTransferredInstances []string,
 	log zerolog.Logger,
 ) (*Client, error) {
 	disgoClient, err := disgo.New(
@@ -66,6 +67,35 @@ func New(
 		discord.AllowedMentions{},
 	)
 
+	allManagedServers := []managedServer{
+		{
+			DisplayName:  "Alamama",
+			APIURL:       "http://127.0.0.1:8090",
+			RCONAddress:  "127.0.0.1:25575",
+			RCONPassword: alamamaRCONPassword,
+			Instance: amp.Instance{
+				Name:     "AlamamaPal01",
+				GamePort: 8211,
+			},
+		},
+		{
+			DisplayName:  "Kalaga",
+			APIURL:       "http://127.0.0.1:8088",
+			RCONAddress:  "127.0.0.1:25576",
+			RCONPassword: kalagaRCONPassword,
+			Instance: amp.Instance{
+				Name:     "KalagaPal01",
+				GamePort: 8212,
+			},
+		},
+	}
+
+	legacyManagedServers, transferredServers :=
+		partitionLegacyIdleServers(
+			allManagedServers,
+			legacyIdleTransferredInstances,
+		)
+
 	client := &Client{
 		bot:                   disgoClient,
 		ampClient:             ampClient,
@@ -74,28 +104,31 @@ func New(
 		notificationChannelID: snowflake.MustParse(notificationChannelID),
 		idleTimeout:           idleTimeout,
 		log:                   log,
-		managedServers: []managedServer{
-			{
-				DisplayName:  "Alamama",
-				APIURL:       "http://127.0.0.1:8090",
-				RCONAddress:  "127.0.0.1:25575",
-				RCONPassword: alamamaRCONPassword,
-				Instance: amp.Instance{
-					Name:     "AlamamaPal01",
-					GamePort: 8211,
-				},
-			},
-			{
-				DisplayName:  "Kalaga",
-				APIURL:       "http://127.0.0.1:8088",
-				RCONAddress:  "127.0.0.1:25576",
-				RCONPassword: kalagaRCONPassword,
-				Instance: amp.Instance{
-					Name:     "KalagaPal01",
-					GamePort: 8212,
-				},
-			},
-		},
+		managedServers:        legacyManagedServers,
+	}
+
+	client.log.Info().
+		Int(
+			"managed_servers",
+			len(legacyManagedServers),
+		).
+		Int(
+			"transferred_servers",
+			len(transferredServers),
+		).
+		Msg("Autoridade do monitor Idle antigo configurada")
+
+	for _, server := range transferredServers {
+		client.log.Info().
+			Str(
+				"server",
+				server.Instance.Name,
+			).
+			Str(
+				"display_name",
+				server.DisplayName,
+			).
+			Msg("Monitor Idle antigo cedeu autoridade ao motor genérico")
 	}
 
 	disgoClient.AddEventListeners(

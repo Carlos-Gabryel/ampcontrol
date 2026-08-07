@@ -18,26 +18,12 @@ var errIdleObservationOnly = errors.New(
 	"modo de observação: Core.Stop não foi executado",
 )
 
-// idleObserver executa o motor genérico de Idle.
-//
-// A autoridade de parada é definida individualmente pela configuração
-// de cada servidor:
-//
-//   - observe: o motor executa todas as verificações, mas Core.Stop
-//     permanece bloqueado;
-//   - active: o motor pode executar a parada real através do AMP,
-//     sempre protegido pelo bloqueio compartilhado da instância.
-//
-// Servidores sem mode explícito são carregados como observe pelo
-// pacote idle.
 type idleObserver struct {
 	engine *idle.Engine
 	config idle.Config
 	log    zerolog.Logger
 }
 
-// observationOnlyStopper implementa idle.ApplicationStopper,
-// mas nunca envia Core.Stop ao AMP.
 type observationOnlyStopper struct{}
 
 func (
@@ -49,13 +35,6 @@ func (
 	return errIdleObservationOnly
 }
 
-// modeAwareStopper seleciona a autoridade de parada de acordo
-// com o mode configurado individualmente para cada servidor.
-//
-// Somente ServerModeActive pode chegar ao stopper real.
-//
-// Mode vazio também é tratado como observe como proteção adicional,
-// embora o loader de configuração já normalize esse caso.
 type modeAwareStopper struct {
 	activeStopper idle.ApplicationStopper
 }
@@ -109,6 +88,7 @@ func newIdleObserver(
 	ampClient *amp.APIClient,
 	operationManager *operation.Manager,
 	notifier idleNotifier,
+	idleConfig idle.Config,
 	log zerolog.Logger,
 ) (*idleObserver, error) {
 	if ampClient == nil {
@@ -126,16 +106,6 @@ func newIdleObserver(
 	if notifier == nil {
 		return nil, fmt.Errorf(
 			"o notificante do observador genérico de Idle não foi informado",
-		)
-	}
-
-	idleConfig, err := idle.Load(
-		idleObserverConfigPath,
-	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"não foi possível carregar a configuração do observador genérico de Idle: %w",
-			err,
 		)
 	}
 
