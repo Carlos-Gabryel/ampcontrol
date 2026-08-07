@@ -41,6 +41,8 @@ func New() (*App, error) {
 		return nil, err
 	}
 
+	discord.EnableAMPCommandHandling()
+
 	return &App{
 		Discord: discord,
 	}, nil
