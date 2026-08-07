@@ -108,6 +108,7 @@ func (s *modeAwareStopper) StopApplication(
 func newIdleObserver(
 	ampClient *amp.APIClient,
 	operationManager *operation.Manager,
+	notifier idleNotifier,
 	log zerolog.Logger,
 ) (*idleObserver, error) {
 	if ampClient == nil {
@@ -119,6 +120,12 @@ func newIdleObserver(
 	if operationManager == nil {
 		return nil, fmt.Errorf(
 			"o gerenciador de operações do observador genérico de Idle não foi informado",
+		)
+	}
+
+	if notifier == nil {
+		return nil, fmt.Errorf(
+			"o notificante do observador genérico de Idle não foi informado",
 		)
 	}
 
@@ -150,9 +157,21 @@ func newIdleObserver(
 		)
 	}
 
+	notificationStopper, err := newIdleNotificationStopper(
+		ampAdapter,
+		notifier,
+		log,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"não foi possível configurar as notificações das paradas automáticas: %w",
+			err,
+		)
+	}
+
 	protectedActiveStopper, err := idle.NewLockedStopper(
 		operationManager,
-		ampAdapter,
+		notificationStopper,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(

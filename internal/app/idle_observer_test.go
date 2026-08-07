@@ -12,6 +12,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type noopIdleNotifier struct{}
+
+func (
+	noopIdleNotifier,
+) SendNotification(
+	string,
+) error {
+	return nil
+}
+
 func TestObservationOnlyStopperBlocksCoreStop(
 	t *testing.T,
 ) {
@@ -53,6 +63,7 @@ func TestNewIdleObserverRejectsNilAMPClient(
 	_, err := newIdleObserver(
 		nil,
 		operation.NewManager(),
+		noopIdleNotifier{},
 		zerolog.Nop(),
 	)
 
@@ -86,6 +97,7 @@ func TestNewIdleObserverRejectsNilOperationManager(
 	_, err := newIdleObserver(
 		ampClient,
 		nil,
+		noopIdleNotifier{},
 		zerolog.Nop(),
 	)
 
@@ -98,6 +110,40 @@ func TestNewIdleObserverRejectsNilOperationManager(
 	if !strings.Contains(
 		err.Error(),
 		"gerenciador de operações",
+	) {
+		t.Fatalf(
+			"erro inesperado: %v",
+			err,
+		)
+	}
+}
+
+func TestNewIdleObserverRejectsNilNotifier(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	ampClient := amp.NewAPIClient(
+		"usuario-teste",
+		"senha-teste",
+	)
+
+	_, err := newIdleObserver(
+		ampClient,
+		operation.NewManager(),
+		nil,
+		zerolog.Nop(),
+	)
+
+	if err == nil {
+		t.Fatal(
+			"era esperado um erro para notificante nulo",
+		)
+	}
+
+	if !strings.Contains(
+		err.Error(),
+		"notificante",
 	) {
 		t.Fatalf(
 			"erro inesperado: %v",
