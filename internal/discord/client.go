@@ -276,6 +276,58 @@ func (c *Client) handleStartCommand(
 		return
 	}
 
+	releaseOperation, activeOperation, acquired, err :=
+		c.acquirePalStartOperation(
+			server,
+		)
+	if err != nil {
+		c.log.Error().
+			Err(err).
+			Str("server", server.Instance.Name).
+			Msg("Não foi possível adquirir o bloqueio de /pal iniciar")
+
+		c.updateInteractionMessage(
+			event,
+			fmt.Sprintf(
+				"❌ Não foi possível reservar **%s** para a inicialização.\n"+
+					"Erro: `%s`",
+				server.DisplayName,
+				sanitizeAMPError(err),
+			),
+		)
+
+		return
+	}
+
+	if !acquired {
+		c.log.Info().
+			Str("server", server.Instance.Name).
+			Str("active_operation", activeOperation).
+			Msg("/pal iniciar recusado porque a instância está ocupada")
+
+		c.updateInteractionMessage(
+			event,
+			fmt.Sprintf(
+				"⏳ **%s** já possui uma operação em andamento.\n"+
+					"Operação atual: `%s`\n"+
+					"Aguarde a conclusão antes de iniciar o servidor.",
+				server.DisplayName,
+				activeOperation,
+			),
+		)
+
+		return
+	}
+
+	releaseOnReturn := true
+
+	defer func() {
+		if releaseOnReturn &&
+			releaseOperation != nil {
+			releaseOperation()
+		}
+	}()
+
 	statusCtx, statusCancel := context.WithTimeout(
 		context.Background(),
 		3*time.Second,
@@ -384,11 +436,17 @@ func (c *Client) handleStartCommand(
 		),
 	)
 
-	go c.waitForServerOnline(
-		event.ApplicationID(),
-		event.Token(),
-		server,
-	)
+	releaseOnReturn = false
+
+	go func() {
+		defer releaseOperation()
+
+		c.waitForServerOnline(
+			event.ApplicationID(),
+			event.Token(),
+			server,
+		)
+	}()
 }
 
 func (c *Client) waitForServerOnline(
