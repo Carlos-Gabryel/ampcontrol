@@ -12,14 +12,27 @@ const (
 	applicationAttemptTimeout       = 20 * time.Second
 )
 
-// StartApplicationUntilReady tenta iniciar a aplicação repetidamente.
+// StartApplicationUntilReady inicia ou acorda a aplicação e aguarda
+// até que Core.GetStatus confirme ApplicationStateReady.
 //
-// Esta função é usada principalmente quando a instância AMP estava
-// completamente desligada. Depois de iniciar a instância, a API pode
-// levar alguns segundos para ficar disponível.
+// Esta função também é usada quando a instância AMP estava
+// completamente desligada. Nesse cenário, depois de iniciar a
+// instância, a API pode levar alguns segundos para ficar disponível.
+//
+// O processo possui duas fases:
+//
+//   - tentar Core.Start até que a API esteja disponível e aceite
+//     a inicialização;
+//   - depois que Core.Start for aceito, consultar Core.GetStatus
+//     repetidamente até a aplicação chegar ao estado Ready.
+//
+// Depois que Core.Start é aceito, ele não é enviado novamente.
 //
 // A função encerra quando:
-//   - Core.Start for executado com sucesso;
+//
+//   - Core.GetStatus retornar ApplicationStateReady;
+//   - a aplicação entrar em Failed;
+//   - a aplicação entrar em Suspended;
 //   - o contexto for cancelado;
 //   - o prazo do contexto for excedido.
 func (c *APIClient) StartApplicationUntilReady(
@@ -41,6 +54,8 @@ func (c *APIClient) StartApplicationUntilReady(
 
 	var lastErr error
 
+	startAccepted := false
+
 	for {
 		if err := ctx.Err(); err != nil {
 			return buildApplicationRetryError(
@@ -50,44 +65,96 @@ func (c *APIClient) StartApplicationUntilReady(
 			)
 		}
 
-		attemptCtx, attemptCancel := context.WithTimeout(
+		if !startAccepted {
+			attemptCtx, attemptCancel := context.WithTimeout(
+				ctx,
+				applicationAttemptTimeout,
+			)
+
+			err := c.StartApplication(
+				attemptCtx,
+				baseURL,
+			)
+
+			attemptCancel()
+
+			if err != nil {
+				lastErr = fmt.Errorf(
+					"Core.Start ainda não foi aceito: %w",
+					err,
+				)
+
+				if err := waitApplicationRetry(
+					ctx,
+					retryInterval,
+				); err != nil {
+					return buildApplicationRetryError(
+						baseURL,
+						lastErr,
+						err,
+					)
+				}
+
+				continue
+			}
+
+			startAccepted = true
+			lastErr = nil
+		}
+
+		statusCtx, statusCancel := context.WithTimeout(
 			ctx,
 			applicationAttemptTimeout,
 		)
 
-		err := c.StartApplication(
-			attemptCtx,
+		status, err := c.GetApplicationStatus(
+			statusCtx,
 			baseURL,
 		)
 
-		attemptCancel()
+		statusCancel()
 
-		if err == nil {
-			return nil
+		if err != nil {
+			lastErr = fmt.Errorf(
+				"Core.GetStatus ainda não pôde ser consultado: %w",
+				err,
+			)
+		} else {
+			switch status.Phase() {
+			case ApplicationPhaseOnline:
+				return nil
+
+			case ApplicationPhaseFailed:
+				return fmt.Errorf(
+					"a aplicação em %s entrou em estado de falha antes de ficar pronta: %s",
+					baseURL,
+					status.State.String(),
+				)
+
+			case ApplicationPhaseSuspended:
+				return fmt.Errorf(
+					"a aplicação em %s ficou suspensa antes de ficar pronta: %s",
+					baseURL,
+					status.State.String(),
+				)
+
+			default:
+				lastErr = fmt.Errorf(
+					"a aplicação ainda não está pronta; estado atual: %s",
+					status.State.String(),
+				)
+			}
 		}
 
-		lastErr = err
-
-		timer := time.NewTimer(
+		if err := waitApplicationRetry(
+			ctx,
 			retryInterval,
-		)
-
-		select {
-		case <-ctx.Done():
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
-
+		); err != nil {
 			return buildApplicationRetryError(
 				baseURL,
 				lastErr,
-				ctx.Err(),
+				err,
 			)
-
-		case <-timer.C:
 		}
 	}
 }
@@ -97,9 +164,11 @@ func (c *APIClient) StartApplicationUntilReady(
 // A instância AMP permanece ligada durante a operação.
 //
 // O processo é:
+//
 //   - executar Core.Stop;
 //   - aguardar a aplicação aceitar Core.Start;
-//   - executar Core.Start novamente.
+//   - executar Core.Start novamente;
+//   - aguardar Core.GetStatus confirmar Ready.
 func (c *APIClient) RestartApplication(
 	ctx context.Context,
 	baseURL string,
@@ -136,6 +205,24 @@ func (c *APIClient) RestartApplication(
 	return nil
 }
 
+func waitApplicationRetry(
+	ctx context.Context,
+	retryInterval time.Duration,
+) error {
+	timer := time.NewTimer(
+		retryInterval,
+	)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+
+	case <-timer.C:
+		return nil
+	}
+}
+
 func buildApplicationRetryError(
 	baseURL string,
 	lastErr error,
@@ -143,14 +230,14 @@ func buildApplicationRetryError(
 ) error {
 	if lastErr == nil {
 		return fmt.Errorf(
-			"a aplicação em %s não pôde ser iniciada: %w",
+			"a aplicação em %s não ficou pronta: %w",
 			baseURL,
 			contextErr,
 		)
 	}
 
 	return fmt.Errorf(
-		"a aplicação em %s não pôde ser iniciada antes do prazo; "+
+		"a aplicação em %s não ficou pronta antes do prazo; "+
 			"último erro: %v: %w",
 		baseURL,
 		lastErr,
