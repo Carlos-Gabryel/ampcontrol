@@ -9,7 +9,12 @@ import (
 	"github.com/alabamaamp/palcontrol/internal/rcon"
 )
 
-const idleMonitorInterval = 30 * time.Second
+const (
+	idleMonitorInterval      = 30 * time.Second
+	legacyIdleOperationName  = "monitor Idle antigo"
+	legacyIdleStopTimeout    = 20 * time.Second
+	legacyIdleConfirmTimeout = 10 * time.Second
+)
 
 func (c *Client) runIdleMonitor(
 	ctx context.Context,
@@ -170,7 +175,7 @@ func (c *Client) getPlayerCount(
 ) (int, error) {
 	rconCtx, rconCancel := context.WithTimeout(
 		ctx,
-		10*time.Second,
+		legacyIdleConfirmTimeout,
 	)
 	defer rconCancel()
 
@@ -226,6 +231,46 @@ func (c *Client) confirmAndStopServer(
 		return
 	}
 
+	releaseOperation, activeOperation, acquired, err :=
+		c.acquireSharedOperation(
+			server.Instance.Name,
+			legacyIdleOperationName,
+		)
+	if err != nil {
+		delete(
+			emptySince,
+			server.Instance.Name,
+		)
+
+		c.log.Error().
+			Err(err).
+			Str("server", server.Instance.Name).
+			Msg("Parada automática cancelada porque o bloqueio compartilhado falhou")
+
+		return
+	}
+
+	if !acquired {
+		delete(
+			emptySince,
+			server.Instance.Name,
+		)
+
+		c.log.Info().
+			Str("server", server.Instance.Name).
+			Str("active_operation", activeOperation).
+			Msg("Parada automática adiada porque a instância possui outra operação")
+
+		return
+	}
+
+	defer releaseOperation()
+
+	c.log.Debug().
+		Str("server", server.Instance.Name).
+		Str("operation", legacyIdleOperationName).
+		Msg("Monitor antigo adquiriu o bloqueio exclusivo da instância")
+
 	warningMessage := fmt.Sprintf(
 		"⚠️ **%s está sem jogadores há %s.**\n"+
 			"O processo do Palworld será encerrado e o servidor entrará em modo Idle.",
@@ -242,7 +287,7 @@ func (c *Client) confirmAndStopServer(
 
 	stopCtx, stopCancel := context.WithTimeout(
 		ctx,
-		20*time.Second,
+		legacyIdleStopTimeout,
 	)
 
 	err = c.ampClient.StopApplication(
