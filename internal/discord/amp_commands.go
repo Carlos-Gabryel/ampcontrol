@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alabamaamp/palcontrol/internal/amp"
@@ -13,9 +14,27 @@ import (
 )
 
 const (
-	ampDiscoveryTimeout = 15 * time.Second
-	ampControlTimeout   = 14 * time.Minute
+	ampDiscoveryTimeout       = 15 * time.Second
+	ampControlTimeout         = 14 * time.Minute
+	ampApplicationTimeout     = 20 * time.Second
+	ampApplicationRetryPeriod = 3 * time.Second
 )
+
+type ampCommandOperation string
+
+const (
+	ampCommandOperationStart    ampCommandOperation = "start"
+	ampCommandOperationStop     ampCommandOperation = "stop"
+	ampCommandOperationRestart  ampCommandOperation = "restart"
+	ampCommandOperationShutdown ampCommandOperation = "shutdown"
+	ampCommandOperationUpdate   ampCommandOperation = "update"
+)
+
+type ampInstanceStatusView struct {
+	Instance          amp.ManagedInstance
+	ApplicationStatus *amp.ApplicationStatus
+	ApplicationError  error
+}
 
 func (c *Client) handleAMPCommand(
 	event *events.ApplicationCommandInteractionCreate,
@@ -38,31 +57,28 @@ func (c *Client) handleAMPCommand(
 		c.handleAMPControlCommand(
 			event,
 			data,
-			amp.InstanceOperationStart,
+			ampCommandOperationStart,
 		)
 
 	case "parar":
 		c.handleAMPControlCommand(
 			event,
 			data,
-			amp.InstanceOperationStop,
+			ampCommandOperationStop,
 		)
 
 	case "reiniciar":
 		c.handleAMPControlCommand(
 			event,
 			data,
-			amp.InstanceOperationRestart,
+			ampCommandOperationRestart,
 		)
 
-	case "atualizar":
-		confirmation, exists := data.OptString(
-			"confirmar",
-		)
-		if !exists || confirmation != "sim" {
+	case "desligar":
+		if !ampCommandConfirmed(data) {
 			c.sendInteractionMessage(
 				event,
-				"⚠️ A atualização não foi confirmada.",
+				"⚠️ O desligamento completo da instância não foi confirmado.",
 			)
 
 			return
@@ -71,7 +87,23 @@ func (c *Client) handleAMPCommand(
 		c.handleAMPControlCommand(
 			event,
 			data,
-			amp.InstanceOperationUpdate,
+			ampCommandOperationShutdown,
+		)
+
+	case "atualizar":
+		if !ampCommandConfirmed(data) {
+			c.sendInteractionMessage(
+				event,
+				"⚠️ A atualização da instalação AMP não foi confirmada.",
+			)
+
+			return
+		}
+
+		c.handleAMPControlCommand(
+			event,
+			data,
+			ampCommandOperationUpdate,
 		)
 
 	default:
@@ -80,6 +112,16 @@ func (c *Client) handleAMPCommand(
 			"⚠️ Subcomando AMP não reconhecido.",
 		)
 	}
+}
+
+func ampCommandConfirmed(
+	data disgoDiscord.SlashCommandInteractionData,
+) bool {
+	confirmation, exists := data.OptString(
+		"confirmar",
+	)
+
+	return exists && confirmation == "sim"
 }
 
 func (c *Client) handleAMPStatusCommand(
@@ -93,9 +135,11 @@ func (c *Client) handleAMPStatusCommand(
 		context.Background(),
 		ampDiscoveryTimeout,
 	)
-	defer cancel()
 
 	instances, err := amp.DiscoverInstances(ctx)
+
+	cancel()
+
 	if err != nil {
 		c.log.Error().
 			Err(err).
@@ -109,16 +153,81 @@ func (c *Client) handleAMPStatusCommand(
 		return
 	}
 
+	statuses := c.collectAMPInstanceStatuses(
+		instances,
+	)
+
 	c.updateInteractionMessage(
 		event,
-		buildAMPStatusMessage(instances),
+		buildAMPStatusMessage(statuses),
 	)
+}
+
+func (c *Client) collectAMPInstanceStatuses(
+	instances []amp.ManagedInstance,
+) []ampInstanceStatusView {
+	statuses := make(
+		[]ampInstanceStatusView,
+		len(instances),
+	)
+
+	var waitGroup sync.WaitGroup
+
+	for index, instance := range instances {
+		statuses[index].Instance = instance
+
+		if !instance.Running {
+			continue
+		}
+
+		waitGroup.Add(1)
+
+		go func(
+			statusIndex int,
+			currentInstance amp.ManagedInstance,
+		) {
+			defer waitGroup.Done()
+
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				ampApplicationTimeout,
+			)
+			defer cancel()
+
+			status, err := c.ampClient.GetApplicationStatus(
+				ctx,
+				currentInstance.APIURL,
+			)
+			if err != nil {
+				statuses[statusIndex].ApplicationError = err
+
+				c.log.Warn().
+					Err(err).
+					Str("instance", currentInstance.Name).
+					Msg("Não foi possível consultar o estado da aplicação")
+
+				return
+			}
+
+			statusCopy := status
+
+			statuses[statusIndex].ApplicationStatus =
+				&statusCopy
+		}(
+			index,
+			instance,
+		)
+	}
+
+	waitGroup.Wait()
+
+	return statuses
 }
 
 func (c *Client) handleAMPControlCommand(
 	event *events.ApplicationCommandInteractionCreate,
 	data disgoDiscord.SlashCommandInteractionData,
-	operation amp.InstanceOperation,
+	operation ampCommandOperation,
 ) {
 	if !c.deferAMPInteraction(event) {
 		return
@@ -153,34 +262,6 @@ func (c *Client) handleAMPControlCommand(
 		return
 	}
 
-	switch operation {
-	case amp.InstanceOperationStart:
-		if instance.Running {
-			c.updateInteractionMessage(
-				event,
-				fmt.Sprintf(
-					"🟢 A instância AMP de **%s** já está ligada.",
-					ampInstanceDisplayName(instance),
-				),
-			)
-
-			return
-		}
-
-	case amp.InstanceOperationStop:
-		if !instance.Running {
-			c.updateInteractionMessage(
-				event,
-				fmt.Sprintf(
-					"⚫ A instância AMP de **%s** já está desligada.",
-					ampInstanceDisplayName(instance),
-				),
-			)
-
-			return
-		}
-	}
-
 	c.updateInteractionMessage(
 		event,
 		fmt.Sprintf(
@@ -203,7 +284,7 @@ func (c *Client) executeAMPControlOperation(
 	applicationID snowflake.ID,
 	interactionToken string,
 	instance amp.ManagedInstance,
-	operation amp.InstanceOperation,
+	operation ampCommandOperation,
 ) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
@@ -214,27 +295,28 @@ func (c *Client) executeAMPControlOperation(
 	c.log.Info().
 		Str("instance", instance.Name).
 		Str("operation", string(operation)).
-		Msg("Executando operação na instância AMP")
+		Msg("Executando operação AMP")
 
-	err := amp.ControlInstance(
+	resultMessage, err := c.performAMPControlOperation(
 		ctx,
+		instance,
 		operation,
-		instance.Name,
 	)
 	if err != nil {
 		c.log.Error().
 			Err(err).
 			Str("instance", instance.Name).
 			Str("operation", string(operation)).
-			Msg("Operação na instância AMP falhou")
+			Msg("Operação AMP falhou")
 
 		c.updateInteractionMessageByToken(
 			applicationID,
 			interactionToken,
 			fmt.Sprintf(
 				"❌ Não foi possível concluir a operação em **%s**.\n"+
-					"Consulte os logs do PalControl para mais detalhes.",
+					"Erro: `%s`",
 				ampInstanceDisplayName(instance),
+				sanitizeAMPError(err),
 			),
 		)
 
@@ -244,20 +326,370 @@ func (c *Client) executeAMPControlOperation(
 	c.log.Info().
 		Str("instance", instance.Name).
 		Str("operation", string(operation)).
-		Msg("Operação na instância AMP concluída")
+		Msg("Operação AMP concluída")
 
 	c.updateInteractionMessageByToken(
 		applicationID,
 		interactionToken,
 		fmt.Sprintf(
 			"%s\nInstância: `%s`",
-			ampOperationSuccessMessage(
-				operation,
-				ampInstanceDisplayName(instance),
-			),
+			resultMessage,
 			instance.Name,
 		),
 	)
+}
+
+func (c *Client) performAMPControlOperation(
+	ctx context.Context,
+	instance amp.ManagedInstance,
+	operation ampCommandOperation,
+) (string, error) {
+	switch operation {
+	case ampCommandOperationStart:
+		return c.startAMPApplication(
+			ctx,
+			instance,
+		)
+
+	case ampCommandOperationStop:
+		return c.stopAMPApplication(
+			ctx,
+			instance,
+		)
+
+	case ampCommandOperationRestart:
+		return c.restartAMPApplication(
+			ctx,
+			instance,
+		)
+
+	case ampCommandOperationShutdown:
+		return c.shutdownAMPInstance(
+			ctx,
+			instance,
+		)
+
+	case ampCommandOperationUpdate:
+		return c.updateAMPInstance(
+			ctx,
+			instance,
+		)
+
+	default:
+		return "", fmt.Errorf(
+			"operação AMP desconhecida: %q",
+			operation,
+		)
+	}
+}
+
+func (c *Client) startAMPApplication(
+	ctx context.Context,
+	instance amp.ManagedInstance,
+) (string, error) {
+	displayName := ampInstanceDisplayName(
+		instance,
+	)
+
+	if !instance.Running {
+		if err := amp.StartInstance(
+			ctx,
+			instance.Name,
+		); err != nil {
+			return "", fmt.Errorf(
+				"não foi possível iniciar a instância AMP: %w",
+				err,
+			)
+		}
+
+		if err := c.ampClient.StartApplicationUntilReady(
+			ctx,
+			instance.APIURL,
+			ampApplicationRetryPeriod,
+		); err != nil {
+			return "", fmt.Errorf(
+				"a instância foi iniciada, mas o jogo não pôde ser iniciado: %w",
+				err,
+			)
+		}
+
+		return fmt.Sprintf(
+			"✅ A instância AMP e o jogo de **%s** foram iniciados.",
+			displayName,
+		), nil
+	}
+
+	status, err := c.getAMPApplicationStatus(
+		ctx,
+		instance,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	switch status.Phase() {
+	case amp.ApplicationPhaseOnline:
+		return fmt.Sprintf(
+			"🟢 O jogo de **%s** já está Online.",
+			displayName,
+		), nil
+
+	case amp.ApplicationPhaseBusy:
+		return fmt.Sprintf(
+			"🔵 O jogo de **%s** já está em transição.\n"+
+				"Estado atual: `%s`",
+			displayName,
+			status.State.String(),
+		), nil
+
+	case amp.ApplicationPhaseSuspended:
+		return fmt.Sprintf(
+			"🟠 O jogo de **%s** está suspenso e não foi iniciado.",
+			displayName,
+		), nil
+	}
+
+	if err := c.ampClient.StartApplicationUntilReady(
+		ctx,
+		instance.APIURL,
+		ampApplicationRetryPeriod,
+	); err != nil {
+		return "", fmt.Errorf(
+			"não foi possível iniciar o processo do jogo: %w",
+			err,
+		)
+	}
+
+	return fmt.Sprintf(
+		"✅ O jogo de **%s** foi iniciado e saiu do modo Idle.",
+		displayName,
+	), nil
+}
+
+func (c *Client) stopAMPApplication(
+	ctx context.Context,
+	instance amp.ManagedInstance,
+) (string, error) {
+	displayName := ampInstanceDisplayName(
+		instance,
+	)
+
+	if !instance.Running {
+		return fmt.Sprintf(
+			"⚫ A instância AMP de **%s** já está Offline.",
+			displayName,
+		), nil
+	}
+
+	status, err := c.getAMPApplicationStatus(
+		ctx,
+		instance,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	switch status.Phase() {
+	case amp.ApplicationPhaseIdle:
+		return fmt.Sprintf(
+			"💤 O jogo de **%s** já está em modo Idle.",
+			displayName,
+		), nil
+
+	case amp.ApplicationPhaseBusy:
+		return fmt.Sprintf(
+			"🔵 O jogo de **%s** está em transição e não foi parado.\n"+
+				"Estado atual: `%s`",
+			displayName,
+			status.State.String(),
+		), nil
+
+	case amp.ApplicationPhaseFailed:
+		return "", fmt.Errorf(
+			"a aplicação está no estado de falha %s",
+			status.State.String(),
+		)
+
+	case amp.ApplicationPhaseSuspended:
+		return "", fmt.Errorf(
+			"a aplicação está suspensa",
+		)
+
+	case amp.ApplicationPhaseUnknown:
+		return "", fmt.Errorf(
+			"o estado da aplicação não é reconhecido: %s",
+			status.State.String(),
+		)
+	}
+
+	if err := c.ampClient.StopApplication(
+		ctx,
+		instance.APIURL,
+	); err != nil {
+		return "", fmt.Errorf(
+			"não foi possível parar o processo do jogo: %w",
+			err,
+		)
+	}
+
+	return fmt.Sprintf(
+		"💤 O processo do jogo de **%s** foi parado.\n"+
+			"A instância AMP permanece ligada em modo Idle.",
+		displayName,
+	), nil
+}
+
+func (c *Client) restartAMPApplication(
+	ctx context.Context,
+	instance amp.ManagedInstance,
+) (string, error) {
+	displayName := ampInstanceDisplayName(
+		instance,
+	)
+
+	if !instance.Running {
+		return fmt.Sprintf(
+			"⚫ A instância AMP de **%s** está Offline.\n"+
+				"Use `/amp iniciar` para ligar o servidor.",
+			displayName,
+		), nil
+	}
+
+	status, err := c.getAMPApplicationStatus(
+		ctx,
+		instance,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	switch status.Phase() {
+	case amp.ApplicationPhaseIdle:
+		return fmt.Sprintf(
+			"💤 O jogo de **%s** está em modo Idle.\n"+
+				"Use `/amp iniciar` para iniciá-lo.",
+			displayName,
+		), nil
+
+	case amp.ApplicationPhaseBusy:
+		return fmt.Sprintf(
+			"🔵 O jogo de **%s** está em transição e não foi reiniciado.\n"+
+				"Estado atual: `%s`",
+			displayName,
+			status.State.String(),
+		), nil
+
+	case amp.ApplicationPhaseFailed:
+		return "", fmt.Errorf(
+			"a aplicação está no estado de falha %s",
+			status.State.String(),
+		)
+
+	case amp.ApplicationPhaseSuspended:
+		return "", fmt.Errorf(
+			"a aplicação está suspensa",
+		)
+
+	case amp.ApplicationPhaseUnknown:
+		return "", fmt.Errorf(
+			"o estado da aplicação não é reconhecido: %s",
+			status.State.String(),
+		)
+	}
+
+	if err := c.ampClient.RestartApplication(
+		ctx,
+		instance.APIURL,
+	); err != nil {
+		return "", fmt.Errorf(
+			"não foi possível reiniciar o processo do jogo: %w",
+			err,
+		)
+	}
+
+	return fmt.Sprintf(
+		"✅ O processo do jogo de **%s** foi reiniciado.",
+		displayName,
+	), nil
+}
+
+func (c *Client) shutdownAMPInstance(
+	ctx context.Context,
+	instance amp.ManagedInstance,
+) (string, error) {
+	displayName := ampInstanceDisplayName(
+		instance,
+	)
+
+	if !instance.Running {
+		return fmt.Sprintf(
+			"⚫ A instância AMP de **%s** já está Offline.",
+			displayName,
+		), nil
+	}
+
+	if err := amp.StopInstance(
+		ctx,
+		instance.Name,
+	); err != nil {
+		return "", fmt.Errorf(
+			"não foi possível desligar a instância AMP: %w",
+			err,
+		)
+	}
+
+	return fmt.Sprintf(
+		"⚫ A instância AMP de **%s** foi desligada completamente.",
+		displayName,
+	), nil
+}
+
+func (c *Client) updateAMPInstance(
+	ctx context.Context,
+	instance amp.ManagedInstance,
+) (string, error) {
+	displayName := ampInstanceDisplayName(
+		instance,
+	)
+
+	if err := amp.UpdateInstance(
+		ctx,
+		instance.Name,
+	); err != nil {
+		return "", fmt.Errorf(
+			"não foi possível atualizar a instalação AMP: %w",
+			err,
+		)
+	}
+
+	return fmt.Sprintf(
+		"✅ A instalação AMP de **%s** foi atualizada.",
+		displayName,
+	), nil
+}
+
+func (c *Client) getAMPApplicationStatus(
+	ctx context.Context,
+	instance amp.ManagedInstance,
+) (amp.ApplicationStatus, error) {
+	statusCtx, statusCancel := context.WithTimeout(
+		ctx,
+		ampApplicationTimeout,
+	)
+	defer statusCancel()
+
+	status, err := c.ampClient.GetApplicationStatus(
+		statusCtx,
+		instance.APIURL,
+	)
+	if err != nil {
+		return amp.ApplicationStatus{}, fmt.Errorf(
+			"não foi possível consultar o estado do jogo: %w",
+			err,
+		)
+	}
+
+	return status, nil
 }
 
 func (c *Client) resolveAMPInstance(
@@ -277,7 +709,9 @@ func (c *Client) resolveAMPInstance(
 		)
 	}
 
-	instanceName = strings.TrimSpace(instanceName)
+	instanceName = strings.TrimSpace(
+		instanceName,
+	)
 
 	for _, instance := range instances {
 		if instance.Name == instanceName {
@@ -307,15 +741,15 @@ func (c *Client) deferAMPInteraction(
 }
 
 func buildAMPStatusMessage(
-	instances []amp.ManagedInstance,
+	statuses []ampInstanceStatusView,
 ) string {
 	var message strings.Builder
 
 	message.WriteString(
-		"🖥️ **PalControl — Instâncias AMP**\n\n",
+		"🖥️ **PalControl — Estado dos servidores**\n\n",
 	)
 
-	if len(instances) == 0 {
+	if len(statuses) == 0 {
 		message.WriteString(
 			"Nenhuma instância controlável foi encontrada.",
 		)
@@ -323,32 +757,70 @@ func buildAMPStatusMessage(
 		return message.String()
 	}
 
-	for _, instance := range instances {
-		statusIcon := "⚫"
-		statusText := "Desligada"
-
-		if instance.Running {
-			statusIcon = "🟢"
-			statusText = "Ligada"
-		}
+	for _, statusView := range statuses {
+		icon, statusText := describeAMPInstanceStatus(
+			statusView,
+		)
 
 		_, _ = fmt.Fprintf(
 			&message,
-			"%s **%s**\n"+
-				"Estado da instância: **%s**\n"+
-				"Nome: `%s`\n"+
-				"Módulo: `%s`\n\n",
-			statusIcon,
-			ampInstanceDisplayName(instance),
+			"%s **%s** — **%s**\n"+
+				"`%s` • `%s`\n\n",
+			icon,
+			ampInstanceDisplayName(statusView.Instance),
 			statusText,
-			instance.Name,
-			instance.Module,
+			statusView.Instance.Name,
+			statusView.Instance.Module,
 		)
 	}
 
 	return strings.TrimSpace(
 		message.String(),
 	)
+}
+
+func describeAMPInstanceStatus(
+	statusView ampInstanceStatusView,
+) (string, string) {
+	if !statusView.Instance.Running {
+		return "⚫", "Offline"
+	}
+
+	if statusView.ApplicationError != nil {
+		return "🟠", "Instância ligada; estado do jogo indisponível"
+	}
+
+	if statusView.ApplicationStatus == nil {
+		return "🟠", "Estado do jogo indisponível"
+	}
+
+	status := *statusView.ApplicationStatus
+
+	switch status.Phase() {
+	case amp.ApplicationPhaseIdle:
+		return "💤", "Idle"
+
+	case amp.ApplicationPhaseOnline:
+		return "🟢", "Online"
+
+	case amp.ApplicationPhaseBusy:
+		return "🔵", fmt.Sprintf(
+			"Em transição — %s",
+			status.State.String(),
+		)
+
+	case amp.ApplicationPhaseFailed:
+		return "🔴", "Falha"
+
+	case amp.ApplicationPhaseSuspended:
+		return "🟠", "Suspenso"
+
+	default:
+		return "⚪", fmt.Sprintf(
+			"Desconhecido — %s",
+			status.State.String(),
+		)
+	}
 }
 
 func ampInstanceDisplayName(
@@ -366,59 +838,45 @@ func ampInstanceDisplayName(
 }
 
 func ampOperationProgressMessage(
-	operation amp.InstanceOperation,
+	operation ampCommandOperation,
 ) string {
 	switch operation {
-	case amp.InstanceOperationStart:
-		return "⏳ Iniciando a instância AMP de"
+	case ampCommandOperationStart:
+		return "⏳ Iniciando"
 
-	case amp.InstanceOperationStop:
-		return "⏳ Parando a instância AMP de"
+	case ampCommandOperationStop:
+		return "⏳ Colocando em modo Idle"
 
-	case amp.InstanceOperationRestart:
-		return "🔄 Reiniciando a instância AMP de"
+	case ampCommandOperationRestart:
+		return "🔄 Reiniciando o processo do jogo de"
 
-	case amp.InstanceOperationUpdate:
+	case ampCommandOperationShutdown:
+		return "⚫ Desligando completamente a instância AMP de"
+
+	case ampCommandOperationUpdate:
 		return "⬆️ Atualizando a instalação AMP de"
 
 	default:
-		return "⏳ Executando uma operação na instância AMP de"
+		return "⏳ Executando uma operação em"
 	}
 }
 
-func ampOperationSuccessMessage(
-	operation amp.InstanceOperation,
-	displayName string,
+func sanitizeAMPError(
+	err error,
 ) string {
-	switch operation {
-	case amp.InstanceOperationStart:
-		return fmt.Sprintf(
-			"✅ A instância AMP de **%s** foi iniciada.",
-			displayName,
-		)
+	message := strings.TrimSpace(
+		err.Error(),
+	)
 
-	case amp.InstanceOperationStop:
-		return fmt.Sprintf(
-			"✅ A instância AMP de **%s** foi parada.",
-			displayName,
-		)
+	message = strings.ReplaceAll(
+		message,
+		"`",
+		"'",
+	)
 
-	case amp.InstanceOperationRestart:
-		return fmt.Sprintf(
-			"✅ A instância AMP de **%s** foi reiniciada.",
-			displayName,
-		)
-
-	case amp.InstanceOperationUpdate:
-		return fmt.Sprintf(
-			"✅ A instalação AMP de **%s** foi atualizada.",
-			displayName,
-		)
-
-	default:
-		return fmt.Sprintf(
-			"✅ A operação em **%s** foi concluída.",
-			displayName,
-		)
+	if len(message) > 900 {
+		message = message[:900]
 	}
+
+	return message
 }

@@ -110,53 +110,46 @@ func buildAMPCommand(
 ) discord.SlashCommandCreate {
 	return discord.SlashCommandCreate{
 		Name:        "amp",
-		Description: "Controla todas as instâncias de servidores no AMP",
+		Description: "Controla os jogos e as instâncias do AMP",
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionSubCommand{
 				Name:        "status",
-				Description: "Mostra o estado de todas as instâncias AMP",
+				Description: "Mostra os estados Offline, Idle e Online",
 			},
 			buildAMPControlSubCommand(
 				"iniciar",
-				"Inicia uma instância AMP desligada",
-				"Instância AMP que será iniciada",
+				"Inicia a instância e o processo do jogo",
+				"Servidor que será iniciado",
 				instanceChoices,
 			),
 			buildAMPControlSubCommand(
 				"parar",
-				"Para completamente uma instância AMP",
-				"Instância AMP que será parada",
+				"Para somente o jogo e mantém a instância em Idle",
+				"Servidor que será colocado em Idle",
 				instanceChoices,
 			),
 			buildAMPControlSubCommand(
 				"reiniciar",
-				"Reinicia uma instância AMP",
-				"Instância AMP que será reiniciada",
+				"Reinicia somente o processo do jogo",
+				"Jogo que será reiniciado",
 				instanceChoices,
 			),
-			discord.ApplicationCommandOptionSubCommand{
-				Name:        "atualizar",
-				Description: "Atualiza a instalação AMP de uma instância",
-				Options: []discord.ApplicationCommandOption{
-					discord.ApplicationCommandOptionString{
-						Name:        "servidor",
-						Description: "Instância AMP que será atualizada",
-						Required:    true,
-						Choices:     instanceChoices,
-					},
-					discord.ApplicationCommandOptionString{
-						Name:        "confirmar",
-						Description: "Confirma a atualização da instância selecionada",
-						Required:    true,
-						Choices: []discord.ApplicationCommandOptionChoiceString{
-							{
-								Name:  "Sim, atualizar esta instância",
-								Value: "sim",
-							},
-						},
-					},
-				},
-			},
+			buildAMPConfirmedControlSubCommand(
+				"desligar",
+				"Desliga completamente uma instância AMP",
+				"Instância AMP que será desligada",
+				"Confirma o desligamento completo da instância",
+				"Sim, desligar completamente",
+				instanceChoices,
+			),
+			buildAMPConfirmedControlSubCommand(
+				"atualizar",
+				"Atualiza somente a instalação AMP da instância",
+				"Instância AMP que será atualizada",
+				"Confirma a atualização da instalação AMP",
+				"Sim, atualizar a instalação AMP",
+				instanceChoices,
+			),
 		},
 	}
 }
@@ -176,6 +169,39 @@ func buildAMPControlSubCommand(
 				Description: optionDescription,
 				Required:    true,
 				Choices:     instanceChoices,
+			},
+		},
+	}
+}
+
+func buildAMPConfirmedControlSubCommand(
+	name string,
+	description string,
+	optionDescription string,
+	confirmationDescription string,
+	confirmationChoiceName string,
+	instanceChoices []discord.ApplicationCommandOptionChoiceString,
+) discord.ApplicationCommandOptionSubCommand {
+	return discord.ApplicationCommandOptionSubCommand{
+		Name:        name,
+		Description: description,
+		Options: []discord.ApplicationCommandOption{
+			discord.ApplicationCommandOptionString{
+				Name:        "servidor",
+				Description: optionDescription,
+				Required:    true,
+				Choices:     instanceChoices,
+			},
+			discord.ApplicationCommandOptionString{
+				Name:        "confirmar",
+				Description: confirmationDescription,
+				Required:    true,
+				Choices: []discord.ApplicationCommandOptionChoiceString{
+					{
+						Name:  confirmationChoiceName,
+						Value: "sim",
+					},
+				},
 			},
 		},
 	}
