@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alabamaamp/palcontrol/internal/amp"
-	"github.com/alabamaamp/palcontrol/internal/config"
-	discordClient "github.com/alabamaamp/palcontrol/internal/discord"
-	"github.com/alabamaamp/palcontrol/internal/idle"
-	"github.com/alabamaamp/palcontrol/internal/logger"
-	"github.com/alabamaamp/palcontrol/internal/operation"
+	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/alabamaamp/ampcontrol/internal/config"
+	discordClient "github.com/alabamaamp/ampcontrol/internal/discord"
+	"github.com/alabamaamp/ampcontrol/internal/idle"
+	"github.com/alabamaamp/ampcontrol/internal/logger"
+	"github.com/alabamaamp/ampcontrol/internal/operation"
 )
 
 type App struct {

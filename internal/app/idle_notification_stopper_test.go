@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alabamaamp/palcontrol/internal/idle"
+	"github.com/alabamaamp/ampcontrol/internal/idle"
 	"github.com/rs/zerolog"
 )
 

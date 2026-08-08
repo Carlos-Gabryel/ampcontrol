@@ -3,7 +3,7 @@ package discord
 import (
 	"fmt"
 
-	"github.com/alabamaamp/palcontrol/internal/operation"
+	"github.com/alabamaamp/ampcontrol/internal/operation"
 )
 
 // acquireAMPCommandOperation tenta reservar uma instância exclusivamente

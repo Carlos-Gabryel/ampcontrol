@@ -85,7 +85,7 @@ func NewDetectorRegistry(
 	return registry, nil
 }
 
-// NewDefaultDetectorRegistry cria o registro usado pelo PalControl.
+// NewDefaultDetectorRegistry cria o registro usado pelo AmpControl.
 //
 // Inicialmente somente o detector Palworld RCON está disponível.
 // Os demais serão adicionados gradualmente.

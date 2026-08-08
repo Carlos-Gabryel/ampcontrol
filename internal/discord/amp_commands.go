@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alabamaamp/palcontrol/internal/amp"
+	"github.com/alabamaamp/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
@@ -839,7 +839,7 @@ func buildAMPStatusMessage(
 	var message strings.Builder
 
 	message.WriteString(
-		"🖥️ **PalControl — Estado dos servidores**\n\n",
+		"🖥️ **AmpControl — Estado dos servidores**\n\n",
 	)
 
 	if len(statuses) == 0 {

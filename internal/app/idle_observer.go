@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alabamaamp/palcontrol/internal/amp"
-	"github.com/alabamaamp/palcontrol/internal/idle"
-	"github.com/alabamaamp/palcontrol/internal/operation"
+	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/alabamaamp/ampcontrol/internal/idle"
+	"github.com/alabamaamp/ampcontrol/internal/operation"
 	"github.com/rs/zerolog"
 )
 

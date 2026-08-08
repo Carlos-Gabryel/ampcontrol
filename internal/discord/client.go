@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alabamaamp/palcontrol/internal/amp"
+	"github.com/alabamaamp/ampcontrol/internal/amp"
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"

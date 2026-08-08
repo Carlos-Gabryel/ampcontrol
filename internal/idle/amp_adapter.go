@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alabamaamp/palcontrol/internal/amp"
+	"github.com/alabamaamp/ampcontrol/internal/amp"
 )
 
 const ampDiscoveryCacheTTL = 5 * time.Second

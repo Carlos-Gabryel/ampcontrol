@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alabamaamp/palcontrol/internal/rcon"
+	"github.com/alabamaamp/ampcontrol/internal/rcon"
 )
 
 type rconPlayerCountFunc func(

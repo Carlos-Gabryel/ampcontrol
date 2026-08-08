@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/alabamaamp/palcontrol/internal/app"
+	"github.com/alabamaamp/ampcontrol/internal/app"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alabamaamp/palcontrol/internal/amp"
+	"github.com/alabamaamp/ampcontrol/internal/amp"
 )
 
 func TestAMPAdapterCachesDiscoveryAcrossRuntimeStateCalls(

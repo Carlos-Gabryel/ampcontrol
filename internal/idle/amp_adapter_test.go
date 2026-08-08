@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alabamaamp/palcontrol/internal/amp"
+	"github.com/alabamaamp/ampcontrol/internal/amp"
 )
 
 type fakeAMPApplicationClient struct {

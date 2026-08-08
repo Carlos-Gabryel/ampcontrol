@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alabamaamp/palcontrol/internal/operation"
+	"github.com/alabamaamp/ampcontrol/internal/operation"
 )
 
 func TestSetOperationManagerRejectsNilClient(
