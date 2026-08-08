@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const palcontrolAMPWrapperPath = "/usr/local/bin/palcontrol-amp"
+const ampcontrolAMPWrapperPath = "/usr/local/bin/ampcontrol-amp"
 
 type ManagedInstance struct {
 	ID           string
@@ -22,7 +22,7 @@ type ManagedInstance struct {
 }
 
 // DiscoverInstances consulta o AMP e retorna todas as instâncias
-// que podem ser administradas pelo PalControl.
+// que podem ser administradas pelo AmpControl.
 //
 // A instância ADS01 e qualquer módulo ADS são excluídos.
 func DiscoverInstances(
@@ -34,7 +34,7 @@ func DiscoverInstances(
 		"-n",
 		"-u",
 		ampSystemUser,
-		palcontrolAMPWrapperPath,
+		ampcontrolAMPWrapperPath,
 		"list",
 	)
 

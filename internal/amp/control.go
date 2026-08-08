@@ -20,7 +20,7 @@ const (
 // ControlInstance executa uma operação permitida sobre uma instância AMP.
 //
 // A validação definitiva do nome da instância e a proteção do ADS01
-// também são aplicadas pelo wrapper /usr/local/bin/palcontrol-amp.
+// também são aplicadas pelo wrapper /usr/local/bin/ampcontrol-amp.
 func ControlInstance(
 	ctx context.Context,
 	operation InstanceOperation,
@@ -47,7 +47,7 @@ func ControlInstance(
 		"-n",
 		"-u",
 		ampSystemUser,
-		palcontrolAMPWrapperPath,
+		ampcontrolAMPWrapperPath,
 		string(operation),
 		instanceName,
 	)
