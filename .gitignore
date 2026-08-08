@@ -8,5 +8,4 @@ data/
 *.so
 *.dylib
 
-/palcontrol
 /ampcontrol
