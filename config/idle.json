@@ -19,7 +19,7 @@
       "instance": "KalagaPal01",
       "display_name": "Kalaga",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "palworld_rcon",
       "idle_timeout_minutes": 15,
       "startup_grace_minutes": 5,
