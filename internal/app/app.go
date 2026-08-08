@@ -45,29 +45,10 @@ func New() (*App, error) {
 		)
 	}
 
-	activeServers := idleConfig.ActiveServers()
-
-	legacyIdleTransferredInstances := make(
-		[]string,
-		0,
-		len(activeServers),
-	)
-
-	for _, server := range activeServers {
-		legacyIdleTransferredInstances = append(
-			legacyIdleTransferredInstances,
-			server.Instance,
-		)
-	}
-
 	discord, err := discordClient.New(
 		cfg.DiscordToken,
 		ampAPIClient,
-		cfg.AlamamaRCONPassword,
-		cfg.KalagaRCONPassword,
 		cfg.DiscordNotificationChannelID,
-		cfg.IdleTimeout,
-		legacyIdleTransferredInstances,
 		log,
 	)
 	if err != nil {

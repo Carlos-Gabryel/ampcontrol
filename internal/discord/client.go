@@ -3,7 +3,6 @@ package discord
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/alabamaamp/palcontrol/internal/amp"
 	"github.com/disgoorg/disgo"
@@ -16,33 +15,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type managedServer struct {
-	DisplayName  string
-	APIURL       string
-	RCONAddress  string
-	RCONPassword string
-	Instance     amp.Instance
-}
-
 type Client struct {
 	bot                   *bot.Client
 	ampClient             *amp.APIClient
 	interactions          rest.Interactions
 	channels              rest.Channels
 	notificationChannelID snowflake.ID
-	managedServers        []managedServer
-	idleTimeout           time.Duration
 	log                   zerolog.Logger
 }
 
 func New(
 	token string,
 	ampClient *amp.APIClient,
-	alamamaRCONPassword string,
-	kalagaRCONPassword string,
 	notificationChannelID string,
-	idleTimeout time.Duration,
-	legacyIdleTransferredInstances []string,
 	log zerolog.Logger,
 ) (*Client, error) {
 	disgoClient, err := disgo.New(
@@ -67,68 +52,13 @@ func New(
 		discord.AllowedMentions{},
 	)
 
-	allManagedServers := []managedServer{
-		{
-			DisplayName:  "Alamama",
-			APIURL:       "http://127.0.0.1:8090",
-			RCONAddress:  "127.0.0.1:25575",
-			RCONPassword: alamamaRCONPassword,
-			Instance: amp.Instance{
-				Name:     "AlamamaPal01",
-				GamePort: 8211,
-			},
-		},
-		{
-			DisplayName:  "Kalaga",
-			APIURL:       "http://127.0.0.1:8088",
-			RCONAddress:  "127.0.0.1:25576",
-			RCONPassword: kalagaRCONPassword,
-			Instance: amp.Instance{
-				Name:     "KalagaPal01",
-				GamePort: 8212,
-			},
-		},
-	}
-
-	legacyManagedServers, transferredServers :=
-		partitionLegacyIdleServers(
-			allManagedServers,
-			legacyIdleTransferredInstances,
-		)
-
 	client := &Client{
 		bot:                   disgoClient,
 		ampClient:             ampClient,
 		interactions:          interactions,
 		channels:              channels,
 		notificationChannelID: snowflake.MustParse(notificationChannelID),
-		idleTimeout:           idleTimeout,
 		log:                   log,
-		managedServers:        legacyManagedServers,
-	}
-
-	client.log.Info().
-		Int(
-			"managed_servers",
-			len(legacyManagedServers),
-		).
-		Int(
-			"transferred_servers",
-			len(transferredServers),
-		).
-		Msg("Autoridade do monitor Idle antigo configurada")
-
-	for _, server := range transferredServers {
-		client.log.Info().
-			Str(
-				"server",
-				server.Instance.Name,
-			).
-			Str(
-				"display_name",
-				server.DisplayName,
-			).
-			Msg("Monitor Idle antigo cedeu autoridade ao motor genérico")
 	}
 
 	disgoClient.AddEventListeners(
@@ -171,23 +101,6 @@ func (c *Client) handleReadyEvent(
 
 	c.log.Info().
 		Msg("Comandos Discord registrados")
-}
-
-func (c *Client) serverInstances() []amp.Instance {
-	instances := make(
-		[]amp.Instance,
-		0,
-		len(c.managedServers),
-	)
-
-	for _, server := range c.managedServers {
-		instances = append(
-			instances,
-			server.Instance,
-		)
-	}
-
-	return instances
 }
 
 func (c *Client) sendInteractionMessage(
@@ -275,8 +188,6 @@ func (c *Client) Start(
 	if err := c.bot.OpenGateway(ctx); err != nil {
 		return err
 	}
-
-	go c.runIdleMonitor(ctx)
 
 	return nil
 }
