@@ -109,20 +109,32 @@ func newIdleObserver(
 		)
 	}
 
-	detectors, err := idle.NewDefaultDetectorRegistry()
-	if err != nil {
-		return nil, fmt.Errorf(
-			"não foi possível criar o registro de detectores do observador de Idle: %w",
-			err,
-		)
-	}
-
 	ampAdapter, err := idle.NewAMPAdapter(
 		ampClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"não foi possível criar o adaptador AMP do observador de Idle: %w",
+			err,
+		)
+	}
+
+	ampPlayersDetector, err := idle.NewAMPPlayersDetector(
+		ampAdapter,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"não foi possível criar o detector de jogadores da API AMP: %w",
+			err,
+		)
+	}
+
+	detectors, err := idle.NewDefaultDetectorRegistry(
+		ampPlayersDetector,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"não foi possível criar o registro de detectores do observador de Idle: %w",
 			err,
 		)
 	}

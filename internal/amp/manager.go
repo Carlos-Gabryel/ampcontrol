@@ -17,6 +17,7 @@ type ManagedInstance struct {
 	Name         string
 	FriendlyName string
 	Module       string
+	Game         string
 	APIURL       string
 	Running      bool
 }

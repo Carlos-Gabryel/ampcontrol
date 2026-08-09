@@ -87,15 +87,21 @@ func NewDetectorRegistry(
 
 // NewDefaultDetectorRegistry cria o registro usado pelo AmpControl.
 //
-// Inicialmente somente o detector Palworld RCON está disponível.
-// Os demais serão adicionados gradualmente.
-func NewDefaultDetectorRegistry() (
+// O registro sempre inclui Palworld RCON e recebe detectores que dependem
+// de serviços construídos em tempo de execução, como a API do AMP.
+func NewDefaultDetectorRegistry(
+	additional ...PlayerDetector,
+) (
 	*DetectorRegistry,
 	error,
 ) {
-	return NewDetectorRegistry(
+	detectors := []PlayerDetector{
 		NewPalworldRCONDetector(),
-	)
+	}
+
+	detectors = append(detectors, additional...)
+
+	return NewDetectorRegistry(detectors...)
 }
 
 // Supports informa se existe um detector registrado para o tipo.
@@ -167,6 +173,62 @@ func (r *DetectorRegistry) PlayerCount(
 			instance,
 		)
 	}
+
+	playerCount, err := r.playerCountForDetector(
+		ctx,
+		server,
+		detectorType,
+	)
+
+	fallbackType := Detector(
+		strings.TrimSpace(string(server.FallbackDetector)),
+	)
+
+	// A API do AMP é a fonte principal. Quando ela falha, o detector
+	// específico assume. Quando a API informa zero, o fallback confirma
+	// esse zero antes que o cronômetro de Idle avance.
+	if fallbackType != "" &&
+		(err != nil || playerCount == 0) {
+		fallbackCount, fallbackErr := r.playerCountForDetector(
+			ctx,
+			server,
+			fallbackType,
+		)
+		if fallbackErr != nil {
+			if err != nil {
+				return 0, fmt.Errorf(
+					"detector primário %q falhou (%v) e o fallback %q também falhou: %w",
+					detectorType,
+					err,
+					fallbackType,
+					fallbackErr,
+				)
+			}
+
+			return 0, fmt.Errorf(
+				"o detector %q informou zero, mas o fallback %q não pôde confirmar: %w",
+				detectorType,
+				fallbackType,
+				fallbackErr,
+			)
+		}
+
+		return fallbackCount, nil
+	}
+
+	if err != nil {
+		return 0, err
+	}
+
+	return playerCount, nil
+}
+
+func (r *DetectorRegistry) playerCountForDetector(
+	ctx context.Context,
+	server Server,
+	detectorType Detector,
+) (int, error) {
+	instance := strings.TrimSpace(server.Instance)
 
 	detector, exists := r.detectors[detectorType]
 	if !exists {

@@ -3,6 +3,8 @@ package discord
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
 	"github.com/disgoorg/disgo"
@@ -21,13 +23,29 @@ type Client struct {
 	interactions          rest.Interactions
 	channels              rest.Channels
 	notificationChannelID snowflake.ID
+	notificationTTL       time.Duration
+	statusRefreshInterval time.Duration
+	adsURL                string
+	statusStatePath       string
+	statusRefreshRequests chan struct{}
+	statusRefreshMu       sync.Mutex
+	gameOverrides         map[string]string
 	log                   zerolog.Logger
+}
+
+type ClientConfig struct {
+	NotificationChannelID string
+	NotificationTTL       time.Duration
+	StatusRefreshInterval time.Duration
+	ADSURL                string
+	StatusStatePath       string
+	GameOverrides         map[string]string
 }
 
 func New(
 	token string,
 	ampClient *amp.APIClient,
-	notificationChannelID string,
+	config ClientConfig,
 	log zerolog.Logger,
 ) (*Client, error) {
 	disgoClient, err := disgo.New(
@@ -57,7 +75,13 @@ func New(
 		ampClient:             ampClient,
 		interactions:          interactions,
 		channels:              channels,
-		notificationChannelID: snowflake.MustParse(notificationChannelID),
+		notificationChannelID: snowflake.MustParse(config.NotificationChannelID),
+		notificationTTL:       config.NotificationTTL,
+		statusRefreshInterval: config.StatusRefreshInterval,
+		adsURL:                config.ADSURL,
+		statusStatePath:       config.StatusStatePath,
+		statusRefreshRequests: make(chan struct{}, 1),
+		gameOverrides:         copyStringMap(config.GameOverrides),
 		log:                   log,
 	}
 
@@ -70,6 +94,14 @@ func New(
 	)
 
 	return client, nil
+}
+
+func copyStringMap(source map[string]string) map[string]string {
+	result := make(map[string]string, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+	return result
 }
 
 func (c *Client) handleReadyEvent(
@@ -108,7 +140,8 @@ func (c *Client) sendInteractionMessage(
 	content string,
 ) {
 	message := discord.NewMessageCreate().
-		WithContent(content)
+		WithContent(content).
+		WithEphemeral(true)
 
 	err := event.CreateMessage(message)
 	if err != nil {
@@ -165,7 +198,7 @@ func (c *Client) sendChannelMessage(
 	message := discord.NewMessageCreate().
 		WithContent(content)
 
-	_, err := c.channels.CreateMessage(
+	created, err := c.channels.CreateMessage(
 		c.notificationChannelID,
 		message,
 	)
@@ -174,6 +207,20 @@ func (c *Client) sendChannelMessage(
 			"não foi possível enviar mensagem ao canal: %w",
 			err,
 		)
+	}
+
+	if c.notificationTTL > 0 {
+		time.AfterFunc(c.notificationTTL, func() {
+			if err := c.channels.DeleteMessage(
+				c.notificationChannelID,
+				created.ID,
+			); err != nil && !isDiscordNotFound(err) {
+				c.log.Warn().
+					Err(err).
+					Str("message_id", created.ID.String()).
+					Msg("Não foi possível apagar uma notificação temporária do AmpControl")
+			}
+		})
 	}
 
 	return nil
@@ -188,6 +235,8 @@ func (c *Client) Start(
 	if err := c.bot.OpenGateway(ctx); err != nil {
 		return err
 	}
+
+	go c.runStatusDashboard(ctx)
 
 	return nil
 }

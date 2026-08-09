@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
 	"github.com/alabamaamp/ampcontrol/internal/config"
@@ -45,10 +46,24 @@ func New() (*App, error) {
 		)
 	}
 
+	gameOverrides := make(map[string]string)
+	for _, server := range idleConfig.Servers {
+		if game := strings.TrimSpace(server.Game); game != "" {
+			gameOverrides[server.Instance] = game
+		}
+	}
+
 	discord, err := discordClient.New(
 		cfg.DiscordToken,
 		ampAPIClient,
-		cfg.DiscordNotificationChannelID,
+		discordClient.ClientConfig{
+			NotificationChannelID: cfg.DiscordNotificationChannelID,
+			NotificationTTL:       cfg.DiscordNotificationTTL,
+			StatusRefreshInterval: cfg.DiscordStatusRefreshInterval,
+			ADSURL:                cfg.AMPADSURL,
+			StatusStatePath:       "data/discord_status.json",
+			GameOverrides:         gameOverrides,
+		},
 		log,
 	)
 	if err != nil {

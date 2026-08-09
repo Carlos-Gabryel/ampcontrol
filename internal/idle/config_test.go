@@ -383,11 +383,35 @@ func TestProjectIdleConfigLoads(
 
 	enabled := config.EnabledServers()
 
-	if len(enabled) != 2 {
+	if len(enabled) != 11 {
 		t.Fatalf(
-			"eram esperados 2 servidores inicialmente habilitados, mas foram encontrados %d",
+			"eram esperados 11 servidores habilitados, mas foram encontrados %d",
 			len(enabled),
 		)
+	}
+
+	active := config.ActiveServers()
+	if len(active) != 2 {
+		t.Fatalf(
+			"eram esperados 2 servidores ativos, mas foram encontrados %d",
+			len(active),
+		)
+	}
+
+	alamama, exists := config.FindServer("AlamamaPal01")
+	if !exists {
+		t.Fatal("AlamamaPal01 não foi encontrada")
+	}
+	if alamama.Detector != DetectorAMPPlayers ||
+		alamama.FallbackDetector != DetectorPalworldRCON {
+		t.Fatalf(
+			"cadeia de detectores inesperada: primário=%q fallback=%q",
+			alamama.Detector,
+			alamama.FallbackDetector,
+		)
+	}
+	if alamama.Game != "Palworld" {
+		t.Fatalf("jogo inesperado: %q", alamama.Game)
 	}
 }
 

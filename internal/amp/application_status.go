@@ -41,8 +41,9 @@ const (
 )
 
 type ApplicationStatus struct {
-	State  ApplicationState `json:"State"`
-	Uptime string           `json:"Uptime"`
+	State   ApplicationState        `json:"State"`
+	Uptime  string                  `json:"Uptime"`
+	Metrics map[string]StatusMetric `json:"Metrics"`
 }
 
 // Phase retorna uma classificação simplificada do estado atual

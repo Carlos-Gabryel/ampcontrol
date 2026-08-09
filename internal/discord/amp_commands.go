@@ -34,6 +34,8 @@ type ampInstanceStatusView struct {
 	Instance          amp.ManagedInstance
 	ApplicationStatus *amp.ApplicationStatus
 	ApplicationError  error
+	PlayerCounts      *amp.PlayerCounts
+	PlayerError       error
 }
 
 func (c *Client) handleAMPCommand(
@@ -44,6 +46,16 @@ func (c *Client) handleAMPCommand(
 		c.sendInteractionMessage(
 			event,
 			"⚠️ Nenhum subcomando foi informado.",
+		)
+
+		return
+	}
+
+	if *data.SubCommandName != "status" &&
+		!ampCommandAuthorized(event.Member()) {
+		c.sendInteractionMessage(
+			event,
+			"⛔ Apenas administradores podem controlar as instâncias AMP.",
 		)
 
 		return
@@ -114,6 +126,15 @@ func (c *Client) handleAMPCommand(
 	}
 }
 
+func ampCommandAuthorized(
+	member *disgoDiscord.ResolvedMember,
+) bool {
+	return member != nil &&
+		member.Permissions.Has(
+			disgoDiscord.PermissionAdministrator,
+		)
+}
+
 func ampCommandConfirmed(
 	data disgoDiscord.SlashCommandInteractionData,
 ) bool {
@@ -136,7 +157,7 @@ func (c *Client) handleAMPStatusCommand(
 		ampDiscoveryTimeout,
 	)
 
-	instances, err := amp.DiscoverInstances(ctx)
+	instances, err := c.discoverAMPInstances(ctx)
 
 	cancel()
 
@@ -188,6 +209,25 @@ func (c *Client) collectAMPInstanceStatuses(
 		) {
 			defer waitGroup.Done()
 
+			if strings.TrimSpace(currentInstance.Game) == "" ||
+				strings.EqualFold(currentInstance.Game, "GenericModule") {
+				moduleCtx, moduleCancel := context.WithTimeout(
+					context.Background(),
+					ampApplicationTimeout,
+				)
+				moduleInfo, moduleErr := c.ampClient.GetModuleInfo(
+					moduleCtx,
+					currentInstance.APIURL,
+				)
+				moduleCancel()
+
+				if moduleErr == nil &&
+					strings.TrimSpace(moduleInfo.Application) != "" {
+					statuses[statusIndex].Instance.Game =
+						moduleInfo.Application
+				}
+			}
+
 			ctx, cancel := context.WithTimeout(
 				context.Background(),
 				ampApplicationTimeout,
@@ -213,6 +253,15 @@ func (c *Client) collectAMPInstanceStatuses(
 
 			statuses[statusIndex].ApplicationStatus =
 				&statusCopy
+
+			counts, countsErr := status.PlayerCounts()
+			if countsErr != nil {
+				statuses[statusIndex].PlayerError = countsErr
+				return
+			}
+
+			countsCopy := counts
+			statuses[statusIndex].PlayerCounts = &countsCopy
 		}(
 			index,
 			instance,
@@ -286,6 +335,8 @@ func (c *Client) executeAMPControlOperation(
 	instance amp.ManagedInstance,
 	commandOperation ampCommandOperation,
 ) {
+	defer c.requestStatusRefresh()
+
 	lease, activeOperation, err :=
 		c.acquireAMPCommandOperation(
 			instance.Name,
@@ -794,7 +845,7 @@ func (c *Client) resolveAMPInstance(
 	)
 	defer cancel()
 
-	instances, err := amp.DiscoverInstances(ctx)
+	instances, err := c.discoverAMPInstances(ctx)
 	if err != nil {
 		return amp.ManagedInstance{}, fmt.Errorf(
 			"não foi possível atualizar a lista de instâncias: %w",
@@ -821,7 +872,7 @@ func (c *Client) resolveAMPInstance(
 func (c *Client) deferAMPInteraction(
 	event *events.ApplicationCommandInteractionCreate,
 ) bool {
-	err := event.DeferCreateMessage(false)
+	err := event.DeferCreateMessage(true)
 	if err != nil {
 		c.log.Error().
 			Err(err).
@@ -855,15 +906,44 @@ func buildAMPStatusMessage(
 			statusView,
 		)
 
+		game := strings.TrimSpace(statusView.Instance.Game)
+		if game == "" {
+			game = strings.TrimSpace(statusView.Instance.Module)
+		}
+		if game == "" {
+			game = "Desconhecido"
+		}
+
+		uptime := "0 min"
+		if statusView.ApplicationStatus != nil {
+			uptime = formatAMPUptime(
+				statusView.ApplicationStatus.Uptime,
+			)
+		}
+
+		players := "?/?"
+		if statusView.PlayerCounts != nil {
+			players = fmt.Sprintf(
+				"%d/%d",
+				statusView.PlayerCounts.Current,
+				statusView.PlayerCounts.Maximum,
+			)
+		} else if !statusView.Instance.Running {
+			players = "0/?"
+		}
+
 		_, _ = fmt.Fprintf(
 			&message,
 			"%s **%s** — **%s**\n"+
-				"`%s` • `%s`\n\n",
+				"> Jogo: `%s`\n"+
+				"> Tempo online: `%s`\n"+
+				"> Jogadores: `%s`\n\n",
 			icon,
 			ampInstanceDisplayName(statusView.Instance),
 			statusText,
-			statusView.Instance.Name,
-			statusView.Instance.Module,
+			game,
+			uptime,
+			players,
 		)
 	}
 
@@ -876,41 +956,41 @@ func describeAMPInstanceStatus(
 	statusView ampInstanceStatusView,
 ) (string, string) {
 	if !statusView.Instance.Running {
-		return "⚫", "Offline"
+		return "🔴", "Offline"
 	}
 
 	if statusView.ApplicationError != nil {
-		return "🟠", "Instância ligada; estado do jogo indisponível"
+		return "🔴", "Offline — estado indisponível"
 	}
 
 	if statusView.ApplicationStatus == nil {
-		return "🟠", "Estado do jogo indisponível"
+		return "🔴", "Offline — estado indisponível"
 	}
 
 	status := *statusView.ApplicationStatus
 
 	switch status.Phase() {
 	case amp.ApplicationPhaseIdle:
-		return "💤", "Idle"
+		return "🟡", "Idle"
 
 	case amp.ApplicationPhaseOnline:
 		return "🟢", "Online"
 
 	case amp.ApplicationPhaseBusy:
-		return "🔵", fmt.Sprintf(
-			"Em transição — %s",
+		return "🟢", fmt.Sprintf(
+			"Online — %s",
 			status.State.String(),
 		)
 
 	case amp.ApplicationPhaseFailed:
-		return "🔴", "Falha"
+		return "🔴", "Offline — falha"
 
 	case amp.ApplicationPhaseSuspended:
-		return "🟠", "Suspenso"
+		return "🔴", "Offline — suspenso"
 
 	default:
-		return "⚪", fmt.Sprintf(
-			"Desconhecido — %s",
+		return "🔴", fmt.Sprintf(
+			"Offline — %s",
 			status.State.String(),
 		)
 	}

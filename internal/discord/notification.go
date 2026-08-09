@@ -13,7 +13,10 @@ func (c *Client) SendNotification(
 		)
 	}
 
-	return c.sendChannelMessage(
+	err := c.sendChannelMessage(
 		content,
 	)
+	c.requestStatusRefresh()
+
+	return err
 }
