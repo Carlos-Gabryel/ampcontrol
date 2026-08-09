@@ -152,36 +152,12 @@ func (c *Client) handleAMPStatusCommand(
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		ampDiscoveryTimeout,
-	)
-
-	instances, err := c.discoverAMPInstances(ctx)
-
-	cancel()
-
-	if err != nil {
-		c.log.Error().
-			Err(err).
-			Msg("Erro descobrindo instâncias AMP")
-
-		c.updateInteractionMessage(
-			event,
-			"❌ Não foi possível consultar as instâncias do AMP.",
-		)
-
-		return
-	}
-
-	statuses := c.collectAMPInstanceStatuses(
-		instances,
-	)
-
-	c.updateInteractionStatusEmbed(
+	c.requestStatusRefresh()
+	c.updateInteractionMessage(
 		event,
-		buildAMPStatusEmbed(statuses, time.Now()),
+		"✅ O painel fixo está sendo atualizado.",
 	)
+	c.deleteInteractionResponseLater(event, 5*time.Second)
 }
 
 func (c *Client) collectAMPInstanceStatuses(
@@ -914,72 +890,100 @@ func (c *Client) deferAMPInteraction(
 	return true
 }
 
-func buildAMPStatusEmbed(
+func buildAMPStatusEmbeds(
 	statuses []ampInstanceStatusView,
 	updatedAt time.Time,
-) disgoDiscord.Embed {
-	embed := disgoDiscord.NewEmbed().
-		WithTitle("— Estado dos servidores").
-		WithDescription(
-			fmt.Sprintf("Atualizado <t:%d:R>", updatedAt.Unix()),
-		).
-		WithColor(0x5865F2)
+) []disgoDiscord.Embed {
+	const serversPerRow = 2
 
 	if len(statuses) == 0 {
-		return embed.WithDescription(
-			"Nenhuma instância controlável foi encontrada.",
-		)
+		return []disgoDiscord.Embed{
+			disgoDiscord.NewEmbed().
+				WithTitle("— Estado dos servidores").
+				WithDescription(
+					"Nenhuma instância controlável foi encontrada.",
+				).
+				WithColor(0x5865F2),
+		}
 	}
 
-	for _, statusView := range statuses {
-		icon, statusText := describeAMPInstanceStatus(
-			statusView,
-		)
+	embeds := make(
+		[]disgoDiscord.Embed,
+		0,
+		(len(statuses)+serversPerRow-1)/serversPerRow+1,
+	)
 
-		game := strings.TrimSpace(statusView.Instance.Game)
-		if game == "" {
-			game = strings.TrimSpace(statusView.Instance.Module)
-		}
-		if game == "" {
-			game = "Desconhecido"
+	for rowStart := 0; rowStart < len(statuses); rowStart += serversPerRow {
+		row := disgoDiscord.NewEmbed().WithColor(0x5865F2)
+		if rowStart == 0 {
+			row = row.
+				WithTitle("— Estado dos servidores").
+				WithDescription(
+					fmt.Sprintf("Atualizado <t:%d:R>", updatedAt.Unix()),
+				)
 		}
 
-		uptime := "0 min"
-		if statusView.ApplicationStatus != nil {
-			uptime = formatAMPUptime(
-				statusView.ApplicationStatus.Uptime,
+		rowEnd := min(rowStart+serversPerRow, len(statuses))
+		for _, statusView := range statuses[rowStart:rowEnd] {
+			icon, _ := describeAMPInstanceStatus(statusView)
+
+			game := strings.TrimSpace(statusView.Instance.Game)
+			if game == "" {
+				game = strings.TrimSpace(statusView.Instance.Module)
+			}
+			if game == "" {
+				game = "Desconhecido"
+			}
+
+			uptime := "0 min"
+			if statusView.ApplicationStatus != nil {
+				uptime = formatAMPUptime(
+					statusView.ApplicationStatus.Uptime,
+				)
+			}
+
+			players := "?/?"
+			if statusView.PlayerCounts != nil {
+				players = fmt.Sprintf(
+					"%d/%d",
+					statusView.PlayerCounts.Current,
+					statusView.PlayerCounts.Maximum,
+				)
+			} else if !statusView.Instance.Running {
+				players = "0/?"
+			}
+
+			row = row.AddField(
+				"\u200b",
+				fmt.Sprintf(
+					"### %s %s\n**Jogo:** `%s`\n**Tempo online:** `%s`\n**Jogadores:** `%s`\n──────────────",
+					icon,
+					ampInstanceDisplayName(statusView.Instance),
+					game,
+					uptime,
+					players,
+				),
+				true,
 			)
 		}
 
-		players := "?/?"
-		if statusView.PlayerCounts != nil {
-			players = fmt.Sprintf(
-				"%d/%d",
-				statusView.PlayerCounts.Current,
-				statusView.PlayerCounts.Maximum,
-			)
-		} else if !statusView.Instance.Running {
-			players = "0/?"
+		if rowEnd-rowStart == 1 {
+			row = row.AddField("\u200b", "\u200b", true)
 		}
 
-		embed = embed.AddField(
-			fmt.Sprintf(
-				"%s %s — %s",
-				icon,
-				ampInstanceDisplayName(statusView.Instance),
-				statusText,
-			),
-			fmt.Sprintf(
-				"**Jogo:** `%s`\n**Tempo online:** `%s`\n**Jogadores:** `%s`",
-				game,
-				uptime,
-				players,
-			),
-			true,
-		)
+		embeds = append(embeds, row)
 	}
 
-	return embed
+	embeds = append(
+		embeds,
+		disgoDiscord.NewEmbed().
+			WithDescription(
+				"**Legenda:**  🟢 Online   •   🟡 Idle   •   🔴 Offline",
+			).
+			WithColor(0x5865F2),
+	)
+
+	return embeds
 }
 
 func describeAMPInstanceStatus(

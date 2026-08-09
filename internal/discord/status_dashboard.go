@@ -88,9 +88,9 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	}
 
 	statuses := c.collectAMPInstanceStatuses(instances)
-	embed := buildAMPStatusEmbed(statuses, time.Now())
+	embeds := buildAMPStatusEmbeds(statuses, time.Now())
 
-	if err := c.upsertStatusDashboardMessage(embed); err != nil {
+	if err := c.upsertStatusDashboardMessage(embeds); err != nil {
 		return err
 	}
 
@@ -148,7 +148,7 @@ func (c *Client) applyGameOverrides(instances []amp.ManagedInstance) {
 }
 
 func (c *Client) upsertStatusDashboardMessage(
-	embed disgoDiscord.Embed,
+	embeds []disgoDiscord.Embed,
 ) error {
 	state, err := loadStatusDashboardState(c.statusStatePath)
 	if err != nil {
@@ -166,7 +166,7 @@ func (c *Client) upsertStatusDashboardMessage(
 				existing.Author.ID == c.bot.ID() {
 				update := disgoDiscord.NewMessageUpdate().
 					ClearContent().
-					WithEmbeds(embed)
+					WithEmbeds(embeds...)
 
 				updated, updateErr := c.channels.UpdateMessage(
 					c.notificationChannelID,
@@ -205,7 +205,7 @@ func (c *Client) upsertStatusDashboardMessage(
 
 	created, err := c.channels.CreateMessage(
 		c.notificationChannelID,
-		disgoDiscord.NewMessageCreate().WithEmbeds(embed),
+		disgoDiscord.NewMessageCreate().WithEmbeds(embeds...),
 	)
 	if err != nil {
 		return fmt.Errorf(

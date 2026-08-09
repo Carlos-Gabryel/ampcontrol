@@ -184,26 +184,6 @@ func (c *Client) updateInteractionMessage(
 	)
 }
 
-func (c *Client) updateInteractionStatusEmbed(
-	event *events.ApplicationCommandInteractionCreate,
-	embed discord.Embed,
-) {
-	message := discord.NewMessageUpdate().
-		ClearContent().
-		WithEmbeds(embed)
-
-	_, err := c.interactions.UpdateInteractionResponse(
-		event.ApplicationID(),
-		event.Token(),
-		message,
-	)
-	if err != nil {
-		c.log.Error().
-			Err(err).
-			Msg("Erro atualizando o painel da interacao")
-	}
-}
-
 func (c *Client) updateInteractionMessageByToken(
 	applicationID snowflake.ID,
 	interactionToken string,
@@ -227,6 +207,28 @@ func (c *Client) updateInteractionMessageByToken(
 
 	c.log.Info().
 		Msg("Resposta da interação atualizada")
+}
+
+func (c *Client) deleteInteractionResponseLater(
+	event *events.ApplicationCommandInteractionCreate,
+	delay time.Duration,
+) {
+	if event == nil || delay <= 0 {
+		return
+	}
+
+	applicationID := event.ApplicationID()
+	interactionToken := event.Token()
+	time.AfterFunc(delay, func() {
+		if err := c.interactions.DeleteInteractionResponse(
+			applicationID,
+			interactionToken,
+		); err != nil && !isDiscordNotFound(err) {
+			c.log.Warn().
+				Err(err).
+				Msg("Não foi possível apagar a confirmação temporária")
+		}
+	})
 }
 
 func (c *Client) sendChannelMessage(

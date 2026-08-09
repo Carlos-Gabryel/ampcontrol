@@ -9,7 +9,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 )
 
-func TestBuildAMPStatusMessageUsesRequestedPresentation(t *testing.T) {
+func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 	idleStatus := amp.ApplicationStatus{
 		State:  amp.ApplicationStateStopped,
 		Uptime: "0:00:00:00",
@@ -19,7 +19,7 @@ func TestBuildAMPStatusMessageUsesRequestedPresentation(t *testing.T) {
 		Uptime: "0:03:24:12",
 	}
 
-	embed := buildAMPStatusEmbed([]ampInstanceStatusView{
+	embeds := buildAMPStatusEmbeds([]ampInstanceStatusView{
 		{
 			Instance: amp.ManagedInstance{
 				Name:         "AlamamaPal01",
@@ -56,34 +56,43 @@ func TestBuildAMPStatusMessageUsesRequestedPresentation(t *testing.T) {
 		},
 	}, time.Unix(1_700_000_000, 0))
 
-	if embed.Title != "— Estado dos servidores" {
-		t.Fatalf("título inesperado: %q", embed.Title)
+	if len(embeds) != 3 {
+		t.Fatalf("quantidade inesperada de embeds: %d", len(embeds))
 	}
-	if len(embed.Fields) != 3 {
-		t.Fatalf("quantidade inesperada de campos: %d", len(embed.Fields))
+	if embeds[0].Title != "— Estado dos servidores" {
+		t.Fatalf("título inesperado: %q", embeds[0].Title)
 	}
 
-	expectedNames := []string{
-		"🟡 Alamama — Idle",
-		"🟢 HyLabama — Online",
-		"🔴 Vanilla - 2025 — Offline",
-	}
 	expectedValues := []string{
-		"**Jogo:** `Palworld`\n**Tempo online:** `0 min`\n**Jogadores:** `0/32`",
-		"**Jogo:** `Hytale`\n**Tempo online:** `3h 24min`\n**Jogadores:** `2/100`",
-		"**Jogo:** `Minecraft`\n**Tempo online:** `0 min`\n**Jogadores:** `0/?`",
+		"### 🟡 Alamama\n**Jogo:** `Palworld`\n**Tempo online:** `0 min`\n**Jogadores:** `0/32`\n──────────────",
+		"### 🟢 HyLabama\n**Jogo:** `Hytale`\n**Tempo online:** `3h 24min`\n**Jogadores:** `2/100`\n──────────────",
+		"### 🔴 Vanilla - 2025\n**Jogo:** `Minecraft`\n**Tempo online:** `0 min`\n**Jogadores:** `0/?`\n──────────────",
 	}
 
-	for index, field := range embed.Fields {
-		if field.Name != expectedNames[index] {
-			t.Fatalf("nome do campo %d inesperado: %q", index, field.Name)
-		}
+	serverFields := []struct {
+		embed int
+		field int
+	}{
+		{embed: 0, field: 0},
+		{embed: 0, field: 1},
+		{embed: 1, field: 0},
+	}
+	for index, location := range serverFields {
+		field := embeds[location.embed].Fields[location.field]
 		if field.Value != expectedValues[index] {
 			t.Fatalf("valor do campo %d inesperado: %q", index, field.Value)
 		}
 		if field.Inline == nil || !*field.Inline {
 			t.Fatalf("campo %d deveria usar o grid inline", index)
 		}
+	}
+
+	if len(embeds[1].Fields) != 2 || embeds[1].Fields[1].Value != "\u200b" {
+		t.Fatal("a última linha deveria manter a segunda coluna vazia")
+	}
+	if embeds[2].Description !=
+		"**Legenda:**  🟢 Online   •   🟡 Idle   •   🔴 Offline" {
+		t.Fatalf("legenda inesperada: %q", embeds[2].Description)
 	}
 }
 
@@ -149,17 +158,32 @@ func TestStatusDashboardEmbedFitsDiscordLimits(t *testing.T) {
 		}
 	}
 
-	embed := buildAMPStatusEmbed(statuses, time.Now())
-	if len(embed.Fields) > 25 {
-		t.Fatalf("painel excede o limite de campos: %d", len(embed.Fields))
+	embeds := buildAMPStatusEmbeds(statuses, time.Now())
+	if len(embeds) > 10 {
+		t.Fatalf("painel excede o limite de embeds: %d", len(embeds))
 	}
-	for index, field := range embed.Fields {
-		if len(field.Name) > 256 {
-			t.Fatalf("nome do campo %d excede o limite", index)
+	fieldCount := 0
+	for embedIndex, embed := range embeds {
+		fieldCount += len(embed.Fields)
+		for fieldIndex, field := range embed.Fields {
+			if len(field.Name) > 256 {
+				t.Fatalf(
+					"nome do campo %d/%d excede o limite",
+					embedIndex,
+					fieldIndex,
+				)
+			}
+			if len(field.Value) > 1024 {
+				t.Fatalf(
+					"valor do campo %d/%d excede o limite",
+					embedIndex,
+					fieldIndex,
+				)
+			}
 		}
-		if len(field.Value) > 1024 {
-			t.Fatalf("valor do campo %d excede o limite", index)
-		}
+	}
+	if fieldCount > 25 {
+		t.Fatalf("painel excede o limite total de campos: %d", fieldCount)
 	}
 }
 
