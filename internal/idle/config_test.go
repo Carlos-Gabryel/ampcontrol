@@ -391,10 +391,21 @@ func TestProjectIdleConfigLoads(
 	}
 
 	active := config.ActiveServers()
-	if len(active) != 2 {
+	if len(active) != 3 {
 		t.Fatalf(
-			"eram esperados 2 servidores ativos, mas foram encontrados %d",
+			"eram esperados 3 servidores ativos, mas foram encontrados %d",
 			len(active),
+		)
+	}
+
+	valheim, exists := config.FindServer("Valheim01")
+	if !exists {
+		t.Fatal("Valheim01 não foi encontrada")
+	}
+	if valheim.Mode != ServerModeActive {
+		t.Fatalf(
+			"Valheim01 deveria estar ativa após a validação da telemetria, modo=%q",
+			valheim.Mode,
 		)
 	}
 

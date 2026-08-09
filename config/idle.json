@@ -93,7 +93,7 @@
       "display_name": "Valheim",
       "game": "Valheim",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     },
     {
