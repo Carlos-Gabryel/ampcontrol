@@ -391,10 +391,21 @@ func TestProjectIdleConfigLoads(
 	}
 
 	active := config.ActiveServers()
-	if len(active) != 3 {
+	if len(active) != 4 {
 		t.Fatalf(
-			"eram esperados 3 servidores ativos, mas foram encontrados %d",
+			"eram esperados 4 servidores ativos, mas foram encontrados %d",
 			len(active),
+		)
+	}
+
+	hylabama, exists := config.FindServer("HyLabama01")
+	if !exists {
+		t.Fatal("HyLabama01 não foi encontrada")
+	}
+	if hylabama.Mode != ServerModeActive {
+		t.Fatalf(
+			"HyLabama01 deveria estar ativa após a validação da telemetria, modo=%q",
+			hylabama.Mode,
 		)
 	}
 

@@ -69,7 +69,7 @@
       "display_name": "HyLabama",
       "game": "Hytale",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     },
     {
