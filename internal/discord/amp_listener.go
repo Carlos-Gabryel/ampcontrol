@@ -3,6 +3,7 @@ package discord
 import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/events"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 func (c *Client) EnableAMPCommandHandling() {
@@ -36,6 +37,24 @@ func (c *Client) handleAMPInteractionEvent(
 		return
 	}
 
+	channelID := event.Channel().ID()
+	if !ampCommandChannelAllowed(
+		channelID,
+		c.notificationChannelID,
+	) {
+		c.log.Warn().
+			Str("channel_id", channelID.String()).
+			Msg("Comando AMP recusado fora do canal autorizado")
+
+		c.sendInteractionMessage(
+			event,
+			"⛔ O AmpControl só aceita comandos no canal <#"+
+				c.notificationChannelID.String()+">.",
+		)
+
+		return
+	}
+
 	c.log.Info().
 		Str("command", data.CommandName()).
 		Str("command_path", data.CommandPath()).
@@ -53,4 +72,11 @@ func (c *Client) handleAMPInteractionEvent(
 		event,
 		data,
 	)
+}
+
+func ampCommandChannelAllowed(
+	channelID snowflake.ID,
+	allowedChannelID snowflake.ID,
+) bool {
+	return channelID != 0 && channelID == allowedChannelID
 }

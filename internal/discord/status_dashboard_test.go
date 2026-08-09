@@ -2,10 +2,11 @@ package discord
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 func TestBuildAMPStatusMessageUsesRequestedPresentation(t *testing.T) {
@@ -18,7 +19,7 @@ func TestBuildAMPStatusMessageUsesRequestedPresentation(t *testing.T) {
 		Uptime: "0:03:24:12",
 	}
 
-	message := buildAMPStatusMessage([]ampInstanceStatusView{
+	embed := buildAMPStatusEmbed([]ampInstanceStatusView{
 		{
 			Instance: amp.ManagedInstance{
 				Name:         "AlamamaPal01",
@@ -53,27 +54,36 @@ func TestBuildAMPStatusMessageUsesRequestedPresentation(t *testing.T) {
 				Running:      false,
 			},
 		},
-	})
+	}, time.Unix(1_700_000_000, 0))
 
-	expectedParts := []string{
-		"🟡 **Alamama** — **Idle**",
-		"Jogo: `Palworld`",
-		"Jogadores: `0/32`",
-		"🟢 **HyLabama** — **Online**",
-		"Tempo online: `3h 24min`",
-		"Jogadores: `2/100`",
-		"🔴 **Vanilla - 2025** — **Offline**",
-		"Jogo: `Minecraft`",
+	if embed.Title != "— Estado dos servidores" {
+		t.Fatalf("título inesperado: %q", embed.Title)
+	}
+	if len(embed.Fields) != 3 {
+		t.Fatalf("quantidade inesperada de campos: %d", len(embed.Fields))
 	}
 
-	for _, part := range expectedParts {
-		if !strings.Contains(message, part) {
-			t.Fatalf("mensagem não contém %q:\n%s", part, message)
+	expectedNames := []string{
+		"🟡 Alamama — Idle",
+		"🟢 HyLabama — Online",
+		"🔴 Vanilla - 2025 — Offline",
+	}
+	expectedValues := []string{
+		"**Jogo:** `Palworld`\n**Tempo online:** `0 min`\n**Jogadores:** `0/32`",
+		"**Jogo:** `Hytale`\n**Tempo online:** `3h 24min`\n**Jogadores:** `2/100`",
+		"**Jogo:** `Minecraft`\n**Tempo online:** `0 min`\n**Jogadores:** `0/?`",
+	}
+
+	for index, field := range embed.Fields {
+		if field.Name != expectedNames[index] {
+			t.Fatalf("nome do campo %d inesperado: %q", index, field.Name)
 		}
-	}
-
-	if strings.Contains(message, "💤") || strings.Contains(message, "ZZZ") {
-		t.Fatalf("mensagem ainda contém o ícone antigo de Idle:\n%s", message)
+		if field.Value != expectedValues[index] {
+			t.Fatalf("valor do campo %d inesperado: %q", index, field.Value)
+		}
+		if field.Inline == nil || !*field.Inline {
+			t.Fatalf("campo %d deveria usar o grid inline", index)
+		}
 	}
 }
 
@@ -117,7 +127,7 @@ func TestFormatAMPUptime(t *testing.T) {
 	}
 }
 
-func TestStatusDashboardMessageFitsDiscordLimit(t *testing.T) {
+func TestStatusDashboardEmbedFitsDiscordLimits(t *testing.T) {
 	statuses := make([]ampInstanceStatusView, 11)
 	for index := range statuses {
 		status := amp.ApplicationStatus{
@@ -139,8 +149,48 @@ func TestStatusDashboardMessageFitsDiscordLimit(t *testing.T) {
 		}
 	}
 
-	message := buildAMPStatusMessage(statuses)
-	if len(message) > 2000 {
-		t.Fatalf("painel excede o limite do Discord: %d bytes", len(message))
+	embed := buildAMPStatusEmbed(statuses, time.Now())
+	if len(embed.Fields) > 25 {
+		t.Fatalf("painel excede o limite de campos: %d", len(embed.Fields))
+	}
+	for index, field := range embed.Fields {
+		if len(field.Name) > 256 {
+			t.Fatalf("nome do campo %d excede o limite", index)
+		}
+		if len(field.Value) > 1024 {
+			t.Fatalf("valor do campo %d excede o limite", index)
+		}
+	}
+}
+
+func TestShouldDeleteEveryExpiredMessageExceptDashboard(t *testing.T) {
+	cutoff := time.Now()
+	dashboardID := snowflake.ID(100)
+
+	if shouldDeleteChannelMessage(
+		dashboardID,
+		dashboardID,
+		cutoff.Add(-time.Hour),
+		cutoff,
+	) {
+		t.Fatal("a mensagem fixa nunca deve ser apagada")
+	}
+
+	if !shouldDeleteChannelMessage(
+		snowflake.ID(200),
+		dashboardID,
+		cutoff.Add(-time.Hour),
+		cutoff,
+	) {
+		t.Fatal("qualquer outra mensagem expirada deve ser apagada")
+	}
+
+	if shouldDeleteChannelMessage(
+		snowflake.ID(300),
+		dashboardID,
+		cutoff.Add(time.Minute),
+		cutoff,
+	) {
+		t.Fatal("mensagem ainda dentro do TTL não deve ser apagada")
 	}
 }

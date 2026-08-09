@@ -73,6 +73,9 @@ func (c *Client) refreshStatusDashboardWithTimeout(parent context.Context) {
 			Err(err).
 			Msg("Não foi possível atualizar o painel fixo do Discord")
 	}
+
+	// A limpeza do canal nao depende da disponibilidade do AMP.
+	c.cleanupExpiredChannelMessages()
 }
 
 func (c *Client) refreshStatusDashboard(ctx context.Context) error {
@@ -85,16 +88,11 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	}
 
 	statuses := c.collectAMPInstanceStatuses(instances)
-	content := buildAMPStatusMessage(statuses) + fmt.Sprintf(
-		"\n\n_Atualizado <t:%d:R>_",
-		time.Now().Unix(),
-	)
+	embed := buildAMPStatusEmbed(statuses, time.Now())
 
-	if err := c.upsertStatusDashboardMessage(content); err != nil {
+	if err := c.upsertStatusDashboardMessage(embed); err != nil {
 		return err
 	}
-
-	c.cleanupExpiredBotMessages()
 
 	return nil
 }
@@ -149,7 +147,9 @@ func (c *Client) applyGameOverrides(instances []amp.ManagedInstance) {
 	}
 }
 
-func (c *Client) upsertStatusDashboardMessage(content string) error {
+func (c *Client) upsertStatusDashboardMessage(
+	embed disgoDiscord.Embed,
+) error {
 	state, err := loadStatusDashboardState(c.statusStatePath)
 	if err != nil {
 		return err
@@ -165,7 +165,8 @@ func (c *Client) upsertStatusDashboardMessage(content string) error {
 			if getErr == nil &&
 				existing.Author.ID == c.bot.ID() {
 				update := disgoDiscord.NewMessageUpdate().
-					WithContent(content)
+					ClearContent().
+					WithEmbeds(embed)
 
 				updated, updateErr := c.channels.UpdateMessage(
 					c.notificationChannelID,
@@ -204,7 +205,7 @@ func (c *Client) upsertStatusDashboardMessage(content string) error {
 
 	created, err := c.channels.CreateMessage(
 		c.notificationChannelID,
-		disgoDiscord.NewMessageCreate().WithContent(content),
+		disgoDiscord.NewMessageCreate().WithEmbeds(embed),
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -313,7 +314,7 @@ func isDiscordNotFound(err error) bool {
 		restError.Response.StatusCode == http.StatusNotFound
 }
 
-func (c *Client) cleanupExpiredBotMessages() {
+func (c *Client) cleanupExpiredChannelMessages() {
 	if c.notificationTTL <= 0 {
 		return
 	}
@@ -327,39 +328,66 @@ func (c *Client) cleanupExpiredBotMessages() {
 	}
 
 	dashboardID, _ := snowflake.Parse(state.MessageID)
-	messages, err := c.channels.GetMessages(
-		c.notificationChannelID,
-		0,
-		0,
-		0,
-		100,
-	)
-	if err != nil {
-		c.log.Warn().
-			Err(err).
-			Msg("Não foi possível listar mensagens antigas do AmpControl")
-		return
-	}
-
 	cutoff := time.Now().Add(-c.notificationTTL)
-	for _, message := range messages {
-		if message.ID == dashboardID ||
-			message.Pinned ||
-			message.Author.ID != c.bot.ID() ||
-			message.CreatedAt.After(cutoff) {
-			continue
+	before := snowflake.ID(0)
+
+	for {
+		messages, listErr := c.channels.GetMessages(
+			c.notificationChannelID,
+			0,
+			before,
+			0,
+			100,
+		)
+		if listErr != nil {
+			c.log.Warn().
+				Err(listErr).
+				Msg("Não foi possível listar mensagens para limpar o canal AmpControl")
+			return
+		}
+		if len(messages) == 0 {
+			return
 		}
 
-		if err := c.channels.DeleteMessage(
-			c.notificationChannelID,
-			message.ID,
-		); err != nil && !isDiscordNotFound(err) {
-			c.log.Warn().
-				Err(err).
-				Str("message_id", message.ID.String()).
-				Msg("Não foi possível apagar uma mensagem antiga do AmpControl")
+		for _, message := range messages {
+			if !shouldDeleteChannelMessage(
+				message.ID,
+				dashboardID,
+				message.CreatedAt,
+				cutoff,
+			) {
+				continue
+			}
+
+			if deleteErr := c.channels.DeleteMessage(
+				c.notificationChannelID,
+				message.ID,
+			); deleteErr != nil && !isDiscordNotFound(deleteErr) {
+				c.log.Warn().
+					Err(deleteErr).
+					Str("message_id", message.ID.String()).
+					Str("author_id", message.Author.ID.String()).
+					Msg("Não foi possível apagar uma mensagem expirada do canal AmpControl")
+			}
 		}
+
+		if len(messages) < 100 {
+			return
+		}
+
+		before = messages[len(messages)-1].ID
 	}
+}
+
+func shouldDeleteChannelMessage(
+	messageID snowflake.ID,
+	dashboardID snowflake.ID,
+	createdAt time.Time,
+	cutoff time.Time,
+) bool {
+	return messageID != 0 &&
+		messageID != dashboardID &&
+		createdAt.Before(cutoff)
 }
 
 func formatAMPUptime(raw string) string {

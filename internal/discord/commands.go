@@ -22,6 +22,7 @@ func RegisterCommands(
 	ctx context.Context,
 	restClient rest.Rest,
 	applicationID snowflake.ID,
+	gameOverrides map[string]string,
 ) error {
 	applications := rest.NewApplications(
 		restClient,
@@ -39,6 +40,8 @@ func RegisterCommands(
 			err,
 		)
 	}
+
+	applyCommandGameNames(instances, gameOverrides)
 
 	instanceChoices, err := buildAMPInstanceChoices(
 		instances,
@@ -227,20 +230,19 @@ func buildAMPChoiceName(
 		instance.FriendlyName,
 	)
 
-	instanceName := strings.TrimSpace(
-		instance.Name,
-	)
-
-	name := instanceName
-
-	if friendlyName != "" &&
-		!strings.EqualFold(friendlyName, instanceName) {
-		name = fmt.Sprintf(
-			"%s — %s",
-			friendlyName,
-			instanceName,
-		)
+	if friendlyName == "" {
+		friendlyName = strings.TrimSpace(instance.Name)
 	}
+
+	game := strings.TrimSpace(instance.Game)
+	if game == "" {
+		game = strings.TrimSpace(instance.Module)
+	}
+	if game == "" {
+		game = "Jogo desconhecido"
+	}
+
+	name := fmt.Sprintf("%s — %s", friendlyName, game)
 
 	if utf8.RuneCountInString(name) <= maximumChoiceNameSize {
 		return name
@@ -251,4 +253,23 @@ func buildAMPChoiceName(
 	return string(
 		runes[:maximumChoiceNameSize],
 	)
+}
+
+func applyCommandGameNames(
+	instances []amp.ManagedInstance,
+	gameOverrides map[string]string,
+) {
+	for index := range instances {
+		for instanceName, game := range gameOverrides {
+			if strings.EqualFold(instances[index].Name, instanceName) &&
+				strings.TrimSpace(game) != "" {
+				instances[index].Game = strings.TrimSpace(game)
+				break
+			}
+		}
+
+		if strings.TrimSpace(instances[index].Game) == "" {
+			instances[index].Game = strings.TrimSpace(instances[index].Module)
+		}
+	}
 }

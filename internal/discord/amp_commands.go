@@ -178,9 +178,9 @@ func (c *Client) handleAMPStatusCommand(
 		instances,
 	)
 
-	c.updateInteractionMessage(
+	c.updateInteractionStatusEmbed(
 		event,
-		buildAMPStatusMessage(statuses),
+		buildAMPStatusEmbed(statuses, time.Now()),
 	)
 }
 
@@ -914,21 +914,21 @@ func (c *Client) deferAMPInteraction(
 	return true
 }
 
-func buildAMPStatusMessage(
+func buildAMPStatusEmbed(
 	statuses []ampInstanceStatusView,
-) string {
-	var message strings.Builder
-
-	message.WriteString(
-		"🖥️ **AmpControl — Estado dos servidores**\n\n",
-	)
+	updatedAt time.Time,
+) disgoDiscord.Embed {
+	embed := disgoDiscord.NewEmbed().
+		WithTitle("— Estado dos servidores").
+		WithDescription(
+			fmt.Sprintf("Atualizado <t:%d:R>", updatedAt.Unix()),
+		).
+		WithColor(0x5865F2)
 
 	if len(statuses) == 0 {
-		message.WriteString(
+		return embed.WithDescription(
 			"Nenhuma instância controlável foi encontrada.",
 		)
-
-		return message.String()
 	}
 
 	for _, statusView := range statuses {
@@ -962,24 +962,24 @@ func buildAMPStatusMessage(
 			players = "0/?"
 		}
 
-		_, _ = fmt.Fprintf(
-			&message,
-			"%s **%s** — **%s**\n"+
-				"> Jogo: `%s`\n"+
-				"> Tempo online: `%s`\n"+
-				"> Jogadores: `%s`\n\n",
-			icon,
-			ampInstanceDisplayName(statusView.Instance),
-			statusText,
-			game,
-			uptime,
-			players,
+		embed = embed.AddField(
+			fmt.Sprintf(
+				"%s %s — %s",
+				icon,
+				ampInstanceDisplayName(statusView.Instance),
+				statusText,
+			),
+			fmt.Sprintf(
+				"**Jogo:** `%s`\n**Tempo online:** `%s`\n**Jogadores:** `%s`",
+				game,
+				uptime,
+				players,
+			),
+			true,
 		)
 	}
 
-	return strings.TrimSpace(
-		message.String(),
-	)
+	return embed
 }
 
 func describeAMPInstanceStatus(

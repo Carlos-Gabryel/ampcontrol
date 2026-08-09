@@ -138,6 +138,7 @@ func (c *Client) handleReadyEvent(
 		context.Background(),
 		c.bot.Rest,
 		c.bot.ApplicationID,
+		c.gameOverrides,
 	)
 	if err != nil {
 		c.log.Error().
@@ -181,6 +182,26 @@ func (c *Client) updateInteractionMessage(
 		event.Token(),
 		content,
 	)
+}
+
+func (c *Client) updateInteractionStatusEmbed(
+	event *events.ApplicationCommandInteractionCreate,
+	embed discord.Embed,
+) {
+	message := discord.NewMessageUpdate().
+		ClearContent().
+		WithEmbeds(embed)
+
+	_, err := c.interactions.UpdateInteractionResponse(
+		event.ApplicationID(),
+		event.Token(),
+		message,
+	)
+	if err != nil {
+		c.log.Error().
+			Err(err).
+			Msg("Erro atualizando o painel da interacao")
+	}
 }
 
 func (c *Client) updateInteractionMessageByToken(
