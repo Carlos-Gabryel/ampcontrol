@@ -660,6 +660,86 @@ func TestAMPAdapterStopApplicationWrapsCoreStopError(
 	}
 }
 
+func TestAMPAdapterPlayerCountUsesValidatedAMPMetric(t *testing.T) {
+	client := &fakeAMPApplicationClient{
+		statuses: []amp.ApplicationStatus{
+			{
+				State: amp.ApplicationStateReady,
+				Metrics: map[string]amp.StatusMetric{
+					"Active Users": {
+						RawValue: 4,
+						MaxValue: 32,
+					},
+				},
+			},
+		},
+	}
+
+	adapter := newAMPAdapterForTest(
+		t,
+		client,
+		[]amp.ManagedInstance{
+			{
+				Name:    "AlamamaPal01",
+				APIURL:  "http://127.0.0.1:8090/",
+				Running: true,
+			},
+		},
+	)
+
+	count, err := adapter.PlayerCount(
+		context.Background(),
+		Server{Instance: "AlamamaPal01"},
+	)
+	if err != nil {
+		t.Fatalf("PlayerCount retornou erro: %v", err)
+	}
+
+	if count != 4 {
+		t.Fatalf("contagem inesperada: %d", count)
+	}
+}
+
+func TestAMPAdapterPlayerCountRejectsInvalidAMPMetric(t *testing.T) {
+	client := &fakeAMPApplicationClient{
+		statuses: []amp.ApplicationStatus{
+			{
+				State: amp.ApplicationStateReady,
+				Metrics: map[string]amp.StatusMetric{
+					"Active Users": {
+						RawValue: 0,
+						MaxValue: 0,
+					},
+				},
+			},
+		},
+	}
+
+	adapter := newAMPAdapterForTest(
+		t,
+		client,
+		[]amp.ManagedInstance{
+			{
+				Name:    "Servidor01",
+				APIURL:  "http://127.0.0.1:8099/",
+				Running: true,
+			},
+		},
+	)
+
+	_, err := adapter.PlayerCount(
+		context.Background(),
+		Server{Instance: "Servidor01"},
+	)
+	if err == nil {
+		t.Fatal("era esperado erro para métrica inválida")
+	}
+
+	if !strings.Contains(err.Error(), "contagem de jogadores") {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+}
+
 func newAMPAdapterForTest(
 	t *testing.T,
 	client AMPApplicationClient,

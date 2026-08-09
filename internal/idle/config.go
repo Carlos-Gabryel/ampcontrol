@@ -38,15 +38,17 @@ type Config struct {
 }
 
 type Server struct {
-	Instance        string
-	DisplayName     string
-	Enabled         bool
-	Mode            ServerMode
-	Detector        Detector
-	IdleTimeout     time.Duration
-	StartupGrace    time.Duration
-	RCONAddress     string
-	RCONPasswordEnv string
+	Instance         string
+	DisplayName      string
+	Game             string
+	Enabled          bool
+	Mode             ServerMode
+	Detector         Detector
+	FallbackDetector Detector
+	IdleTimeout      time.Duration
+	StartupGrace     time.Duration
+	RCONAddress      string
+	RCONPasswordEnv  string
 }
 
 type rawConfig struct {
@@ -58,9 +60,11 @@ type rawConfig struct {
 type rawServer struct {
 	Instance            string         `json:"instance"`
 	DisplayName         string         `json:"display_name"`
+	Game                string         `json:"game"`
 	Enabled             bool           `json:"enabled"`
 	Mode                ServerMode     `json:"mode"`
 	Detector            Detector       `json:"detector"`
+	FallbackDetector    Detector       `json:"fallback_detector"`
 	IdleTimeoutMinutes  int            `json:"idle_timeout_minutes"`
 	StartupGraceMinutes int            `json:"startup_grace_minutes"`
 	RCON                *rawRCONConfig `json:"rcon"`
@@ -299,11 +303,13 @@ func buildServer(
 	}
 
 	server := Server{
-		Instance:    instance,
-		DisplayName: displayName,
-		Enabled:     raw.Enabled,
-		Mode:        mode,
-		Detector:    raw.Detector,
+		Instance:         instance,
+		DisplayName:      displayName,
+		Game:             strings.TrimSpace(raw.Game),
+		Enabled:          raw.Enabled,
+		Mode:             mode,
+		Detector:         raw.Detector,
+		FallbackDetector: raw.FallbackDetector,
 		IdleTimeout: time.Duration(
 			idleTimeoutMinutes,
 		) * time.Minute,
@@ -318,6 +324,15 @@ func buildServer(
 			return Server{}, fmt.Errorf(
 				"o detector %q da instância %s não é reconhecido",
 				server.Detector,
+				instance,
+			)
+		}
+
+		if server.FallbackDetector != "" &&
+			!isKnownDetector(server.FallbackDetector) {
+			return Server{}, fmt.Errorf(
+				"o detector fallback %q da instância %s não é reconhecido",
+				server.FallbackDetector,
 				instance,
 			)
 		}
@@ -340,7 +355,25 @@ func buildServer(
 		)
 	}
 
-	if server.Detector == DetectorPalworldRCON {
+	if server.FallbackDetector != "" {
+		if server.FallbackDetector == server.Detector {
+			return Server{}, fmt.Errorf(
+				"a instância %s usa o mesmo detector como primário e fallback",
+				instance,
+			)
+		}
+
+		if !isImplementedDetector(server.FallbackDetector) {
+			return Server{}, fmt.Errorf(
+				"o detector fallback %q da instância %s ainda não foi implementado",
+				server.FallbackDetector,
+				instance,
+			)
+		}
+	}
+
+	if server.Detector == DetectorPalworldRCON ||
+		server.FallbackDetector == DetectorPalworldRCON {
 		if raw.RCON == nil {
 			return Server{}, fmt.Errorf(
 				"a instância %s usa palworld_rcon, mas não possui configuração RCON",
@@ -405,7 +438,8 @@ func isKnownDetector(
 func isImplementedDetector(
 	detector Detector,
 ) bool {
-	return detector == DetectorPalworldRCON
+	return detector == DetectorPalworldRCON ||
+		detector == DetectorAMPPlayers
 }
 
 func (c Config) EnabledServers() []Server {

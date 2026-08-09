@@ -5,9 +5,11 @@
     {
       "instance": "AlamamaPal01",
       "display_name": "Alamama",
+      "game": "Palworld",
       "enabled": true,
       "mode": "active",
-      "detector": "palworld_rcon",
+      "detector": "amp_players",
+      "fallback_detector": "palworld_rcon",
       "idle_timeout_minutes": 15,
       "startup_grace_minutes": 5,
       "rcon": {
@@ -18,9 +20,11 @@
     {
       "instance": "KalagaPal01",
       "display_name": "Kalaga",
+      "game": "Palworld (Modded)",
       "enabled": true,
       "mode": "active",
-      "detector": "palworld_rcon",
+      "detector": "amp_players",
+      "fallback_detector": "palworld_rcon",
       "idle_timeout_minutes": 15,
       "startup_grace_minutes": 5,
       "rcon": {
@@ -31,47 +35,74 @@
     {
       "instance": "AIO01",
       "display_name": "AIO",
-      "enabled": false
+      "game": "Minecraft",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "Cobblemon01",
       "display_name": "Cobblemon",
-      "enabled": false
+      "game": "Minecraft",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "CursedWalking01",
       "display_name": "CursedWalking",
-      "enabled": false
+      "game": "Minecraft",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "FabricadeMonstro01",
       "display_name": "Fabrica de Monstro",
-      "enabled": false
+      "game": "Satisfactory",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "HyLabama01",
       "display_name": "HyLabama",
-      "enabled": false
+      "game": "Hytale",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "NightFallCraft01",
       "display_name": "NightFallCraft",
-      "enabled": false
+      "game": "Minecraft",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "TheWalkingRats01",
       "display_name": "The Walking Rats",
-      "enabled": false
+      "game": "Project Zomboid",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "Valheim01",
       "display_name": "Valheim",
-      "enabled": false
+      "game": "Valheim",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     },
     {
       "instance": "Vanilla-202501",
       "display_name": "Vanilla - 2025",
-      "enabled": false
+      "game": "Minecraft",
+      "enabled": true,
+      "mode": "observe",
+      "detector": "amp_players"
     }
   ]
 }

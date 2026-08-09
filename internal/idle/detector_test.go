@@ -53,6 +53,106 @@ func TestNewDefaultDetectorRegistrySupportsPalworld(
 	}
 }
 
+func TestDetectorRegistryUsesFallbackToConfirmZero(t *testing.T) {
+	primary := &fakePlayerDetector{
+		detectorType: DetectorAMPPlayers,
+		playerCount:  0,
+	}
+	fallback := &fakePlayerDetector{
+		detectorType: DetectorPalworldRCON,
+		playerCount:  2,
+	}
+
+	registry, err := NewDetectorRegistry(primary, fallback)
+	if err != nil {
+		t.Fatalf("não foi possível criar o registro: %v", err)
+	}
+
+	count, err := registry.PlayerCount(context.Background(), Server{
+		Instance:         "Palworld01",
+		Enabled:          true,
+		Detector:         DetectorAMPPlayers,
+		FallbackDetector: DetectorPalworldRCON,
+	})
+	if err != nil {
+		t.Fatalf("PlayerCount retornou erro: %v", err)
+	}
+
+	if count != 2 {
+		t.Fatalf("contagem inesperada: %d", count)
+	}
+	if primary.calls != 1 || fallback.calls != 1 {
+		t.Fatalf(
+			"chamadas inesperadas: primário=%d fallback=%d",
+			primary.calls,
+			fallback.calls,
+		)
+	}
+}
+
+func TestDetectorRegistryUsesFallbackWhenPrimaryFails(t *testing.T) {
+	primary := &fakePlayerDetector{
+		detectorType: DetectorAMPPlayers,
+		err:          errors.New("AMP indisponível"),
+	}
+	fallback := &fakePlayerDetector{
+		detectorType: DetectorPalworldRCON,
+		playerCount:  1,
+	}
+
+	registry, err := NewDetectorRegistry(primary, fallback)
+	if err != nil {
+		t.Fatalf("não foi possível criar o registro: %v", err)
+	}
+
+	count, err := registry.PlayerCount(context.Background(), Server{
+		Instance:         "Palworld01",
+		Enabled:          true,
+		Detector:         DetectorAMPPlayers,
+		FallbackDetector: DetectorPalworldRCON,
+	})
+	if err != nil {
+		t.Fatalf("PlayerCount retornou erro: %v", err)
+	}
+
+	if count != 1 {
+		t.Fatalf("contagem inesperada: %d", count)
+	}
+}
+
+func TestDetectorRegistrySkipsFallbackWhenPrimaryHasPlayers(t *testing.T) {
+	primary := &fakePlayerDetector{
+		detectorType: DetectorAMPPlayers,
+		playerCount:  3,
+	}
+	fallback := &fakePlayerDetector{
+		detectorType: DetectorPalworldRCON,
+		playerCount:  0,
+	}
+
+	registry, err := NewDetectorRegistry(primary, fallback)
+	if err != nil {
+		t.Fatalf("não foi possível criar o registro: %v", err)
+	}
+
+	count, err := registry.PlayerCount(context.Background(), Server{
+		Instance:         "Palworld01",
+		Enabled:          true,
+		Detector:         DetectorAMPPlayers,
+		FallbackDetector: DetectorPalworldRCON,
+	})
+	if err != nil {
+		t.Fatalf("PlayerCount retornou erro: %v", err)
+	}
+
+	if count != 3 {
+		t.Fatalf("contagem inesperada: %d", count)
+	}
+	if fallback.calls != 0 {
+		t.Fatalf("o fallback não deveria ser consultado; chamadas=%d", fallback.calls)
+	}
+}
+
 func TestDetectorRegistryRejectsNilDetector(
 	t *testing.T,
 ) {

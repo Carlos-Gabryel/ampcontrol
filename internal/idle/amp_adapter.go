@@ -138,6 +138,54 @@ func (a *AMPAdapter) RuntimeState(
 	), nil
 }
 
+// PlayerCount consulta Core.GetStatus diretamente na instância e valida
+// a métrica Active Users. Valores ausentes, fracionários ou incoerentes
+// retornam erro para preservar o comportamento fail-open do motor de Idle.
+func (a *AMPAdapter) PlayerCount(
+	ctx context.Context,
+	server Server,
+) (int, error) {
+	instance, err := a.resolveInstance(ctx, server, true)
+	if err != nil {
+		return 0, err
+	}
+
+	if !instance.Running {
+		return 0, fmt.Errorf(
+			"a instância AMP %s está Offline",
+			instance.Name,
+		)
+	}
+
+	apiURL := strings.TrimSpace(instance.APIURL)
+	if apiURL == "" {
+		return 0, fmt.Errorf(
+			"a instância AMP %s está ligada, mas não possui URL de API",
+			instance.Name,
+		)
+	}
+
+	status, err := a.client.GetApplicationStatus(ctx, apiURL)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"não foi possível consultar jogadores da instância %s: %w",
+			instance.Name,
+			err,
+		)
+	}
+
+	counts, err := status.PlayerCounts()
+	if err != nil {
+		return 0, fmt.Errorf(
+			"a contagem de jogadores da instância %s é inválida: %w",
+			instance.Name,
+			err,
+		)
+	}
+
+	return counts.Current, nil
+}
+
 // StopApplication implementa ApplicationStopper.
 //
 // Antes de executar Core.Stop, o adaptador ignora o cache, descobre
