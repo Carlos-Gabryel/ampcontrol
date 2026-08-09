@@ -66,10 +66,12 @@ func New() (*App, error) {
 		ampAPIClient,
 		discordClient.ClientConfig{
 			NotificationChannelID: cfg.DiscordNotificationChannelID,
+			OwnerUserID:           cfg.DiscordOwnerUserID,
 			NotificationTTL:       cfg.DiscordNotificationTTL,
 			StatusRefreshInterval: cfg.DiscordStatusRefreshInterval,
 			ADSURL:                cfg.AMPADSURL,
 			StatusStatePath:       "data/discord_status.json",
+			PreferencesPath:       "data/discord_preferences.json",
 			GameOverrides:         gameOverrides,
 			PlayerCountResolver:   playerCountResolver,
 		},

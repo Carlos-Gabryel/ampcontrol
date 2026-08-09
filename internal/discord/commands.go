@@ -9,6 +9,7 @@ import (
 	"github.com/alabamaamp/ampcontrol/internal/amp"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -23,6 +24,7 @@ func RegisterCommands(
 	restClient rest.Rest,
 	applicationID snowflake.ID,
 	gameOverrides map[string]string,
+	hiddenInstanceNames []string,
 ) error {
 	applications := rest.NewApplications(
 		restClient,
@@ -42,16 +44,25 @@ func RegisterCommands(
 	}
 
 	applyCommandGameNames(instances, gameOverrides)
+	visibleInstances, hiddenInstances := splitAMPInstancesByVisibility(
+		instances,
+		hiddenInstanceNames,
+	)
 
 	instanceChoices, err := buildAMPInstanceChoices(
-		instances,
+		visibleInstances,
 	)
+	if err != nil {
+		return err
+	}
+	hiddenInstanceChoices, err := buildAMPInstanceChoices(hiddenInstances)
 	if err != nil {
 		return err
 	}
 
 	commands := []discord.ApplicationCommandCreate{
 		buildAMPCommand(instanceChoices),
+		buildAMPConfigCommand(instanceChoices, hiddenInstanceChoices),
 	}
 
 	guildID := snowflake.MustParse(
@@ -71,6 +82,19 @@ func RegisterCommands(
 	}
 
 	return nil
+}
+
+func (c *Client) registerCommands(ctx context.Context) error {
+	c.commandRegistrationMu.Lock()
+	defer c.commandRegistrationMu.Unlock()
+
+	return RegisterCommands(
+		ctx,
+		c.bot.Rest,
+		c.bot.ApplicationID,
+		c.gameOverrides,
+		c.hiddenInstanceNames(),
+	)
 }
 
 func buildAMPCommand(
@@ -118,6 +142,37 @@ func buildAMPCommand(
 				"Sim, atualizar a instalação AMP",
 				instanceChoices,
 			),
+		},
+	}
+}
+
+func buildAMPConfigCommand(
+	visibleChoices []discord.ApplicationCommandOptionChoiceString,
+	hiddenChoices []discord.ApplicationCommandOptionChoiceString,
+) discord.SlashCommandCreate {
+	return discord.SlashCommandCreate{
+		Name:        "ampconfig",
+		Description: "Configura a apresentação das instâncias do AmpControl",
+		DefaultMemberPermissions: omit.NewPtr(
+			discord.PermissionAdministrator,
+		),
+		Options: []discord.ApplicationCommandOption{
+			buildAMPControlSubCommand(
+				"ocultar",
+				"Oculta uma instância do painel e dos comandos",
+				"Instância que deixará de aparecer no Discord",
+				visibleChoices,
+			),
+			buildAMPControlSubCommand(
+				"exibir",
+				"Volta a exibir uma instância no painel e nos comandos",
+				"Instância que voltará a aparecer no Discord",
+				hiddenChoices,
+			),
+			discord.ApplicationCommandOptionSubCommand{
+				Name:        "listar",
+				Description: "Lista as instâncias ocultas do Discord",
+			},
 		},
 	}
 }
@@ -178,12 +233,6 @@ func buildAMPConfirmedControlSubCommand(
 func buildAMPInstanceChoices(
 	instances []amp.ManagedInstance,
 ) ([]discord.ApplicationCommandOptionChoiceString, error) {
-	if len(instances) == 0 {
-		return nil, fmt.Errorf(
-			"nenhuma instância AMP controlável foi encontrada",
-		)
-	}
-
 	if len(instances) > maximumDiscordChoices {
 		return nil, fmt.Errorf(
 			"foram encontradas %d instâncias, mas o Discord aceita no máximo %d opções estáticas",

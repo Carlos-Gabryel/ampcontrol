@@ -33,7 +33,8 @@ func (c *Client) handleAMPInteractionEvent(
 
 	data := event.SlashCommandInteractionData()
 
-	if data.CommandName() != "amp" {
+	if data.CommandName() != "amp" &&
+		data.CommandName() != "ampconfig" {
 		return
 	}
 
@@ -68,10 +69,12 @@ func (c *Client) handleAMPInteractionEvent(
 		).
 		Msg("Comando AMP recebido")
 
-	c.handleAMPCommand(
-		event,
-		data,
-	)
+	if data.CommandName() == "ampconfig" {
+		c.handleAMPConfigCommand(event, data)
+		return
+	}
+
+	c.handleAMPCommand(event, data)
 }
 
 func ampCommandChannelAllowed(

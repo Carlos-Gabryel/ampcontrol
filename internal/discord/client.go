@@ -23,12 +23,17 @@ type Client struct {
 	interactions          rest.Interactions
 	channels              rest.Channels
 	notificationChannelID snowflake.ID
+	ownerUserID           snowflake.ID
 	notificationTTL       time.Duration
 	statusRefreshInterval time.Duration
 	adsURL                string
 	statusStatePath       string
 	statusRefreshRequests chan struct{}
 	statusRefreshMu       sync.Mutex
+	commandRegistrationMu sync.Mutex
+	preferencesMu         sync.RWMutex
+	preferencesPath       string
+	preferences           discordPreferences
 	gameOverrides         map[string]string
 	playerCountResolver   PlayerCountResolver
 	log                   zerolog.Logger
@@ -49,10 +54,12 @@ type PlayerCountResolver interface {
 
 type ClientConfig struct {
 	NotificationChannelID string
+	OwnerUserID           string
 	NotificationTTL       time.Duration
 	StatusRefreshInterval time.Duration
 	ADSURL                string
 	StatusStatePath       string
+	PreferencesPath       string
 	GameOverrides         map[string]string
 	PlayerCountResolver   PlayerCountResolver
 }
@@ -63,6 +70,11 @@ func New(
 	config ClientConfig,
 	log zerolog.Logger,
 ) (*Client, error) {
+	preferences, err := loadDiscordPreferences(config.PreferencesPath)
+	if err != nil {
+		return nil, err
+	}
+
 	disgoClient, err := disgo.New(
 		token,
 		bot.WithGatewayConfigOpts(
@@ -91,10 +103,13 @@ func New(
 		interactions:          interactions,
 		channels:              channels,
 		notificationChannelID: snowflake.MustParse(config.NotificationChannelID),
+		ownerUserID:           snowflake.MustParse(config.OwnerUserID),
 		notificationTTL:       config.NotificationTTL,
 		statusRefreshInterval: config.StatusRefreshInterval,
 		adsURL:                config.ADSURL,
 		statusStatePath:       config.StatusStatePath,
+		preferencesPath:       config.PreferencesPath,
+		preferences:           preferences,
 		statusRefreshRequests: make(chan struct{}, 1),
 		gameOverrides:         copyStringMap(config.GameOverrides),
 		playerCountResolver:   config.PlayerCountResolver,
@@ -134,12 +149,7 @@ func (c *Client) handleReadyEvent(
 		).
 		Msg("Application ID")
 
-	err := RegisterCommands(
-		context.Background(),
-		c.bot.Rest,
-		c.bot.ApplicationID,
-		c.gameOverrides,
-	)
+	err := c.registerCommands(context.Background())
 	if err != nil {
 		c.log.Error().
 			Err(err).

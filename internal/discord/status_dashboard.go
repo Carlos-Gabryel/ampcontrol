@@ -86,6 +86,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	instances = c.visibleAMPInstances(instances)
 
 	statuses := c.collectAMPInstanceStatuses(instances)
 	embeds := buildAMPStatusEmbeds(statuses, time.Now())

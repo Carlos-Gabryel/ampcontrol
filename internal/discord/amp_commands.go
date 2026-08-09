@@ -317,6 +317,14 @@ func (c *Client) handleAMPControlCommand(
 		return
 	}
 
+	if c.instanceHidden(instance.Name) {
+		c.updateInteractionMessage(
+			event,
+			"⛔ Essa instância está oculta dos comandos do Discord.",
+		)
+		return
+	}
+
 	c.updateInteractionMessage(
 		event,
 		fmt.Sprintf(
