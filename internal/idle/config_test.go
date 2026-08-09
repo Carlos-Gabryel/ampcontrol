@@ -391,10 +391,44 @@ func TestProjectIdleConfigLoads(
 	}
 
 	active := config.ActiveServers()
-	if len(active) != 9 {
+	if len(active) != 11 {
 		t.Fatalf(
-			"eram esperados 9 servidores ativos, mas foram encontrados %d",
+			"eram esperados 11 servidores ativos, mas foram encontrados %d",
 			len(active),
+		)
+	}
+
+	satisfactory, exists := config.FindServer("FabricadeMonstro01")
+	if !exists {
+		t.Fatal("FabricadeMonstro01 não foi encontrada")
+	}
+	if satisfactory.Mode != ServerModeActive {
+		t.Fatalf(
+			"FabricadeMonstro01 deveria estar ativa após a validação da telemetria, modo=%q",
+			satisfactory.Mode,
+		)
+	}
+
+	projectZomboid, exists := config.FindServer("TheWalkingRats01")
+	if !exists {
+		t.Fatal("TheWalkingRats01 não foi encontrada")
+	}
+	if projectZomboid.Mode != ServerModeActive ||
+		projectZomboid.Detector != DetectorAMPPlayers ||
+		projectZomboid.FallbackDetector != DetectorProjectZomboidRCON {
+		t.Fatalf(
+			"configuração inesperada do Project Zomboid: modo=%q primário=%q fallback=%q",
+			projectZomboid.Mode,
+			projectZomboid.Detector,
+			projectZomboid.FallbackDetector,
+		)
+	}
+	if projectZomboid.RCONAddress != "127.0.0.1:27015" ||
+		projectZomboid.RCONPasswordEnv != "THE_WALKING_RATS_RCON_PASSWORD" {
+		t.Fatalf(
+			"configuração RCON inesperada do Project Zomboid: endereço=%q senha_env=%q",
+			projectZomboid.RCONAddress,
+			projectZomboid.RCONPasswordEnv,
 		)
 	}
 

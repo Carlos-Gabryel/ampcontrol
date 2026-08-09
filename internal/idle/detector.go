@@ -87,8 +87,9 @@ func NewDetectorRegistry(
 
 // NewDefaultDetectorRegistry cria o registro usado pelo AmpControl.
 //
-// O registro sempre inclui Palworld RCON e recebe detectores que dependem
-// de serviços construídos em tempo de execução, como a API do AMP.
+// O registro sempre inclui os detectores RCON específicos e recebe
+// detectores que dependem de serviços construídos em tempo de execução,
+// como a API do AMP.
 func NewDefaultDetectorRegistry(
 	additional ...PlayerDetector,
 ) (
@@ -97,6 +98,7 @@ func NewDefaultDetectorRegistry(
 ) {
 	detectors := []PlayerDetector{
 		NewPalworldRCONDetector(),
+		NewProjectZomboidRCONDetector(),
 	}
 
 	detectors = append(detectors, additional...)

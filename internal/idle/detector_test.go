@@ -46,10 +46,64 @@ func TestNewDefaultDetectorRegistrySupportsPalworld(
 		)
 	}
 
+	if !registry.Supports(DetectorProjectZomboidRCON) {
+		t.Fatal(
+			"o registro padrão deveria possuir project_zomboid_rcon",
+		)
+	}
+
 	if registry.Supports(DetectorMinecraftRCON) {
 		t.Fatal(
 			"minecraft_rcon ainda não deveria estar implementado",
 		)
+	}
+}
+
+func TestProjectZomboidRCONDetectorUsesEnvironmentVariable(
+	t *testing.T,
+) {
+	t.Setenv(
+		"TEST_PROJECT_ZOMBOID_RCON_PASSWORD",
+		"senha-de-teste",
+	)
+
+	called := false
+	detector := ProjectZomboidRCONDetector{
+		playerCount: func(
+			_ context.Context,
+			address string,
+			password string,
+		) (int, error) {
+			called = true
+			if address != "127.0.0.1:27015" {
+				t.Fatalf("endereço inesperado: %q", address)
+			}
+			if password != "senha-de-teste" {
+				t.Fatalf("senha inesperada")
+			}
+
+			return 2, nil
+		},
+	}
+
+	count, err := detector.PlayerCount(
+		context.Background(),
+		Server{
+			Instance:        "TheWalkingRats01",
+			Enabled:         true,
+			Detector:        DetectorProjectZomboidRCON,
+			RCONAddress:     "127.0.0.1:27015",
+			RCONPasswordEnv: "TEST_PROJECT_ZOMBOID_RCON_PASSWORD",
+		},
+	)
+	if err != nil {
+		t.Fatalf("PlayerCount retornou erro: %v", err)
+	}
+	if !called {
+		t.Fatal("a função RCON não foi chamada")
+	}
+	if count != 2 {
+		t.Fatalf("contagem inesperada: %d", count)
 	}
 }
 

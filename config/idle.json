@@ -61,7 +61,7 @@
       "display_name": "Fabrica de Monstro",
       "game": "Satisfactory",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     },
     {
@@ -85,8 +85,13 @@
       "display_name": "The Walking Rats",
       "game": "Project Zomboid",
       "enabled": true,
-      "mode": "observe",
-      "detector": "amp_players"
+      "mode": "active",
+      "detector": "amp_players",
+      "fallback_detector": "project_zomboid_rcon",
+      "rcon": {
+        "address": "127.0.0.1:27015",
+        "password_env": "THE_WALKING_RATS_RCON_PASSWORD"
+      }
     },
     {
       "instance": "Valheim01",

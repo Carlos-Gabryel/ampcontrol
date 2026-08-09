@@ -28,6 +28,41 @@ func PlayerCount(
 	address string,
 	password string,
 ) (int, error) {
+	output, err := ExecuteCommand(
+		ctx,
+		address,
+		password,
+		"ShowPlayers",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := parsePlayerCount(
+		output,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// ExecuteCommand autentica em um endpoint Source RCON e executa um
+// comando, retornando somente a primeira resposta não vazia.
+func ExecuteCommand(
+	ctx context.Context,
+	address string,
+	password string,
+	command string,
+) (string, error) {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return "", fmt.Errorf(
+			"o comando RCON não foi informado",
+		)
+	}
+
 	dialer := net.Dialer{
 		Timeout: 5 * time.Second,
 	}
@@ -38,7 +73,7 @@ func PlayerCount(
 		address,
 	)
 	if err != nil {
-		return 0, fmt.Errorf(
+		return "", fmt.Errorf(
 			"não foi possível conectar ao RCON %s: %w",
 			address,
 			err,
@@ -56,7 +91,7 @@ func PlayerCount(
 	}
 
 	if err := connection.SetDeadline(deadline); err != nil {
-		return 0, fmt.Errorf(
+		return "", fmt.Errorf(
 			"não foi possível configurar o prazo RCON: %w",
 			err,
 		)
@@ -66,25 +101,18 @@ func PlayerCount(
 		connection,
 		password,
 	); err != nil {
-		return 0, err
+		return "", err
 	}
 
 	output, err := executeCommand(
 		connection,
-		"ShowPlayers",
+		command,
 	)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
-	count, err := parsePlayerCount(
-		output,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	return count, nil
+	return output, nil
 }
 
 func authenticate(
@@ -175,7 +203,8 @@ func executeCommand(
 	}
 
 	return "", fmt.Errorf(
-		"o servidor RCON não retornou a resposta de ShowPlayers",
+		"o servidor RCON não retornou resposta ao comando %s",
+		command,
 	)
 }
 

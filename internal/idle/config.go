@@ -19,10 +19,11 @@ const (
 type Detector string
 
 const (
-	DetectorPalworldRCON  Detector = "palworld_rcon"
-	DetectorMinecraftRCON Detector = "minecraft_rcon"
-	DetectorSourceQuery   Detector = "source_query"
-	DetectorAMPPlayers    Detector = "amp_players"
+	DetectorPalworldRCON       Detector = "palworld_rcon"
+	DetectorProjectZomboidRCON Detector = "project_zomboid_rcon"
+	DetectorMinecraftRCON      Detector = "minecraft_rcon"
+	DetectorSourceQuery        Detector = "source_query"
+	DetectorAMPPlayers         Detector = "amp_players"
 )
 
 type ServerMode string
@@ -372,11 +373,11 @@ func buildServer(
 		}
 	}
 
-	if server.Detector == DetectorPalworldRCON ||
-		server.FallbackDetector == DetectorPalworldRCON {
+	if detectorUsesRCON(server.Detector) ||
+		detectorUsesRCON(server.FallbackDetector) {
 		if raw.RCON == nil {
 			return Server{}, fmt.Errorf(
-				"a instância %s usa palworld_rcon, mas não possui configuração RCON",
+				"a instância %s usa um detector RCON, mas não possui configuração RCON",
 				instance,
 			)
 		}
@@ -425,6 +426,7 @@ func isKnownDetector(
 ) bool {
 	switch detector {
 	case DetectorPalworldRCON,
+		DetectorProjectZomboidRCON,
 		DetectorMinecraftRCON,
 		DetectorSourceQuery,
 		DetectorAMPPlayers:
@@ -439,7 +441,13 @@ func isImplementedDetector(
 	detector Detector,
 ) bool {
 	return detector == DetectorPalworldRCON ||
+		detector == DetectorProjectZomboidRCON ||
 		detector == DetectorAMPPlayers
+}
+
+func detectorUsesRCON(detector Detector) bool {
+	return detector == DetectorPalworldRCON ||
+		detector == DetectorProjectZomboidRCON
 }
 
 func (c Config) EnabledServers() []Server {
