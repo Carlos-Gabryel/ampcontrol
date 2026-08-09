@@ -260,6 +260,36 @@ func (c *Client) collectAMPInstanceStatuses(
 				return
 			}
 
+			if counts.Current == 0 &&
+				status.Phase() == amp.ApplicationPhaseOnline &&
+				c.playerCountResolver != nil {
+				resolverCtx, resolverCancel := context.WithTimeout(
+					context.Background(),
+					ampApplicationTimeout,
+				)
+				resolvedCount, applies, resolverErr :=
+					c.playerCountResolver.ResolvePlayerCount(
+						resolverCtx,
+						currentInstance.Name,
+					)
+				resolverCancel()
+
+				if applies {
+					if resolverErr != nil {
+						statuses[statusIndex].PlayerError = resolverErr
+
+						c.log.Warn().
+							Err(resolverErr).
+							Str("instance", currentInstance.Name).
+							Msg("Fallback de jogadores do painel falhou")
+
+						return
+					}
+
+					counts.Current = resolvedCount
+				}
+			}
+
 			countsCopy := counts
 			statuses[statusIndex].PlayerCounts = &countsCopy
 		}(

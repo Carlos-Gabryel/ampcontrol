@@ -53,6 +53,14 @@ func New() (*App, error) {
 		}
 	}
 
+	playerCountResolver, err := newDashboardPlayerCountResolver(
+		ampAPIClient,
+		idleConfig,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	discord, err := discordClient.New(
 		cfg.DiscordToken,
 		ampAPIClient,
@@ -63,6 +71,7 @@ func New() (*App, error) {
 			ADSURL:                cfg.AMPADSURL,
 			StatusStatePath:       "data/discord_status.json",
 			GameOverrides:         gameOverrides,
+			PlayerCountResolver:   playerCountResolver,
 		},
 		log,
 	)

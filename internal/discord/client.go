@@ -30,7 +30,21 @@ type Client struct {
 	statusRefreshRequests chan struct{}
 	statusRefreshMu       sync.Mutex
 	gameOverrides         map[string]string
+	playerCountResolver   PlayerCountResolver
 	log                   zerolog.Logger
+}
+
+// PlayerCountResolver aplica os detectores específicos configurados para
+// uma instância quando a telemetria genérica do AMP precisa de confirmação.
+type PlayerCountResolver interface {
+	ResolvePlayerCount(
+		ctx context.Context,
+		instance string,
+	) (
+		count int,
+		applies bool,
+		err error,
+	)
 }
 
 type ClientConfig struct {
@@ -40,6 +54,7 @@ type ClientConfig struct {
 	ADSURL                string
 	StatusStatePath       string
 	GameOverrides         map[string]string
+	PlayerCountResolver   PlayerCountResolver
 }
 
 func New(
@@ -82,6 +97,7 @@ func New(
 		statusStatePath:       config.StatusStatePath,
 		statusRefreshRequests: make(chan struct{}, 1),
 		gameOverrides:         copyStringMap(config.GameOverrides),
+		playerCountResolver:   config.PlayerCountResolver,
 		log:                   log,
 	}
 
