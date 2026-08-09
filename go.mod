@@ -1,4 +1,4 @@
-module github.com/alabamaamp/palcontrol
+module github.com/alabamaamp/ampcontrol
 
 go 1.26.5
 

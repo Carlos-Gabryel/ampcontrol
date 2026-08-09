@@ -1,0 +1,77 @@
+{
+  "check_interval_seconds": 30,
+  "default_idle_timeout_minutes": 15,
+  "servers": [
+    {
+      "instance": "AlamamaPal01",
+      "display_name": "Alamama",
+      "enabled": true,
+      "mode": "active",
+      "detector": "palworld_rcon",
+      "idle_timeout_minutes": 15,
+      "startup_grace_minutes": 5,
+      "rcon": {
+        "address": "127.0.0.1:25575",
+        "password_env": "ALAMAMA_RCON_PASSWORD"
+      }
+    },
+    {
+      "instance": "KalagaPal01",
+      "display_name": "Kalaga",
+      "enabled": true,
+      "mode": "active",
+      "detector": "palworld_rcon",
+      "idle_timeout_minutes": 15,
+      "startup_grace_minutes": 5,
+      "rcon": {
+        "address": "127.0.0.1:25576",
+        "password_env": "KALAGA_RCON_PASSWORD"
+      }
+    },
+    {
+      "instance": "AIO01",
+      "display_name": "AIO",
+      "enabled": false
+    },
+    {
+      "instance": "Cobblemon01",
+      "display_name": "Cobblemon",
+      "enabled": false
+    },
+    {
+      "instance": "CursedWalking01",
+      "display_name": "CursedWalking",
+      "enabled": false
+    },
+    {
+      "instance": "FabricadeMonstro01",
+      "display_name": "Fabrica de Monstro",
+      "enabled": false
+    },
+    {
+      "instance": "HyLabama01",
+      "display_name": "HyLabama",
+      "enabled": false
+    },
+    {
+      "instance": "NightFallCraft01",
+      "display_name": "NightFallCraft",
+      "enabled": false
+    },
+    {
+      "instance": "TheWalkingRats01",
+      "display_name": "The Walking Rats",
+      "enabled": false
+    },
+    {
+      "instance": "Valheim01",
+      "display_name": "Valheim",
+      "enabled": false
+    },
+    {
+      "instance": "Vanilla-202501",
+      "display_name": "Vanilla - 2025",
+      "enabled": false
+    }
+  ]
+}

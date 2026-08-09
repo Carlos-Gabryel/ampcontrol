@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+readonly AMPINSTMGR="/usr/bin/ampinstmgr"
+readonly INSTANCES_DIRECTORY="/home/amp/.ampdata/instances"
+readonly PROTECTED_INSTANCE="ADS01"
+
+show_usage() {
+    cat <<'EOF'
+Uso:
+  ampcontrol-amp list
+  ampcontrol-amp status
+  ampcontrol-amp start INSTANCIA
+  ampcontrol-amp stop INSTANCIA
+  ampcontrol-amp restart INSTANCIA
+  ampcontrol-amp update INSTANCIA
+EOF
+}
+
+fail() {
+    printf 'Erro: %s\n' "$1" >&2
+    exit 1
+}
+
+validate_instance() {
+    local instance_name="$1"
+
+    if [[ -z "$instance_name" ]]; then
+        fail "o nome da instância não foi informado"
+    fi
+
+    if [[ ! "$instance_name" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        fail "o nome da instância contém caracteres inválidos"
+    fi
+
+    if [[ "$instance_name" == "$PROTECTED_INSTANCE" ]]; then
+        fail "a instância ADS01 é protegida e não pode ser controlada pelo bot"
+    fi
+
+    if [[ ! -d "$INSTANCES_DIRECTORY/$instance_name" ]]; then
+        fail "a instância '$instance_name' não existe"
+    fi
+}
+
+require_no_extra_arguments() {
+    if [[ "$#" -ne 1 ]]; then
+        show_usage >&2
+        exit 2
+    fi
+}
+
+require_instance_argument() {
+    if [[ "$#" -ne 2 ]]; then
+        show_usage >&2
+        exit 2
+    fi
+
+    validate_instance "$2"
+}
+
+main() {
+    if [[ "$#" -lt 1 ]]; then
+        show_usage >&2
+        exit 2
+    fi
+
+    local operation="$1"
+
+    case "$operation" in
+        list)
+            require_no_extra_arguments "$@"
+            exec "$AMPINSTMGR" --ShowInstancesList
+            ;;
+
+        status)
+            require_no_extra_arguments "$@"
+            exec "$AMPINSTMGR" status
+            ;;
+
+        start)
+            require_instance_argument "$@"
+            exec "$AMPINSTMGR" --StartInstance "$2"
+            ;;
+
+        stop)
+            require_instance_argument "$@"
+            exec "$AMPINSTMGR" --StopInstance "$2"
+            ;;
+
+        restart)
+            require_instance_argument "$@"
+            exec "$AMPINSTMGR" --RestartInstance "$2"
+            ;;
+
+        update)
+            require_instance_argument "$@"
+            exec "$AMPINSTMGR" --UpgradeInstance "$2" true
+            ;;
+
+        *)
+            fail "operação desconhecida: '$operation'"
+            ;;
+    esac
+}
+
+main "$@"

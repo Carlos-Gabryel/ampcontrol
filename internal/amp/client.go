@@ -117,7 +117,7 @@ func (c *APIClient) StartApplication(
 // somente o processo do jogo.
 //
 // A instância AMP continua ligada, deixando o servidor
-// no estado Idle usado pelo PalControl.
+// no estado Idle usado pelo AmpControl.
 func (c *APIClient) StopApplication(
 	ctx context.Context,
 	baseURL string,
