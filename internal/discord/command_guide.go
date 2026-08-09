@@ -42,7 +42,7 @@ func buildAMPCommandGuideEmbeds() []disgoDiscord.Embed {
 		).
 		AddField(
 			"`/amp atualizar servidor:<servidor> confirmar:sim`",
-			"Atualiza a instalação do **AMP** daquela instância. Não é um comando de atualização do jogo e também exige confirmação.",
+			"Atualiza a instalação do **AMP** daquela instância. Não atualiza o jogo, exige confirmação e reinicia a instância caso ela esteja ligada, interrompendo o servidor durante o processo.",
 			false,
 		).
 		WithFooter(

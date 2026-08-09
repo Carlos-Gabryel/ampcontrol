@@ -20,9 +20,12 @@ import (
 
 const statusDashboardTimeout = 45 * time.Second
 
+const statusDashboardMessageOrderVersion = 1
+
 type statusDashboardState struct {
-	MessageID      string `json:"message_id"`
-	GuideMessageID string `json:"guide_message_id,omitempty"`
+	MessageID           string `json:"message_id"`
+	GuideMessageID      string `json:"guide_message_id,omitempty"`
+	MessageOrderVersion int    `json:"message_order_version,omitempty"`
 }
 
 func (c *Client) runStatusDashboard(ctx context.Context) {
@@ -93,11 +96,14 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	statuses := c.collectAMPInstanceStatuses(instances)
 	embeds := buildAMPStatusEmbeds(statuses, time.Now())
 
-	if err := c.upsertStatusDashboardMessage(embeds); err != nil {
+	// O guia precisa ser a primeira mensagem do canal. Em instalações
+	// antigas, o upsert do painel abaixo faz uma migração única para que o
+	// novo painel fique cronologicamente depois do guia.
+	if err := c.upsertCommandGuideMessage(); err != nil {
 		return err
 	}
 
-	if err := c.upsertCommandGuideMessage(); err != nil {
+	if err := c.upsertStatusDashboardMessage(embeds); err != nil {
 		return err
 	}
 
@@ -183,7 +189,10 @@ func (c *Client) upsertStatusDashboardMessage(
 		return err
 	}
 
-	if state.MessageID != "" {
+	recreateForOrder := statusDashboardNeedsOrderMigration(state)
+	previousMessageID, _ := snowflake.Parse(state.MessageID)
+
+	if state.MessageID != "" && !recreateForOrder {
 		messageID, parseErr := snowflake.Parse(state.MessageID)
 		if parseErr == nil && messageID != 0 {
 			existing, getErr := c.channels.GetMessage(
@@ -245,7 +254,11 @@ func (c *Client) upsertStatusDashboardMessage(
 	}
 
 	state.MessageID = created.ID.String()
+	if state.GuideMessageID != "" {
+		state.MessageOrderVersion = statusDashboardMessageOrderVersion
+	}
 	if err := saveStatusDashboardState(c.statusStatePath, state); err != nil {
+		_ = c.channels.DeleteMessage(c.notificationChannelID, created.ID)
 		return err
 	}
 
@@ -262,7 +275,30 @@ func (c *Client) upsertStatusDashboardMessage(
 		Str("message_id", created.ID.String()).
 		Msg("Painel fixo de status criado no Discord")
 
+	if recreateForOrder && previousMessageID != 0 &&
+		previousMessageID != created.ID {
+		if err := c.channels.DeleteMessage(
+			c.notificationChannelID,
+			previousMessageID,
+		); err != nil && !isDiscordNotFound(err) {
+			c.log.Warn().
+				Err(err).
+				Str("message_id", previousMessageID.String()).
+				Msg("Novo painel criado, mas o painel antigo não pôde ser apagado")
+		} else {
+			c.log.Info().
+				Str("old_message_id", previousMessageID.String()).
+				Str("new_message_id", created.ID.String()).
+				Msg("Ordem das mensagens fixas migrada para guia seguido do painel")
+		}
+	}
+
 	return nil
+}
+
+func statusDashboardNeedsOrderMigration(state statusDashboardState) bool {
+	return state.GuideMessageID != "" &&
+		state.MessageOrderVersion < statusDashboardMessageOrderVersion
 }
 
 func loadStatusDashboardState(path string) (statusDashboardState, error) {

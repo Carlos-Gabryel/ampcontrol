@@ -108,8 +108,9 @@ func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 func TestStatusDashboardStateRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data", "discord_status.json")
 	expected := statusDashboardState{
-		MessageID:      "123456789",
-		GuideMessageID: "987654321",
+		MessageID:           "123456789",
+		GuideMessageID:      "987654321",
+		MessageOrderVersion: statusDashboardMessageOrderVersion,
 	}
 
 	if err := saveStatusDashboardState(path, expected); err != nil {
@@ -242,6 +243,27 @@ func TestShouldDeleteEveryExpiredMessageExceptDashboard(t *testing.T) {
 		cutoff,
 	) {
 		t.Fatal("mensagem ainda dentro do TTL não deve ser apagada")
+	}
+}
+
+func TestStatusDashboardOrderMigrationRunsOnlyOnce(t *testing.T) {
+	legacyState := statusDashboardState{
+		MessageID:      "100",
+		GuideMessageID: "200",
+	}
+	if !statusDashboardNeedsOrderMigration(legacyState) {
+		t.Fatal("o estado legado deveria solicitar a migração de ordem")
+	}
+
+	migratedState := legacyState
+	migratedState.MessageOrderVersion = statusDashboardMessageOrderVersion
+	if statusDashboardNeedsOrderMigration(migratedState) {
+		t.Fatal("a migração concluída não deveria ser repetida")
+	}
+
+	withoutGuide := statusDashboardState{MessageID: "100"}
+	if statusDashboardNeedsOrderMigration(withoutGuide) {
+		t.Fatal("não há ordem para migrar enquanto o guia ainda não existe")
 	}
 }
 
