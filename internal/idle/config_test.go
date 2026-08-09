@@ -391,11 +391,31 @@ func TestProjectIdleConfigLoads(
 	}
 
 	active := config.ActiveServers()
-	if len(active) != 4 {
+	if len(active) != 9 {
 		t.Fatalf(
-			"eram esperados 4 servidores ativos, mas foram encontrados %d",
+			"eram esperados 9 servidores ativos, mas foram encontrados %d",
 			len(active),
 		)
+	}
+
+	for _, instance := range []string{
+		"AIO01",
+		"Cobblemon01",
+		"CursedWalking01",
+		"NightFallCraft01",
+		"Vanilla-202501",
+	} {
+		server, exists := config.FindServer(instance)
+		if !exists {
+			t.Fatalf("%s não foi encontrada", instance)
+		}
+		if server.Mode != ServerModeActive {
+			t.Fatalf(
+				"%s deveria estar ativa após a validação do módulo Minecraft, modo=%q",
+				instance,
+				server.Mode,
+			)
+		}
 	}
 
 	hylabama, exists := config.FindServer("HyLabama01")

@@ -37,7 +37,7 @@
       "display_name": "AIO",
       "game": "Minecraft",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     },
     {
@@ -45,7 +45,7 @@
       "display_name": "Cobblemon",
       "game": "Minecraft",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     },
     {
@@ -53,7 +53,7 @@
       "display_name": "CursedWalking",
       "game": "Minecraft",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     },
     {
@@ -77,7 +77,7 @@
       "display_name": "NightFallCraft",
       "game": "Minecraft",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     },
     {
@@ -101,7 +101,7 @@
       "display_name": "Vanilla - 2025",
       "game": "Minecraft",
       "enabled": true,
-      "mode": "observe",
+      "mode": "active",
       "detector": "amp_players"
     }
   ]
