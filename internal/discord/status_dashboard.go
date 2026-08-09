@@ -86,6 +86,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.refreshCommandsForInventory(ctx, instances)
 	instances = c.visibleAMPInstances(instances)
 
 	statuses := c.collectAMPInstanceStatuses(instances)
@@ -137,8 +138,9 @@ func (c *Client) discoverAMPInstances(
 }
 
 func (c *Client) applyGameOverrides(instances []amp.ManagedInstance) {
+	gameOverrides := c.gameOverridesSnapshot()
 	for index := range instances {
-		for instanceName, game := range c.gameOverrides {
+		for instanceName, game := range gameOverrides {
 			if strings.EqualFold(instances[index].Name, instanceName) &&
 				strings.TrimSpace(game) != "" {
 				instances[index].Game = strings.TrimSpace(game)
@@ -146,6 +148,24 @@ func (c *Client) applyGameOverrides(instances []amp.ManagedInstance) {
 			}
 		}
 	}
+}
+
+func (c *Client) gameOverridesSnapshot() map[string]string {
+	c.gameOverridesMu.RLock()
+	defer c.gameOverridesMu.RUnlock()
+	return copyStringMap(c.gameOverrides)
+}
+
+func (c *Client) setGameOverride(instance string, game string) {
+	instance = strings.TrimSpace(instance)
+	game = strings.TrimSpace(game)
+	if instance == "" || game == "" {
+		return
+	}
+
+	c.gameOverridesMu.Lock()
+	c.gameOverrides[instance] = game
+	c.gameOverridesMu.Unlock()
 }
 
 func (c *Client) upsertStatusDashboardMessage(

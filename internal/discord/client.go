@@ -31,9 +31,15 @@ type Client struct {
 	statusRefreshRequests chan struct{}
 	statusRefreshMu       sync.Mutex
 	commandRegistrationMu sync.Mutex
+	commandInventoryMu    sync.RWMutex
+	commandInventory      string
 	preferencesMu         sync.RWMutex
 	preferencesPath       string
 	preferences           discordPreferences
+	gameOverridesMu       sync.RWMutex
+	idleRegistrationMu    sync.RWMutex
+	idleServerRegistrar   IdleServerRegistrar
+	idleRegistered        map[string]string
 	gameOverrides         map[string]string
 	playerCountResolver   PlayerCountResolver
 	log                   zerolog.Logger
@@ -53,15 +59,16 @@ type PlayerCountResolver interface {
 }
 
 type ClientConfig struct {
-	NotificationChannelID string
-	OwnerUserID           string
-	NotificationTTL       time.Duration
-	StatusRefreshInterval time.Duration
-	ADSURL                string
-	StatusStatePath       string
-	PreferencesPath       string
-	GameOverrides         map[string]string
-	PlayerCountResolver   PlayerCountResolver
+	NotificationChannelID   string
+	OwnerUserID             string
+	NotificationTTL         time.Duration
+	StatusRefreshInterval   time.Duration
+	ADSURL                  string
+	StatusStatePath         string
+	PreferencesPath         string
+	GameOverrides           map[string]string
+	PlayerCountResolver     PlayerCountResolver
+	IdleRegisteredInstances []string
 }
 
 func New(
@@ -110,6 +117,7 @@ func New(
 		statusStatePath:       config.StatusStatePath,
 		preferencesPath:       config.PreferencesPath,
 		preferences:           preferences,
+		idleRegistered:        instanceNameMap(config.IdleRegisteredInstances),
 		statusRefreshRequests: make(chan struct{}, 1),
 		gameOverrides:         copyStringMap(config.GameOverrides),
 		playerCountResolver:   config.PlayerCountResolver,

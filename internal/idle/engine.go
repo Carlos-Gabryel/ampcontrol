@@ -128,12 +128,6 @@ func NewEngine(
 	eventHandler EventHandler,
 	options ...EngineOption,
 ) (*Engine, error) {
-	if config.CheckInterval <= 0 {
-		return nil, fmt.Errorf(
-			"o intervalo de verificação do motor de Idle precisa ser maior que zero",
-		)
-	}
-
 	if detectors == nil {
 		return nil, fmt.Errorf(
 			"o registro de detectores do motor de Idle não foi informado",
@@ -152,37 +146,11 @@ func NewEngine(
 		)
 	}
 
-	enabledServers := config.EnabledServers()
-
-	for _, server := range enabledServers {
-		if strings.TrimSpace(server.Instance) == "" {
-			return nil, fmt.Errorf(
-				"há um servidor habilitado sem nome de instância",
-			)
-		}
-
-		if server.IdleTimeout <= 0 {
-			return nil, fmt.Errorf(
-				"o tempo de Idle da instância %s precisa ser maior que zero",
-				server.Instance,
-			)
-		}
-
-		if server.StartupGrace <= 0 {
-			return nil, fmt.Errorf(
-				"a proteção inicial da instância %s precisa ser maior que zero",
-				server.Instance,
-			)
-		}
-
-		if !detectors.Supports(server.Detector) {
-			return nil, fmt.Errorf(
-				"o detector %q da instância %s não está registrado",
-				server.Detector,
-				server.Instance,
-			)
-		}
+	if err := validateEngineConfig(config, detectors); err != nil {
+		return nil, err
 	}
+
+	enabledServers := config.EnabledServers()
 
 	engine := &Engine{
 		config:         config,
@@ -207,6 +175,80 @@ func NewEngine(
 	}
 
 	return engine, nil
+}
+
+func validateEngineConfig(
+	config Config,
+	detectors *DetectorRegistry,
+) error {
+	if config.CheckInterval <= 0 {
+		return fmt.Errorf(
+			"o intervalo de verificação do motor de Idle precisa ser maior que zero",
+		)
+	}
+	if detectors == nil {
+		return fmt.Errorf("o registro de detectores não foi informado")
+	}
+
+	for _, server := range config.EnabledServers() {
+		if strings.TrimSpace(server.Instance) == "" {
+			return fmt.Errorf("há um servidor habilitado sem nome de instância")
+		}
+		if server.IdleTimeout <= 0 {
+			return fmt.Errorf(
+				"o tempo de Idle da instância %s precisa ser maior que zero",
+				server.Instance,
+			)
+		}
+		if server.StartupGrace <= 0 {
+			return fmt.Errorf(
+				"a proteção inicial da instância %s precisa ser maior que zero",
+				server.Instance,
+			)
+		}
+		if !detectors.Supports(server.Detector) {
+			return fmt.Errorf(
+				"o detector %q da instância %s não está registrado",
+				server.Detector,
+				server.Instance,
+			)
+		}
+	}
+
+	return nil
+}
+
+// ReplaceConfig aplica uma configuração validada sem reiniciar o motor.
+// O intervalo global não pode mudar enquanto o ticker atual está ativo.
+func (e *Engine) ReplaceConfig(config Config) error {
+	if e == nil {
+		return fmt.Errorf("o motor de Idle não está disponível")
+	}
+	if err := validateEngineConfig(config, e.detectors); err != nil {
+		return err
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if config.CheckInterval != e.config.CheckInterval {
+		return fmt.Errorf(
+			"o intervalo do motor de Idle não pode ser alterado sem reinicialização",
+		)
+	}
+
+	enabled := make(map[string]struct{}, len(config.EnabledServers()))
+	for _, server := range config.EnabledServers() {
+		enabled[normalizeTrackerKey(server.Instance)] = struct{}{}
+	}
+	for key := range e.trackers {
+		if _, exists := enabled[key]; !exists {
+			delete(e.trackers, key)
+		}
+	}
+
+	e.config = config
+	return nil
 }
 
 // Run executa uma verificação imediatamente e depois repete

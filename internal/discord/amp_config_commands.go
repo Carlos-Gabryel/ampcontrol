@@ -48,12 +48,96 @@ func (c *Client) handleAMPConfigCommand(
 	case "listar":
 		c.handleAMPHiddenInstancesCommand(event)
 
+	case "idle-adicionar":
+		c.handleAMPIdleRegistrationCommand(event, data)
+
 	default:
 		c.sendInteractionMessage(
 			event,
 			"⚠️ Subcomando de configuração não reconhecido.",
 		)
 	}
+}
+
+func (c *Client) handleAMPIdleRegistrationCommand(
+	event *events.ApplicationCommandInteractionCreate,
+	data disgoDiscord.SlashCommandInteractionData,
+) {
+	if !c.deferAMPInteraction(event) {
+		return
+	}
+
+	instanceName, exists := data.OptString("servidor")
+	instanceName = strings.TrimSpace(instanceName)
+	if !exists || instanceName == "" {
+		c.updateInteractionMessage(
+			event,
+			"⚠️ A instância AMP não foi informada.",
+		)
+		return
+	}
+
+	instance, err := c.resolveAMPInstance(instanceName)
+	if err != nil {
+		c.updateInteractionMessage(
+			event,
+			"⚠️ A instância selecionada não existe ou não pode ser controlada.",
+		)
+		return
+	}
+	if c.idleInstanceRegistered(instance.Name) {
+		c.updateInteractionMessage(
+			event,
+			fmt.Sprintf(
+				"ℹ️ **%s** já está cadastrada no motor de Idle.",
+				ampInstanceDisplayName(instance),
+			),
+		)
+		return
+	}
+
+	registrar := c.idleRegistrar()
+	if registrar == nil {
+		c.updateInteractionMessage(
+			event,
+			"❌ O gerenciador de cadastros do Idle não está disponível.",
+		)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ampDiscoveryTimeout)
+	defer cancel()
+	if err := registrar.RegisterIdleServer(ctx, instance); err != nil {
+		c.log.Error().
+			Err(err).
+			Str("instance", instance.Name).
+			Msg("Não foi possível cadastrar a instância no motor de Idle")
+		c.updateInteractionMessage(
+			event,
+			"❌ Não foi possível cadastrar a instância no motor de Idle.",
+		)
+		return
+	}
+
+	c.markIdleInstanceRegistered(instance.Name)
+	c.setGameOverride(instance.Name, instance.Game)
+	registrationErr := c.registerCommands(ctx)
+	c.requestStatusRefresh()
+
+	message := fmt.Sprintf(
+		"✅ **%s** foi adicionada ao Idle automático.\n"+
+			"Detector: `API AMP` • Limite: `15 min` • Proteção inicial: `5 min`.",
+		ampInstanceDisplayName(instance),
+	)
+	if registrationErr != nil {
+		c.log.Error().
+			Err(registrationErr).
+			Msg("Idle ativado, mas os comandos não foram atualizados")
+		message += "\n⚠️ O Idle já está ativo, mas a lista do comando será atualizada na próxima conexão do bot."
+	}
+
+	c.updateInteractionMessage(event, message)
+	c.deleteInteractionResponseLater(event, 12*time.Second)
 }
 
 func ampConfigCommandAuthorized(

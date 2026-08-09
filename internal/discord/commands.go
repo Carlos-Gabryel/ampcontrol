@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -25,7 +26,8 @@ func RegisterCommands(
 	applicationID snowflake.ID,
 	gameOverrides map[string]string,
 	hiddenInstanceNames []string,
-) error {
+	idleRegisteredNames []string,
+) ([]amp.ManagedInstance, error) {
 	applications := rest.NewApplications(
 		restClient,
 	)
@@ -37,7 +39,7 @@ func RegisterCommands(
 
 	instances, err := amp.DiscoverInstances(ctx)
 	if err != nil {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"não foi possível descobrir as instâncias para registrar os comandos: %w",
 			err,
 		)
@@ -53,16 +55,26 @@ func RegisterCommands(
 		visibleInstances,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	hiddenInstanceChoices, err := buildAMPInstanceChoices(hiddenInstances)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	idleCandidateChoices, err := buildAMPInstanceChoices(
+		filterUnregisteredAMPInstances(instances, idleRegisteredNames),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	commands := []discord.ApplicationCommandCreate{
 		buildAMPCommand(instanceChoices),
-		buildAMPConfigCommand(instanceChoices, hiddenInstanceChoices),
+		buildAMPConfigCommand(
+			instanceChoices,
+			hiddenInstanceChoices,
+			idleCandidateChoices,
+		),
 	}
 
 	guildID := snowflake.MustParse(
@@ -75,26 +87,75 @@ func RegisterCommands(
 		commands,
 	)
 	if err != nil {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"não foi possível registrar os comandos da guilda: %w",
 			err,
 		)
 	}
 
-	return nil
+	return instances, nil
 }
 
 func (c *Client) registerCommands(ctx context.Context) error {
 	c.commandRegistrationMu.Lock()
 	defer c.commandRegistrationMu.Unlock()
 
-	return RegisterCommands(
+	instances, err := RegisterCommands(
 		ctx,
 		c.bot.Rest,
 		c.bot.ApplicationID,
-		c.gameOverrides,
+		c.gameOverridesSnapshot(),
 		c.hiddenInstanceNames(),
+		c.idleRegisteredInstanceNames(),
 	)
+	if err != nil {
+		return err
+	}
+
+	c.commandInventoryMu.Lock()
+	c.commandInventory = ampInstanceInventorySignature(instances)
+	c.commandInventoryMu.Unlock()
+	return nil
+}
+
+func ampInstanceInventorySignature(instances []amp.ManagedInstance) string {
+	names := make([]string, 0, len(instances))
+	for _, instance := range instances {
+		name := normalizeInstanceVisibilityKey(instance.Name)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return strings.Join(names, "\n")
+}
+
+func (c *Client) refreshCommandsForInventory(
+	ctx context.Context,
+	instances []amp.ManagedInstance,
+) {
+	if c == nil || c.bot == nil || c.bot.ApplicationID == 0 {
+		return
+	}
+
+	signature := ampInstanceInventorySignature(instances)
+	c.commandInventoryMu.RLock()
+	current := c.commandInventory
+	c.commandInventoryMu.RUnlock()
+	if signature == current {
+		return
+	}
+
+	if err := c.registerCommands(ctx); err != nil {
+		c.log.Warn().
+			Err(err).
+			Msg("Inventário AMP mudou, mas os comandos não puderam ser atualizados")
+		return
+	}
+
+	c.log.Info().
+		Int("instances", len(instances)).
+		Msg("Comandos atualizados após mudança no inventário AMP")
 }
 
 func buildAMPCommand(
@@ -149,6 +210,7 @@ func buildAMPCommand(
 func buildAMPConfigCommand(
 	visibleChoices []discord.ApplicationCommandOptionChoiceString,
 	hiddenChoices []discord.ApplicationCommandOptionChoiceString,
+	idleCandidateChoices []discord.ApplicationCommandOptionChoiceString,
 ) discord.SlashCommandCreate {
 	return discord.SlashCommandCreate{
 		Name:        "ampconfig",
@@ -168,6 +230,12 @@ func buildAMPConfigCommand(
 				"Volta a exibir uma instância no painel e nos comandos",
 				"Instância que voltará a aparecer no Discord",
 				hiddenChoices,
+			),
+			buildAMPControlSubCommand(
+				"idle-adicionar",
+				"Adiciona uma instância ao Idle automático",
+				"Instância que usará Idle ativo após 15 minutos",
+				idleCandidateChoices,
 			),
 			discord.ApplicationCommandOptionSubCommand{
 				Name:        "listar",

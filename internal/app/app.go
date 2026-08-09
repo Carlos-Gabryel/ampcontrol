@@ -36,8 +36,9 @@ func New() (*App, error) {
 
 	operationManager := operation.NewManager()
 
-	idleConfig, err := idle.Load(
+	idleConfig, err := idle.LoadCombined(
 		idleObserverConfigPath,
+		idleAdditionalServersPath,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -74,6 +75,9 @@ func New() (*App, error) {
 			PreferencesPath:       "data/discord_preferences.json",
 			GameOverrides:         gameOverrides,
 			PlayerCountResolver:   playerCountResolver,
+			IdleRegisteredInstances: idleRegisteredInstanceNames(
+				idleConfig,
+			),
 		},
 		log,
 	)
@@ -97,6 +101,9 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := discord.SetIdleServerRegistrar(idleObserver); err != nil {
+		return nil, err
+	}
 
 	discord.EnableAMPCommandHandling()
 
@@ -105,6 +112,14 @@ func New() (*App, error) {
 		IdleObserver: idleObserver,
 		Operations:   operationManager,
 	}, nil
+}
+
+func idleRegisteredInstanceNames(config idle.Config) []string {
+	names := make([]string, 0, len(config.Servers))
+	for _, server := range config.Servers {
+		names = append(names, server.Instance)
+	}
+	return names
 }
 
 func (a *App) Start(

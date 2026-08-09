@@ -111,10 +111,51 @@ func TestAMPConfigAuthorizationRequiresExactOwnerAndAdministrator(t *testing.T) 
 }
 
 func TestAMPConfigCommandDefaultsToAdministrators(t *testing.T) {
-	command := buildAMPConfigCommand(nil, nil)
+	command := buildAMPConfigCommand(nil, nil, nil)
 	permissions := command.DefaultMemberPermissions
 	if !permissions.OK || permissions.Value == nil ||
 		!permissions.Value.Has(disgoDiscord.PermissionAdministrator) {
 		t.Fatal("ampconfig deveria ficar oculto por padrão para não administradores")
+	}
+
+	foundIdleAdd := false
+	for _, option := range command.Options {
+		if option.OptionName() == "idle-adicionar" {
+			foundIdleAdd = true
+			break
+		}
+	}
+	if !foundIdleAdd {
+		t.Fatal("ampconfig deveria oferecer o cadastro no Idle")
+	}
+}
+
+func TestFilterUnregisteredAMPInstances(t *testing.T) {
+	instances := []amp.ManagedInstance{
+		{Name: "AIO01"},
+		{Name: "NovoServidor01"},
+		{Name: "Valheim01"},
+	}
+
+	actual := filterUnregisteredAMPInstances(
+		instances,
+		[]string{"aio01", "Valheim01"},
+	)
+	if len(actual) != 1 || actual[0].Name != "NovoServidor01" {
+		t.Fatalf("candidatos ao Idle inesperados: %#v", actual)
+	}
+}
+
+func TestAMPInstanceInventorySignatureIgnoresOrderAndCase(t *testing.T) {
+	left := ampInstanceInventorySignature([]amp.ManagedInstance{
+		{Name: "Valheim01"},
+		{Name: "AIO01"},
+	})
+	right := ampInstanceInventorySignature([]amp.ManagedInstance{
+		{Name: "aio01"},
+		{Name: "VALHEIM01"},
+	})
+	if left != right {
+		t.Fatalf("assinaturas equivalentes divergiram: %q != %q", left, right)
 	}
 }

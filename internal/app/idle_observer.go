@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
 	"github.com/alabamaamp/ampcontrol/internal/idle"
@@ -13,6 +14,7 @@ import (
 )
 
 const idleObserverConfigPath = "config/idle.json"
+const idleAdditionalServersPath = "data/idle_servers.json"
 const idleObserverStatePath = "data/idle_state.json"
 
 var errIdleObservationOnly = errors.New(
@@ -20,9 +22,11 @@ var errIdleObservationOnly = errors.New(
 )
 
 type idleObserver struct {
-	engine *idle.Engine
-	config idle.Config
-	log    zerolog.Logger
+	engine         *idle.Engine
+	config         idle.Config
+	configMu       sync.RWMutex
+	registrationMu sync.Mutex
+	log            zerolog.Logger
 }
 
 type observationOnlyStopper struct{}
@@ -173,15 +177,17 @@ func newIdleObserver(
 		)
 	}
 
+	observer := &idleObserver{
+		config: idleConfig,
+		log:    log,
+	}
+
 	engine, err := idle.NewEngine(
 		idleConfig,
 		detectors,
 		ampAdapter,
 		configuredStopper,
-		buildIdleEventHandler(
-			idleConfig,
-			log,
-		),
+		buildIdleEventHandler(observer.serverMode, log),
 		idle.WithStatePath(idleObserverStatePath),
 	)
 	if err != nil {
@@ -191,11 +197,8 @@ func newIdleObserver(
 		)
 	}
 
-	return &idleObserver{
-		engine: engine,
-		config: idleConfig,
-		log:    log,
-	}, nil
+	observer.engine = engine
+	return observer, nil
 }
 
 func (o *idleObserver) Run(
@@ -207,18 +210,19 @@ func (o *idleObserver) Run(
 		return
 	}
 
-	enabledServers := o.config.EnabledServers()
-	activeServers := o.config.ActiveServers()
+	config := o.configSnapshot()
+	enabledServers := config.EnabledServers()
+	activeServers := config.ActiveServers()
 	observeServers := len(enabledServers) - len(activeServers)
 
 	o.log.Info().
 		Str("idle_mode", "per_server").
 		Str("config_path", idleObserverConfigPath).
-		Int("registered_servers", len(o.config.Servers)).
+		Int("registered_servers", len(config.Servers)).
 		Int("enabled_servers", len(enabledServers)).
 		Int("observe_servers", observeServers).
 		Int("active_servers", len(activeServers)).
-		Dur("check_interval", o.config.CheckInterval).
+		Dur("check_interval", config.CheckInterval).
 		Msg("Motor genérico de Idle iniciado")
 
 	o.engine.Run(
@@ -231,7 +235,7 @@ func (o *idleObserver) Run(
 }
 
 func buildIdleEventHandler(
-	config idle.Config,
+	resolveMode func(string) idle.ServerMode,
 	log zerolog.Logger,
 ) idle.EventHandler {
 	return func(
@@ -240,11 +244,9 @@ func buildIdleEventHandler(
 	) {
 		mode := idle.ServerModeObserve
 
-		if server, exists := config.FindServer(
-			event.Instance,
-		); exists {
-			if server.Mode != "" {
-				mode = server.Mode
+		if resolveMode != nil {
+			if resolved := resolveMode(event.Instance); resolved != "" {
+				mode = resolved
 			}
 		}
 
@@ -428,4 +430,66 @@ func buildIdleEventHandler(
 				Msg("Evento do motor genérico de Idle")
 		}
 	}
+}
+
+func (o *idleObserver) configSnapshot() idle.Config {
+	o.configMu.RLock()
+	defer o.configMu.RUnlock()
+
+	return idle.Config{
+		CheckInterval: o.config.CheckInterval,
+		Servers:       append([]idle.Server(nil), o.config.Servers...),
+	}
+}
+
+func (o *idleObserver) serverMode(instance string) idle.ServerMode {
+	config := o.configSnapshot()
+	server, exists := config.FindServer(instance)
+	if !exists {
+		return ""
+	}
+	return server.Mode
+}
+
+func (o *idleObserver) RegisterIdleServer(
+	_ context.Context,
+	instance amp.ManagedInstance,
+) error {
+	if o == nil || o.engine == nil {
+		return fmt.Errorf("o motor de Idle não está disponível")
+	}
+
+	o.registrationMu.Lock()
+	defer o.registrationMu.Unlock()
+
+	next, err := idle.RegisterAdditionalServer(
+		idleObserverConfigPath,
+		idleAdditionalServersPath,
+		idle.ServerRegistration{
+			Instance:    instance.Name,
+			DisplayName: instance.FriendlyName,
+			Game:        instance.Game,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	if err := o.engine.ReplaceConfig(next); err != nil {
+		return fmt.Errorf(
+			"o cadastro foi salvo, mas não pôde ser aplicado ao motor: %w",
+			err,
+		)
+	}
+
+	o.configMu.Lock()
+	o.config = next
+	o.configMu.Unlock()
+
+	o.log.Info().
+		Str("server", instance.Name).
+		Str("display_name", instance.FriendlyName).
+		Str("game", instance.Game).
+		Msg("Instância adicionada ao motor de Idle em tempo real")
+
+	return nil
 }
