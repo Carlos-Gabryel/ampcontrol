@@ -21,7 +21,8 @@ import (
 const statusDashboardTimeout = 45 * time.Second
 
 type statusDashboardState struct {
-	MessageID string `json:"message_id"`
+	MessageID      string `json:"message_id"`
+	GuideMessageID string `json:"guide_message_id,omitempty"`
 }
 
 func (c *Client) runStatusDashboard(ctx context.Context) {
@@ -93,6 +94,10 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	embeds := buildAMPStatusEmbeds(statuses, time.Now())
 
 	if err := c.upsertStatusDashboardMessage(embeds); err != nil {
+		return err
+	}
+
+	if err := c.upsertCommandGuideMessage(); err != nil {
 		return err
 	}
 
@@ -239,10 +244,8 @@ func (c *Client) upsertStatusDashboardMessage(
 		)
 	}
 
-	if err := saveStatusDashboardState(
-		c.statusStatePath,
-		statusDashboardState{MessageID: created.ID.String()},
-	); err != nil {
+	state.MessageID = created.ID.String()
+	if err := saveStatusDashboardState(c.statusStatePath, state); err != nil {
 		return err
 	}
 
@@ -353,6 +356,7 @@ func (c *Client) cleanupExpiredChannelMessages() {
 	}
 
 	dashboardID, _ := snowflake.Parse(state.MessageID)
+	guideID, _ := snowflake.Parse(state.GuideMessageID)
 	cutoff := time.Now().Add(-c.notificationTTL)
 	before := snowflake.ID(0)
 
@@ -378,6 +382,7 @@ func (c *Client) cleanupExpiredChannelMessages() {
 			if !shouldDeleteChannelMessage(
 				message.ID,
 				dashboardID,
+				guideID,
 				message.CreatedAt,
 				cutoff,
 			) {
@@ -407,11 +412,13 @@ func (c *Client) cleanupExpiredChannelMessages() {
 func shouldDeleteChannelMessage(
 	messageID snowflake.ID,
 	dashboardID snowflake.ID,
+	guideID snowflake.ID,
 	createdAt time.Time,
 	cutoff time.Time,
 ) bool {
 	return messageID != 0 &&
 		messageID != dashboardID &&
+		messageID != guideID &&
 		createdAt.Before(cutoff)
 }
 

@@ -2,6 +2,7 @@ package discord
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,7 +107,10 @@ func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 
 func TestStatusDashboardStateRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data", "discord_status.json")
-	expected := statusDashboardState{MessageID: "123456789"}
+	expected := statusDashboardState{
+		MessageID:      "123456789",
+		GuideMessageID: "987654321",
+	}
 
 	if err := saveStatusDashboardState(path, expected); err != nil {
 		t.Fatalf("saveStatusDashboardState retornou erro: %v", err)
@@ -198,19 +202,32 @@ func TestStatusDashboardEmbedFitsDiscordLimits(t *testing.T) {
 func TestShouldDeleteEveryExpiredMessageExceptDashboard(t *testing.T) {
 	cutoff := time.Now()
 	dashboardID := snowflake.ID(100)
+	guideID := snowflake.ID(150)
 
 	if shouldDeleteChannelMessage(
 		dashboardID,
 		dashboardID,
+		guideID,
 		cutoff.Add(-time.Hour),
 		cutoff,
 	) {
-		t.Fatal("a mensagem fixa nunca deve ser apagada")
+		t.Fatal("o painel fixo nunca deve ser apagado")
+	}
+
+	if shouldDeleteChannelMessage(
+		guideID,
+		dashboardID,
+		guideID,
+		cutoff.Add(-time.Hour),
+		cutoff,
+	) {
+		t.Fatal("o guia fixo nunca deve ser apagado")
 	}
 
 	if !shouldDeleteChannelMessage(
 		snowflake.ID(200),
 		dashboardID,
+		guideID,
 		cutoff.Add(-time.Hour),
 		cutoff,
 	) {
@@ -220,9 +237,83 @@ func TestShouldDeleteEveryExpiredMessageExceptDashboard(t *testing.T) {
 	if shouldDeleteChannelMessage(
 		snowflake.ID(300),
 		dashboardID,
+		guideID,
 		cutoff.Add(time.Minute),
 		cutoff,
 	) {
 		t.Fatal("mensagem ainda dentro do TTL não deve ser apagada")
+	}
+}
+
+func TestBuildAMPCommandGuideEmbedsDocumentsEveryCommand(t *testing.T) {
+	embeds := buildAMPCommandGuideEmbeds()
+	if len(embeds) != 1 {
+		t.Fatalf("quantidade inesperada de embeds do guia: %d", len(embeds))
+	}
+
+	fields := embeds[0].Fields
+	expectedCommands := []string{
+		"/amp status",
+		"/amp iniciar",
+		"/amp parar",
+		"/amp reiniciar",
+		"/amp desligar",
+		"/amp atualizar",
+	}
+
+	for _, command := range expectedCommands {
+		found := false
+		for _, field := range fields {
+			if strings.Contains(field.Name, command) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("o guia não documenta %s", command)
+		}
+	}
+
+	if !strings.Contains(embeds[0].Description, "não funcionam em outros canais") {
+		t.Fatal("o guia deveria explicar a restrição de canal")
+	}
+	for _, field := range fields {
+		if strings.Contains(field.Name, "/ampconfig") ||
+			strings.Contains(field.Value, "/ampconfig") {
+			t.Fatal("o guia público não deve revelar comandos privados de configuração")
+		}
+	}
+}
+
+func TestAMPCommandGuideFitsDiscordLimits(t *testing.T) {
+	embeds := buildAMPCommandGuideEmbeds()
+	if len(commandGuideContent) > 2000 {
+		t.Fatal("o conteúdo do guia excede o limite do Discord")
+	}
+	if len(embeds) > 10 {
+		t.Fatal("o guia excede o limite de embeds do Discord")
+	}
+
+	totalCharacters := 0
+	fieldCount := 0
+	for _, embed := range embeds {
+		totalCharacters += len(embed.Title) + len(embed.Description)
+		fieldCount += len(embed.Fields)
+		for _, field := range embed.Fields {
+			if len(field.Name) > 256 || len(field.Value) > 1024 {
+				t.Fatalf("campo do guia excede os limites: %q", field.Name)
+			}
+			totalCharacters += len(field.Name) + len(field.Value)
+		}
+		if embed.Footer != nil {
+			totalCharacters += len(embed.Footer.Text)
+		}
+	}
+
+	if fieldCount > 25 {
+		t.Fatalf("o guia excede o limite de campos: %d", fieldCount)
+	}
+	if totalCharacters > 6000 {
+		t.Fatalf("o guia excede o limite total de caracteres: %d", totalCharacters)
 	}
 }
