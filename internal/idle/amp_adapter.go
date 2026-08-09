@@ -3,6 +3,7 @@ package idle
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -97,17 +98,26 @@ func (a *AMPAdapter) RuntimeState(
 	ctx context.Context,
 	server Server,
 ) (RuntimeState, error) {
+	observation, err := a.RuntimeObservation(ctx, server)
+	return observation.State, err
+}
+
+// RuntimeObservation consulta estado e uptime na mesma chamada ao AMP.
+func (a *AMPAdapter) RuntimeObservation(
+	ctx context.Context,
+	server Server,
+) (RuntimeObservation, error) {
 	instance, err := a.resolveInstance(
 		ctx,
 		server,
 		true,
 	)
 	if err != nil {
-		return RuntimeStateUnknown, err
+		return RuntimeObservation{State: RuntimeStateUnknown}, err
 	}
 
 	if !instance.Running {
-		return RuntimeStateOffline, nil
+		return RuntimeObservation{State: RuntimeStateOffline}, nil
 	}
 
 	apiURL := strings.TrimSpace(
@@ -115,7 +125,7 @@ func (a *AMPAdapter) RuntimeState(
 	)
 
 	if apiURL == "" {
-		return RuntimeStateUnknown, fmt.Errorf(
+		return RuntimeObservation{State: RuntimeStateUnknown}, fmt.Errorf(
 			"a instância AMP %s está ligada, mas não possui URL de API",
 			instance.Name,
 		)
@@ -126,16 +136,64 @@ func (a *AMPAdapter) RuntimeState(
 		apiURL,
 	)
 	if err != nil {
-		return RuntimeStateUnknown, fmt.Errorf(
+		return RuntimeObservation{State: RuntimeStateUnknown}, fmt.Errorf(
 			"não foi possível consultar o estado da aplicação da instância %s: %w",
 			instance.Name,
 			err,
 		)
 	}
 
-	return mapAMPApplicationStatus(
-		status,
-	), nil
+	observation := RuntimeObservation{
+		State: mapAMPApplicationStatus(status),
+	}
+
+	if uptime, uptimeErr := parseAMPApplicationUptime(status.Uptime); uptimeErr == nil {
+		observation.Uptime = uptime
+		observation.UptimeKnown = true
+	}
+
+	return observation, nil
+}
+
+func parseAMPApplicationUptime(raw string) (time.Duration, error) {
+	parts := strings.Split(strings.TrimSpace(raw), ":")
+	if len(parts) != 3 && len(parts) != 4 {
+		return 0, fmt.Errorf("uptime AMP possui formato inesperado: %q", raw)
+	}
+
+	days := 0
+	hoursIndex := 0
+	if len(parts) == 4 {
+		parsedDays, err := strconv.Atoi(parts[0])
+		if err != nil || parsedDays < 0 {
+			return 0, fmt.Errorf("dias invalidos no uptime AMP: %q", raw)
+		}
+		days = parsedDays
+		hoursIndex = 1
+	} else if dayHour := strings.SplitN(parts[0], ".", 2); len(dayHour) == 2 {
+		parsedDays, daysErr := strconv.Atoi(dayHour[0])
+		parsedHours, hoursErr := strconv.Atoi(dayHour[1])
+		if daysErr != nil || hoursErr != nil || parsedDays < 0 || parsedHours < 0 {
+			return 0, fmt.Errorf("dias ou horas invalidos no uptime AMP: %q", raw)
+		}
+		days = parsedDays
+		parts[0] = dayHour[1]
+	}
+
+	hours, hoursErr := strconv.Atoi(parts[hoursIndex])
+	minutes, minutesErr := strconv.Atoi(parts[hoursIndex+1])
+	secondsText := strings.SplitN(parts[hoursIndex+2], ".", 2)[0]
+	seconds, secondsErr := strconv.Atoi(secondsText)
+	if hoursErr != nil || minutesErr != nil || secondsErr != nil ||
+		hours < 0 || minutes < 0 || seconds < 0 ||
+		minutes >= 60 || seconds >= 60 {
+		return 0, fmt.Errorf("uptime AMP possui valores invalidos: %q", raw)
+	}
+
+	return time.Duration(days)*24*time.Hour +
+		time.Duration(hours)*time.Hour +
+		time.Duration(minutes)*time.Minute +
+		time.Duration(seconds)*time.Second, nil
 }
 
 // PlayerCount consulta Core.GetStatus diretamente na instância e valida

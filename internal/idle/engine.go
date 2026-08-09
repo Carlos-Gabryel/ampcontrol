@@ -29,6 +29,22 @@ type RuntimeStatusProvider interface {
 	) (RuntimeState, error)
 }
 
+// RuntimeObservationProvider acrescenta a identidade do processo atual por
+// meio do uptime. O motor usa essa informacao para restaurar um contador
+// somente quando o jogo continua sendo o mesmo processo.
+type RuntimeObservationProvider interface {
+	RuntimeObservation(
+		ctx context.Context,
+		server Server,
+	) (RuntimeObservation, error)
+}
+
+type RuntimeObservation struct {
+	State       RuntimeState
+	Uptime      time.Duration
+	UptimeKnown bool
+}
+
 // ApplicationStopper coloca somente o processo do jogo em Idle.
 //
 // A instância AMP deve permanecer ligada.
@@ -42,20 +58,21 @@ type ApplicationStopper interface {
 type EventType string
 
 const (
-	EventRuntimeUnavailable   EventType = "runtime_unavailable"
-	EventRuntimeNotOnline     EventType = "runtime_not_online"
-	EventStartupGraceStarted  EventType = "startup_grace_started"
-	EventStartupGraceActive   EventType = "startup_grace_active"
-	EventDetectorFailed       EventType = "detector_failed"
-	EventPlayersPresent       EventType = "players_present"
-	EventIdleTimerStarted     EventType = "idle_timer_started"
-	EventIdleTimerActive      EventType = "idle_timer_active"
-	EventFinalCheckFailed     EventType = "final_check_failed"
-	EventStopCancelledPlayers EventType = "stop_cancelled_players"
-	EventStopCancelledState   EventType = "stop_cancelled_state"
-	EventStopStarting         EventType = "stop_starting"
-	EventStopSucceeded        EventType = "stop_succeeded"
-	EventStopFailed           EventType = "stop_failed"
+	EventRuntimeUnavailable     EventType = "runtime_unavailable"
+	EventRuntimeNotOnline       EventType = "runtime_not_online"
+	EventStartupGraceStarted    EventType = "startup_grace_started"
+	EventStartupGraceActive     EventType = "startup_grace_active"
+	EventDetectorFailed         EventType = "detector_failed"
+	EventPlayersPresent         EventType = "players_present"
+	EventIdleTimerStarted       EventType = "idle_timer_started"
+	EventIdleTimerActive        EventType = "idle_timer_active"
+	EventFinalCheckFailed       EventType = "final_check_failed"
+	EventStopCancelledPlayers   EventType = "stop_cancelled_players"
+	EventStopCancelledState     EventType = "stop_cancelled_state"
+	EventStopStarting           EventType = "stop_starting"
+	EventStopSucceeded          EventType = "stop_succeeded"
+	EventStopFailed             EventType = "stop_failed"
+	EventStatePersistenceFailed EventType = "state_persistence_failed"
 )
 
 type Event struct {
@@ -77,10 +94,14 @@ type EventHandler func(
 )
 
 type serverTracker struct {
-	LastRuntime RuntimeState
-	OnlineSince time.Time
-	EmptySince  time.Time
+	LastRuntime          RuntimeState
+	OnlineSince          time.Time
+	EmptySince           time.Time
+	ApplicationStartedAt time.Time
+	Restored             bool
 }
+
+type EngineOption func(*Engine) error
 
 type Engine struct {
 	config         Config
@@ -89,6 +110,7 @@ type Engine struct {
 	stopper        ApplicationStopper
 	eventHandler   EventHandler
 	now            func() time.Time
+	statePath      string
 
 	mu       sync.Mutex
 	trackers map[string]*serverTracker
@@ -104,6 +126,7 @@ func NewEngine(
 	statusProvider RuntimeStatusProvider,
 	stopper ApplicationStopper,
 	eventHandler EventHandler,
+	options ...EngineOption,
 ) (*Engine, error) {
 	if config.CheckInterval <= 0 {
 		return nil, fmt.Errorf(
@@ -161,7 +184,7 @@ func NewEngine(
 		}
 	}
 
-	return &Engine{
+	engine := &Engine{
 		config:         config,
 		detectors:      detectors,
 		statusProvider: statusProvider,
@@ -172,7 +195,18 @@ func NewEngine(
 			map[string]*serverTracker,
 			len(enabledServers),
 		),
-	}, nil
+	}
+
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		if err := option(engine); err != nil {
+			return nil, err
+		}
+	}
+
+	return engine, nil
 }
 
 // Run executa uma verificação imediatamente e depois repete
@@ -238,6 +272,19 @@ func (e *Engine) CheckNow(
 		)
 	}
 
+	if err := e.persistState(e.now()); err != nil {
+		events = append(
+			events,
+			e.emitMany(
+				ctx,
+				Event{
+					Type: EventStatePersistenceFailed,
+					Err:  err,
+				},
+			)...,
+		)
+	}
+
 	return events
 }
 
@@ -251,7 +298,7 @@ func (e *Engine) checkServer(
 
 	now := e.now()
 
-	runtimeState, err := e.statusProvider.RuntimeState(
+	observation, err := e.observeRuntime(
 		ctx,
 		server,
 	)
@@ -272,6 +319,7 @@ func (e *Engine) checkServer(
 			},
 		)
 	}
+	runtimeState := observation.State
 
 	if runtimeState != RuntimeStateOnline {
 		e.resetTracker(
@@ -290,11 +338,31 @@ func (e *Engine) checkServer(
 		)
 	}
 
+	applicationStartedAt := time.Time{}
+	if observation.UptimeKnown {
+		applicationStartedAt = now.Add(-observation.Uptime)
+	}
+
+	applicationChanged :=
+		!applicationStartedAt.IsZero() &&
+			!tracker.ApplicationStartedAt.IsZero() &&
+			absoluteDuration(
+				applicationStartedAt.Sub(tracker.ApplicationStartedAt),
+			) > 5*time.Second
+
+	restoredWithoutIdentity := tracker.Restored &&
+		(applicationStartedAt.IsZero() ||
+			tracker.ApplicationStartedAt.IsZero())
+
 	if tracker.LastRuntime != RuntimeStateOnline ||
-		tracker.OnlineSince.IsZero() {
+		tracker.OnlineSince.IsZero() ||
+		applicationChanged ||
+		restoredWithoutIdentity {
 		tracker.LastRuntime = RuntimeStateOnline
 		tracker.OnlineSince = now
 		tracker.EmptySince = time.Time{}
+		tracker.ApplicationStartedAt = applicationStartedAt
+		tracker.Restored = false
 
 		return e.emitMany(
 			ctx,
@@ -306,6 +374,11 @@ func (e *Engine) checkServer(
 				GraceRemaining: server.StartupGrace,
 			},
 		)
+	}
+
+	tracker.Restored = false
+	if tracker.ApplicationStartedAt.IsZero() {
+		tracker.ApplicationStartedAt = applicationStartedAt
 	}
 
 	graceElapsed := nonNegativeDuration(
@@ -535,9 +608,7 @@ func (e *Engine) checkServer(
 func (e *Engine) trackerFor(
 	instance string,
 ) *serverTracker {
-	key := strings.ToLower(
-		strings.TrimSpace(instance),
-	)
+	key := normalizeTrackerKey(instance)
 
 	tracker, exists := e.trackers[key]
 	if exists {
@@ -560,6 +631,20 @@ func (e *Engine) resetTracker(
 	tracker.LastRuntime = runtimeState
 	tracker.OnlineSince = time.Time{}
 	tracker.EmptySince = time.Time{}
+	tracker.ApplicationStartedAt = time.Time{}
+	tracker.Restored = false
+}
+
+func (e *Engine) observeRuntime(
+	ctx context.Context,
+	server Server,
+) (RuntimeObservation, error) {
+	if provider, ok := e.statusProvider.(RuntimeObservationProvider); ok {
+		return provider.RuntimeObservation(ctx, server)
+	}
+
+	state, err := e.statusProvider.RuntimeState(ctx, server)
+	return RuntimeObservation{State: state}, err
 }
 
 func (e *Engine) emitMany(
@@ -583,6 +668,14 @@ func nonNegativeDuration(
 ) time.Duration {
 	if duration < 0 {
 		return 0
+	}
+
+	return duration
+}
+
+func absoluteDuration(duration time.Duration) time.Duration {
+	if duration < 0 {
+		return -duration
 	}
 
 	return duration

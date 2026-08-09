@@ -13,6 +13,7 @@ import (
 )
 
 const idleObserverConfigPath = "config/idle.json"
+const idleObserverStatePath = "data/idle_state.json"
 
 var errIdleObservationOnly = errors.New(
 	"modo de observação: Core.Stop não foi executado",
@@ -181,6 +182,7 @@ func newIdleObserver(
 			idleConfig,
 			log,
 		),
+		idle.WithStatePath(idleObserverStatePath),
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -411,6 +413,11 @@ func buildIdleEventHandler(
 
 			eventLog.Warn().
 				Msg("Modo observe registrou uma parada concluída inesperadamente")
+
+		case idle.EventStatePersistenceFailed:
+			eventLog.Error().
+				Err(event.Err).
+				Msg("Motor de Idle nao conseguiu persistir os contadores")
 
 		default:
 			eventLog.Debug().
