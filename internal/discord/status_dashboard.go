@@ -150,6 +150,8 @@ func (c *Client) applyGameOverrides(instances []amp.ManagedInstance) {
 func (c *Client) upsertStatusDashboardMessage(
 	embeds []disgoDiscord.Embed,
 ) error {
+	const dashboardContent = "— Estado dos servidores"
+
 	state, err := loadStatusDashboardState(c.statusStatePath)
 	if err != nil {
 		return err
@@ -165,7 +167,7 @@ func (c *Client) upsertStatusDashboardMessage(
 			if getErr == nil &&
 				existing.Author.ID == c.bot.ID() {
 				update := disgoDiscord.NewMessageUpdate().
-					ClearContent().
+					WithContent(dashboardContent).
 					WithEmbeds(embeds...)
 
 				updated, updateErr := c.channels.UpdateMessage(
@@ -205,7 +207,9 @@ func (c *Client) upsertStatusDashboardMessage(
 
 	created, err := c.channels.CreateMessage(
 		c.notificationChannelID,
-		disgoDiscord.NewMessageCreate().WithEmbeds(embeds...),
+		disgoDiscord.NewMessageCreate().
+			WithContent(dashboardContent).
+			WithEmbeds(embeds...),
 	)
 	if err != nil {
 		return fmt.Errorf(

@@ -59,14 +59,19 @@ func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 	if len(embeds) != 3 {
 		t.Fatalf("quantidade inesperada de embeds: %d", len(embeds))
 	}
-	if embeds[0].Title != "— Estado dos servidores" {
-		t.Fatalf("título inesperado: %q", embeds[0].Title)
+	if embeds[0].Title != "" {
+		t.Fatalf("o título deveria ficar fora do embed: %q", embeds[0].Title)
 	}
 
+	expectedNames := []string{
+		"🟡 Alamama",
+		"🟢 HyLabama",
+		"🔴 Vanilla - 2025",
+	}
 	expectedValues := []string{
-		"### 🟡 Alamama\n**Jogo:** `Palworld`\n**Tempo online:** `0 min`\n**Jogadores:** `0/32`\n──────────────",
-		"### 🟢 HyLabama\n**Jogo:** `Hytale`\n**Tempo online:** `3h 24min`\n**Jogadores:** `2/100`\n──────────────",
-		"### 🔴 Vanilla - 2025\n**Jogo:** `Minecraft`\n**Tempo online:** `0 min`\n**Jogadores:** `0/?`\n──────────────",
+		"**Jogo:** `Palworld`\n**Tempo online:** `0 min`\n**Jogadores:** `0/32`\n──────────────",
+		"**Jogo:** `Hytale`\n**Tempo online:** `3h 24min`\n**Jogadores:** `2/100`\n──────────────",
+		"**Jogo:** `Minecraft`\n**Tempo online:** `0 min`\n**Jogadores:** `0/?`\n──────────────",
 	}
 
 	serverFields := []struct {
@@ -79,6 +84,9 @@ func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 	}
 	for index, location := range serverFields {
 		field := embeds[location.embed].Fields[location.field]
+		if field.Name != expectedNames[index] {
+			t.Fatalf("nome do campo %d inesperado: %q", index, field.Name)
+		}
 		if field.Value != expectedValues[index] {
 			t.Fatalf("valor do campo %d inesperado: %q", index, field.Value)
 		}

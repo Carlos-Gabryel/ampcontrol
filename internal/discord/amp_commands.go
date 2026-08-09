@@ -899,7 +899,6 @@ func buildAMPStatusEmbeds(
 	if len(statuses) == 0 {
 		return []disgoDiscord.Embed{
 			disgoDiscord.NewEmbed().
-				WithTitle("— Estado dos servidores").
 				WithDescription(
 					"Nenhuma instância controlável foi encontrada.",
 				).
@@ -916,11 +915,9 @@ func buildAMPStatusEmbeds(
 	for rowStart := 0; rowStart < len(statuses); rowStart += serversPerRow {
 		row := disgoDiscord.NewEmbed().WithColor(0x5865F2)
 		if rowStart == 0 {
-			row = row.
-				WithTitle("— Estado dos servidores").
-				WithDescription(
-					fmt.Sprintf("Atualizado <t:%d:R>", updatedAt.Unix()),
-				)
+			row = row.WithDescription(
+				fmt.Sprintf("Atualizado <t:%d:R>", updatedAt.Unix()),
+			)
 		}
 
 		rowEnd := min(rowStart+serversPerRow, len(statuses))
@@ -954,11 +951,13 @@ func buildAMPStatusEmbeds(
 			}
 
 			row = row.AddField(
-				"\u200b",
 				fmt.Sprintf(
-					"### %s %s\n**Jogo:** `%s`\n**Tempo online:** `%s`\n**Jogadores:** `%s`\n──────────────",
+					"%s %s",
 					icon,
 					ampInstanceDisplayName(statusView.Instance),
+				),
+				fmt.Sprintf(
+					"**Jogo:** `%s`\n**Tempo online:** `%s`\n**Jogadores:** `%s`\n──────────────",
 					game,
 					uptime,
 					players,
