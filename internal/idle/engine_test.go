@@ -490,11 +490,71 @@ func TestEngineFailsOpenWhenDetectorFails(
 		context.Background(),
 	)
 
+	if len(events) != 2 ||
+		events[0].Type != EventStopStarting ||
+		events[1].Type != EventStopSucceeded {
+		t.Fatalf("eventos após a recuperação inesperados: %#v", events)
+	}
+	if events[0].IdleElapsed != 11*time.Minute {
+		t.Fatalf(
+			"a falha transitória não deveria apagar o contador: %s",
+			events[0].IdleElapsed,
+		)
+	}
+	if stopper.calls != 1 {
+		t.Fatalf("a parada confirmada deveria ocorrer uma vez: %d", stopper.calls)
+	}
+}
+
+func TestEngineRuntimeFailurePreservesIdleProgress(t *testing.T) {
+	t.Parallel()
+
+	runtimeErr := errors.New("AMP temporariamente indisponível")
+	provider := &scriptedRuntimeProvider{
+		states: []RuntimeState{
+			RuntimeStateOnline,
+			RuntimeStateOnline,
+			RuntimeStateUnknown,
+			RuntimeStateOnline,
+		},
+		errors:       []error{nil, nil, runtimeErr, nil},
+		defaultState: RuntimeStateOnline,
+	}
+	engine := newEngineForTest(
+		t,
+		&scriptedEngineDetector{defaultCount: 0},
+		provider,
+		&fakeApplicationStopper{},
+	)
+
+	currentTime := time.Date(2026, time.August, 9, 3, 0, 0, 0, time.UTC)
+	engine.now = func() time.Time { return currentTime }
 	assertSingleEventType(
 		t,
-		events,
+		engine.CheckNow(context.Background()),
+		EventStartupGraceStarted,
+	)
+
+	currentTime = currentTime.Add(5 * time.Minute)
+	assertSingleEventType(
+		t,
+		engine.CheckNow(context.Background()),
 		EventIdleTimerStarted,
 	)
+
+	currentTime = currentTime.Add(5 * time.Minute)
+	events := engine.CheckNow(context.Background())
+	assertSingleEventType(t, events, EventRuntimeUnavailable)
+	if !errors.Is(events[0].Err, runtimeErr) {
+		t.Fatalf("erro transitório inesperado: %v", events[0].Err)
+	}
+
+	currentTime = currentTime.Add(time.Minute)
+	events = engine.CheckNow(context.Background())
+	assertSingleEventType(t, events, EventIdleTimerActive)
+	if events[0].IdleElapsed != 6*time.Minute {
+		t.Fatalf("contador não foi preservado: %s", events[0].IdleElapsed)
+	}
 }
 
 func TestEngineCancelsStopWhenRuntimeChanges(

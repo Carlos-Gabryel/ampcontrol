@@ -132,6 +132,47 @@ func TestEngineRestoredStateProtectsNewGameProcess(t *testing.T) {
 	)
 }
 
+func TestEngineToleratesAMPUptimeJitter(t *testing.T) {
+	baseTime := time.Date(2026, time.August, 9, 3, 0, 0, 0, time.UTC)
+	currentTime := baseTime
+	provider := &observedRuntimeProvider{
+		now:       &currentTime,
+		startedAt: baseTime.Add(-time.Hour),
+		state:     RuntimeStateOnline,
+	}
+	registry, err := NewDetectorRegistry(
+		&scriptedEngineDetector{defaultCount: 0},
+	)
+	if err != nil {
+		t.Fatalf("não foi possível criar o registro: %v", err)
+	}
+	engine, err := NewEngine(
+		engineTestConfig(),
+		registry,
+		provider,
+		&fakeApplicationStopper{},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("não foi possível criar o motor: %v", err)
+	}
+	engine.now = func() time.Time { return currentTime }
+
+	assertSingleEventType(
+		t,
+		engine.CheckNow(context.Background()),
+		EventStartupGraceStarted,
+	)
+
+	currentTime = currentTime.Add(time.Minute)
+	provider.startedAt = provider.startedAt.Add(90 * time.Second)
+	events := engine.CheckNow(context.Background())
+	assertSingleEventType(t, events, EventStartupGraceActive)
+	if events[0].GraceElapsed != time.Minute {
+		t.Fatalf("a oscilação do uptime reiniciou a proteção: %s", events[0].GraceElapsed)
+	}
+}
+
 func newPersistentEngineForTest(
 	t *testing.T,
 	currentTime *time.Time,

@@ -101,6 +101,8 @@ type serverTracker struct {
 	Restored             bool
 }
 
+const applicationIdentityTolerance = 2 * time.Minute
+
 type EngineOption func(*Engine) error
 
 type Engine struct {
@@ -345,11 +347,9 @@ func (e *Engine) checkServer(
 		server,
 	)
 	if err != nil {
-		e.resetTracker(
-			tracker,
-			RuntimeStateUnknown,
-		)
-
+		// Uma falha transitória apenas pausa este ciclo. O progresso é
+		// preservado, mas nenhuma decisão de parada é tomada sem que o
+		// estado e os jogadores possam ser confirmados novamente.
 		return e.emitMany(
 			ctx,
 			Event{
@@ -390,7 +390,7 @@ func (e *Engine) checkServer(
 			!tracker.ApplicationStartedAt.IsZero() &&
 			absoluteDuration(
 				applicationStartedAt.Sub(tracker.ApplicationStartedAt),
-			) > 5*time.Second
+			) > applicationIdentityTolerance
 
 	restoredWithoutIdentity := tracker.Restored &&
 		(applicationStartedAt.IsZero() ||
@@ -449,8 +449,9 @@ func (e *Engine) checkServer(
 	)
 	if err != nil {
 		// Fail-open:
-		// um erro no detector nunca é interpretado como zero jogadores.
-		tracker.EmptySince = time.Time{}
+		// um erro nunca é interpretado como zero jogadores e não autoriza
+		// uma parada. O contador fica pausado até uma leitura válida; as
+		// duas confirmações finais continuam obrigatórias.
 
 		return e.emitMany(
 			ctx,
@@ -521,8 +522,6 @@ func (e *Engine) checkServer(
 		server,
 	)
 	if err != nil {
-		tracker.EmptySince = time.Time{}
-
 		return e.emitMany(
 			ctx,
 			Event{
@@ -559,8 +558,6 @@ func (e *Engine) checkServer(
 		server,
 	)
 	if err != nil {
-		tracker.EmptySince = time.Time{}
-
 		return e.emitMany(
 			ctx,
 			Event{
