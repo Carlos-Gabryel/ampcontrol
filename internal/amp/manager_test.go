@@ -89,6 +89,39 @@ Running            │ Yes
 	}
 }
 
+func TestParseInstancesListRejectsMissingRunningState(t *testing.T) {
+	t.Parallel()
+
+	output := `
+Instance ID        â”‚ minecraft-id
+Module             â”‚ Minecraft
+Instance Name      â”‚ Vanilla-202501
+Friendly Name      â”‚ Vanilla - 2025
+URL                â”‚ http://127.0.0.1:8081/
+`
+
+	if _, err := parseInstancesList(output); err == nil {
+		t.Fatal("a saída parcial sem Running deveria ser rejeitada")
+	}
+}
+
+func TestParseInstancesListRejectsUnknownRunningState(t *testing.T) {
+	t.Parallel()
+
+	output := `
+Instance ID        â”‚ minecraft-id
+Module             â”‚ Minecraft
+Instance Name      â”‚ Vanilla-202501
+Friendly Name      â”‚ Vanilla - 2025
+URL                â”‚ http://127.0.0.1:8081/
+Running            â”‚ Unknown
+`
+
+	if _, err := parseInstancesList(output); err == nil {
+		t.Fatal("um valor Running desconhecido deveria ser rejeitado")
+	}
+}
+
 func TestNormalizeInstanceURLMarkdown(
 	t *testing.T,
 ) {

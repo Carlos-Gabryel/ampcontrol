@@ -20,6 +20,7 @@ type ManagedInstance struct {
 	Game         string
 	APIURL       string
 	Running      bool
+	runningSet   bool
 }
 
 // DiscoverInstances consulta o AMP e retorna todas as instâncias
@@ -199,10 +200,15 @@ func parseInstancesList(
 			)
 
 		case "Running":
-			current.Running = strings.EqualFold(
-				value,
-				"Yes",
-			)
+			switch {
+			case strings.EqualFold(value, "Yes"):
+				current.Running = true
+				current.runningSet = true
+
+			case strings.EqualFold(value, "No"):
+				current.Running = false
+				current.runningSet = true
+			}
 		}
 	}
 
@@ -230,6 +236,13 @@ func parseInstancesList(
 		if strings.TrimSpace(instance.Name) == "" {
 			return nil, fmt.Errorf(
 				"o AMP retornou uma instância sem nome",
+			)
+		}
+
+		if !instance.runningSet {
+			return nil, fmt.Errorf(
+				"o AMP não informou um estado Running válido para a instância %q",
+				instance.Name,
 			)
 		}
 
