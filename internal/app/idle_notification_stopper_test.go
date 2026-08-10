@@ -12,8 +12,23 @@ import (
 )
 
 type recordingIdleNotificationTarget struct {
-	messages []string
-	err      error
+	messages       []string
+	err            error
+	auditCalls     int
+	auditServer    idle.Server
+	auditStartedAt time.Time
+	auditErr       error
+}
+
+func (n *recordingIdleNotificationTarget) RecordAutomaticIdle(
+	server idle.Server,
+	startedAt time.Time,
+	operationErr error,
+) {
+	n.auditCalls++
+	n.auditServer = server
+	n.auditStartedAt = startedAt
+	n.auditErr = operationErr
 }
 
 func (n *recordingIdleNotificationTarget) SendNotification(
@@ -90,6 +105,13 @@ func TestIdleNotificationStopperSendsWarningAndSuccess(
 			"eram esperadas duas notificações; encontradas=%d",
 			len(notifier.messages),
 		)
+	}
+
+	if notifier.auditCalls != 1 ||
+		notifier.auditServer.Instance != "AlamamaPal01" ||
+		notifier.auditStartedAt.IsZero() ||
+		notifier.auditErr != nil {
+		t.Fatalf("auditoria de sucesso inesperada: %#v", notifier)
 	}
 
 	if !strings.Contains(
@@ -181,6 +203,13 @@ func TestIdleNotificationStopperSendsFailure(
 			"eram esperadas duas notificações; encontradas=%d",
 			len(notifier.messages),
 		)
+	}
+
+	if notifier.auditCalls != 1 ||
+		notifier.auditServer.Instance != "KalagaPal01" ||
+		notifier.auditStartedAt.IsZero() ||
+		!errors.Is(notifier.auditErr, expectedErr) {
+		t.Fatalf("auditoria de falha inesperada: %#v", notifier)
 	}
 
 	if !strings.Contains(

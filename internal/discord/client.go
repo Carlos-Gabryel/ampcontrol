@@ -34,6 +34,7 @@ type Client struct {
 	commandRegistrationMu sync.Mutex
 	commandInventoryMu    sync.RWMutex
 	commandInventory      string
+	commandAudits         sync.Map
 	preferencesMu         sync.RWMutex
 	preferencesPath       string
 	preferences           discordPreferences
@@ -197,8 +198,16 @@ func (c *Client) sendInteractionMessage(
 			Err(err).
 			Msg("Erro enviando resposta ao Discord")
 
+		c.finishCommandAudit(
+			event.Token(),
+			commandAuditPhaseFailed,
+			"Não foi possível responder ao comando no Discord.",
+			"",
+		)
 		return
 	}
+
+	c.recordCommandAuditResponse(event.Token(), content)
 
 	c.log.Info().
 		Msg("Resposta enviada ao Discord")
@@ -233,8 +242,16 @@ func (c *Client) updateInteractionMessageByToken(
 			Err(err).
 			Msg("Erro atualizando resposta da interação")
 
+		c.finishCommandAudit(
+			interactionToken,
+			commandAuditPhaseFailed,
+			"Não foi possível atualizar a resposta do comando no Discord.",
+			"",
+		)
 		return
 	}
+
+	c.recordCommandAuditResponse(interactionToken, content)
 
 	c.log.Info().
 		Msg("Resposta da interação atualizada")

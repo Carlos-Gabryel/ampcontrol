@@ -28,6 +28,12 @@ func (c *Client) handleAMPInteractionEvent(
 			c.log.Error().
 				Interface("panic", recovered).
 				Msg("Panic processando comando AMP")
+			c.finishCommandAudit(
+				event.Token(),
+				commandAuditPhaseFailed,
+				"O comando foi interrompido por uma falha interna.",
+				"Não concluído",
+			)
 		}
 	}()
 
@@ -49,7 +55,8 @@ func (c *Client) handleAMPInteractionEvent(
 		data,
 		channelAllowed,
 	)
-	go c.sendCommandAudit(
+	c.beginCommandAudit(
+		event.Token(),
 		newCommandAuditRecord(
 			event,
 			data,

@@ -881,6 +881,12 @@ func (c *Client) deferAMPInteraction(
 		c.log.Error().
 			Err(err).
 			Msg("Erro adiando resposta do comando AMP")
+		c.finishCommandAudit(
+			event.Token(),
+			commandAuditPhaseFailed,
+			"Não foi possível iniciar a resposta do comando no Discord.",
+			"",
+		)
 
 		return false
 	}

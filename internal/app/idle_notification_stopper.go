@@ -20,6 +20,14 @@ type idleNotifier interface {
 	) error
 }
 
+type idleAuditRecorder interface {
+	RecordAutomaticIdle(
+		server idle.Server,
+		startedAt time.Time,
+		operationErr error,
+	)
+}
+
 // idleNotificationStopper envolve somente a parada real.
 //
 // Ele é instalado dentro do LockedStopper. Dessa forma, as mensagens
@@ -70,6 +78,7 @@ func (s *idleNotificationStopper) StopApplication(
 	displayName := idleNotificationDisplayName(
 		server,
 	)
+	startedAt := time.Now()
 
 	warningMessage := fmt.Sprintf(
 		"⚠️ **%s está sem jogadores há %s.**\n"+
@@ -94,6 +103,7 @@ func (s *idleNotificationStopper) StopApplication(
 		server,
 	)
 	if err != nil {
+		s.recordAudit(server, startedAt, err)
 		failureMessage := fmt.Sprintf(
 			"❌ Não foi possível colocar **%s** em modo Idle automaticamente.\n"+
 				"O erro foi registrado nos logs do serviço.",
@@ -112,6 +122,8 @@ func (s *idleNotificationStopper) StopApplication(
 		return err
 	}
 
+	s.recordAudit(server, startedAt, nil)
+
 	successMessage := fmt.Sprintf(
 		"💤 **%s entrou em modo Idle por inatividade.**\n"+
 			"Use `/amp iniciar` quando quiser jogar novamente.",
@@ -128,6 +140,22 @@ func (s *idleNotificationStopper) StopApplication(
 	}
 
 	return nil
+}
+
+func (s *idleNotificationStopper) recordAudit(
+	server idle.Server,
+	startedAt time.Time,
+	operationErr error,
+) {
+	recorder, ok := s.notifier.(idleAuditRecorder)
+	if !ok || recorder == nil {
+		return
+	}
+	recorder.RecordAutomaticIdle(
+		server,
+		startedAt,
+		operationErr,
+	)
 }
 
 func idleNotificationDisplayName(
