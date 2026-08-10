@@ -51,16 +51,6 @@ func (c *Client) handleAMPCommand(
 		return
 	}
 
-	if *data.SubCommandName != "status" &&
-		!ampCommandAuthorized(event.Member()) {
-		c.sendInteractionMessage(
-			event,
-			"⛔ Apenas administradores podem controlar as instâncias AMP.",
-		)
-
-		return
-	}
-
 	switch *data.SubCommandName {
 	case "status":
 		c.handleAMPStatusCommand(event)

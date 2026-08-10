@@ -22,31 +22,31 @@ func buildAMPCommandGuideEmbeds() []disgoDiscord.Embed {
 		).
 		AddField(
 			"`/amp iniciar servidor:<servidor>`",
-			"Liga a instância AMP, se necessário, inicia o processo do jogo e aguarda o estado Online. O início é manual e pode levar alguns minutos.",
+			"Liga a instância AMP, se necessário, inicia o processo do jogo e aguarda o estado Online. O início é manual, pode levar alguns minutos e está **disponível para todos**.",
 			false,
 		).
 		AddField(
 			"`/amp parar servidor:<servidor>`",
-			"Para somente o processo do jogo. A instância AMP permanece ligada e o painel mostra a bolinha amarela de **Idle**.",
+			"Para somente o processo do jogo. A instância AMP permanece ligada e o painel mostra a bolinha amarela de **Idle**. **Disponível para todos.**",
 			false,
 		).
 		AddField(
 			"`/amp reiniciar servidor:<servidor>`",
-			"Reinicia somente o processo do jogo e aguarda que ele volte a ficar Online.",
+			"Reinicia somente o processo do jogo e aguarda que ele volte a ficar Online. **Disponível para todos.**",
 			false,
 		).
 		AddField(
 			"`/amp desligar servidor:<servidor> confirmar:sim`",
-			"Desliga completamente a instância AMP. Exige a confirmação oferecida pelo Discord e o painel passa a mostrar **Offline**.",
+			"Desliga completamente a instância AMP. Exige a confirmação oferecida pelo Discord e o painel passa a mostrar **Offline**. **Disponível para todos.**",
 			false,
 		).
 		AddField(
 			"`/amp atualizar servidor:<servidor> confirmar:sim`",
-			"Atualiza a instalação do **AMP** daquela instância. Não atualiza o jogo, exige confirmação e reinicia a instância caso ela esteja ligada, interrompendo o servidor durante o processo.",
+			"Atualiza a instância selecionada. Exige confirmação e reinicia a instância caso ela esteja ligada, interrompendo o servidor durante o processo. **Disponível para todos.**",
 			false,
 		).
 		WithFooter(
-			"Controle de servidores: exige a permissão Administrador do Discord, exceto /amp status.",
+			"Todos os comandos /amp estão disponíveis para os usuários deste canal.",
 			"",
 		).
 		WithColor(0x5865F2)
