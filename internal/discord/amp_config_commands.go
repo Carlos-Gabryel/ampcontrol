@@ -39,6 +39,9 @@ func (c *Client) handleAMPConfigCommand(
 	}
 
 	switch *data.SubCommandName {
+	case "diagnostico":
+		c.handleAMPDiagnosticsCommand(event)
+
 	case "ocultar":
 		c.handleAMPInstanceVisibilityCommand(event, data, true)
 

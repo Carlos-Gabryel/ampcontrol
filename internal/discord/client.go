@@ -18,33 +18,39 @@ import (
 )
 
 type Client struct {
-	bot                   *bot.Client
-	ampClient             *amp.APIClient
-	interactions          rest.Interactions
-	channels              rest.Channels
-	notificationChannelID snowflake.ID
-	auditChannelID        snowflake.ID
-	ownerUserID           snowflake.ID
-	notificationTTL       time.Duration
-	statusRefreshInterval time.Duration
-	adsURL                string
-	statusStatePath       string
-	statusRefreshRequests chan struct{}
-	statusRefreshMu       sync.Mutex
-	commandRegistrationMu sync.Mutex
-	commandInventoryMu    sync.RWMutex
-	commandInventory      string
-	commandAudits         sync.Map
-	preferencesMu         sync.RWMutex
-	preferencesPath       string
-	preferences           discordPreferences
-	gameOverridesMu       sync.RWMutex
-	idleRegistrationMu    sync.RWMutex
-	idleServerRegistrar   IdleServerRegistrar
-	idleRegistered        map[string]string
-	gameOverrides         map[string]string
-	playerCountResolver   PlayerCountResolver
-	log                   zerolog.Logger
+	bot                     *bot.Client
+	ampClient               *amp.APIClient
+	interactions            rest.Interactions
+	channels                rest.Channels
+	notificationChannelID   snowflake.ID
+	auditChannelID          snowflake.ID
+	ownerUserID             snowflake.ID
+	notificationTTL         time.Duration
+	statusRefreshInterval   time.Duration
+	adsURL                  string
+	statusStatePath         string
+	statusRefreshRequests   chan struct{}
+	statusRefreshMu         sync.Mutex
+	commandRegistrationMu   sync.Mutex
+	commandInventoryMu      sync.RWMutex
+	commandInventory        string
+	commandAudits           sync.Map
+	diagnosticsMu           sync.RWMutex
+	discordConnectedAt      time.Time
+	lastDashboardSuccess    time.Time
+	lastDashboardFailure    time.Time
+	lastDashboardError      string
+	preferencesMu           sync.RWMutex
+	preferencesPath         string
+	preferences             discordPreferences
+	gameOverridesMu         sync.RWMutex
+	idleRegistrationMu      sync.RWMutex
+	idleServerRegistrar     IdleServerRegistrar
+	idleDiagnosticsProvider IdleDiagnosticsProvider
+	idleRegistered          map[string]string
+	gameOverrides           map[string]string
+	playerCountResolver     PlayerCountResolver
+	log                     zerolog.Logger
 }
 
 // PlayerCountResolver aplica os detectores específicos configurados para
@@ -150,6 +156,10 @@ func copyStringMap(source map[string]string) map[string]string {
 func (c *Client) handleReadyEvent(
 	event *events.Ready,
 ) {
+	c.diagnosticsMu.Lock()
+	c.discordConnectedAt = time.Now()
+	c.diagnosticsMu.Unlock()
+
 	c.log.Info().
 		Str("username", event.User.Username).
 		Msg("Discord conectado")

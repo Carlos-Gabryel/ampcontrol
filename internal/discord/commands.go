@@ -219,6 +219,10 @@ func buildAMPConfigCommand(
 			discord.PermissionAdministrator,
 		),
 		Options: []discord.ApplicationCommandOption{
+			discord.ApplicationCommandOptionSubCommand{
+				Name:        "diagnostico",
+				Description: "Verifica a saúde do AmpControl e das integrações",
+			},
 			buildAMPControlSubCommand(
 				"ocultar",
 				"Oculta uma instância do painel e dos comandos",

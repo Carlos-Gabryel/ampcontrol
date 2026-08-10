@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
+	discordClient "github.com/alabamaamp/ampcontrol/internal/discord"
 	"github.com/alabamaamp/ampcontrol/internal/idle"
 	"github.com/alabamaamp/ampcontrol/internal/operation"
 	"github.com/rs/zerolog"
@@ -26,6 +29,12 @@ type idleObserver struct {
 	config         idle.Config
 	configMu       sync.RWMutex
 	registrationMu sync.Mutex
+	healthMu       sync.RWMutex
+	running        bool
+	startedAt      time.Time
+	lastEventAt    time.Time
+	lastErrorAt    time.Time
+	lastError      string
 	log            zerolog.Logger
 }
 
@@ -187,7 +196,11 @@ func newIdleObserver(
 		detectors,
 		ampAdapter,
 		configuredStopper,
-		buildIdleEventHandler(observer.serverMode, log),
+		buildIdleEventHandler(
+			observer.serverMode,
+			observer.recordEvent,
+			log,
+		),
 		idle.WithStatePath(idleObserverStatePath),
 	)
 	if err != nil {
@@ -215,6 +228,16 @@ func (o *idleObserver) Run(
 	activeServers := config.ActiveServers()
 	observeServers := len(enabledServers) - len(activeServers)
 
+	o.healthMu.Lock()
+	o.running = true
+	o.startedAt = time.Now()
+	o.healthMu.Unlock()
+	defer func() {
+		o.healthMu.Lock()
+		o.running = false
+		o.healthMu.Unlock()
+	}()
+
 	o.log.Info().
 		Str("idle_mode", "per_server").
 		Str("config_path", idleObserverConfigPath).
@@ -236,12 +259,17 @@ func (o *idleObserver) Run(
 
 func buildIdleEventHandler(
 	resolveMode func(string) idle.ServerMode,
+	recordEvent func(idle.Event),
 	log zerolog.Logger,
 ) idle.EventHandler {
 	return func(
 		_ context.Context,
 		event idle.Event,
 	) {
+		if recordEvent != nil {
+			recordEvent(event)
+		}
+
 		mode := idle.ServerModeObserve
 
 		if resolveMode != nil {
@@ -430,6 +458,90 @@ func buildIdleEventHandler(
 				Msg("Evento do motor genérico de Idle")
 		}
 	}
+}
+
+func (o *idleObserver) recordEvent(event idle.Event) {
+	if o == nil {
+		return
+	}
+
+	now := time.Now()
+	o.healthMu.Lock()
+	o.lastEventAt = now
+	if idleEventIsDiagnosticFailure(event) {
+		o.lastErrorAt = now
+		o.lastError = strings.TrimSpace(event.Err.Error())
+	}
+	o.healthMu.Unlock()
+}
+
+func idleEventIsDiagnosticFailure(event idle.Event) bool {
+	if event.Err == nil {
+		return false
+	}
+
+	switch event.Type {
+	case idle.EventRuntimeUnavailable,
+		idle.EventDetectorFailed,
+		idle.EventFinalCheckFailed,
+		idle.EventStatePersistenceFailed:
+		return true
+
+	case idle.EventStopFailed:
+		var busyError *idle.OperationBusyError
+		return !errors.As(event.Err, &busyError) &&
+			!errors.Is(event.Err, errIdleObservationOnly)
+
+	default:
+		return false
+	}
+}
+
+func (o *idleObserver) IdleDiagnostics() discordClient.IdleDiagnosticsSnapshot {
+	if o == nil {
+		return discordClient.IdleDiagnosticsSnapshot{}
+	}
+
+	config := o.configSnapshot()
+	enabled := config.EnabledServers()
+	active := config.ActiveServers()
+	rconServers := 0
+	rconReady := 0
+	for _, server := range enabled {
+		if !idleServerUsesRCON(server) {
+			continue
+		}
+		rconServers++
+		if strings.TrimSpace(server.RCONAddress) != "" &&
+			strings.TrimSpace(server.RCONPasswordEnv) != "" &&
+			strings.TrimSpace(os.Getenv(server.RCONPasswordEnv)) != "" {
+			rconReady++
+		}
+	}
+
+	o.healthMu.RLock()
+	snapshot := discordClient.IdleDiagnosticsSnapshot{
+		Running:           o.running,
+		StartedAt:         o.startedAt,
+		LastEventAt:       o.lastEventAt,
+		LastErrorAt:       o.lastErrorAt,
+		LastError:         o.lastError,
+		CheckInterval:     config.CheckInterval,
+		RegisteredServers: len(config.Servers),
+		EnabledServers:    len(enabled),
+		ActiveServers:     len(active),
+		ObserveServers:    len(enabled) - len(active),
+		RCONServers:       rconServers,
+		RCONReadyServers:  rconReady,
+	}
+	o.healthMu.RUnlock()
+
+	return snapshot
+}
+
+func idleServerUsesRCON(server idle.Server) bool {
+	return strings.HasSuffix(string(server.Detector), "_rcon") ||
+		strings.HasSuffix(string(server.FallbackDetector), "_rcon")
 }
 
 func (o *idleObserver) configSnapshot() idle.Config {

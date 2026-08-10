@@ -119,14 +119,20 @@ func TestAMPConfigCommandDefaultsToAdministrators(t *testing.T) {
 	}
 
 	foundIdleAdd := false
+	foundDiagnostics := false
 	for _, option := range command.Options {
 		if option.OptionName() == "idle-adicionar" {
 			foundIdleAdd = true
-			break
+		}
+		if option.OptionName() == "diagnostico" {
+			foundDiagnostics = true
 		}
 	}
 	if !foundIdleAdd {
 		t.Fatal("ampconfig deveria oferecer o cadastro no Idle")
+	}
+	if !foundDiagnostics {
+		t.Fatal("ampconfig deveria oferecer o diagnóstico privado")
 	}
 }
 

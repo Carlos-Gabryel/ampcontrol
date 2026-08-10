@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
 )
@@ -13,6 +14,25 @@ type IdleServerRegistrar interface {
 		ctx context.Context,
 		instance amp.ManagedInstance,
 	) error
+}
+
+type IdleDiagnosticsSnapshot struct {
+	Running           bool
+	StartedAt         time.Time
+	LastEventAt       time.Time
+	LastErrorAt       time.Time
+	LastError         string
+	CheckInterval     time.Duration
+	RegisteredServers int
+	EnabledServers    int
+	ActiveServers     int
+	ObserveServers    int
+	RCONServers       int
+	RCONReadyServers  int
+}
+
+type IdleDiagnosticsProvider interface {
+	IdleDiagnostics() IdleDiagnosticsSnapshot
 }
 
 func (c *Client) SetIdleServerRegistrar(
@@ -26,6 +46,9 @@ func (c *Client) SetIdleServerRegistrar(
 
 	c.idleRegistrationMu.Lock()
 	c.idleServerRegistrar = registrar
+	if diagnostics, ok := registrar.(IdleDiagnosticsProvider); ok {
+		c.idleDiagnosticsProvider = diagnostics
+	}
 	c.idleRegistrationMu.Unlock()
 	return nil
 }

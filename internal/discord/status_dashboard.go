@@ -72,7 +72,9 @@ func (c *Client) refreshStatusDashboardWithTimeout(parent context.Context) {
 	ctx, cancel := context.WithTimeout(parent, statusDashboardTimeout)
 	defer cancel()
 
-	if err := c.refreshStatusDashboard(ctx); err != nil {
+	err := c.refreshStatusDashboard(ctx)
+	c.recordDashboardRefresh(err)
+	if err != nil {
 		c.log.Error().
 			Err(err).
 			Msg("Não foi possível atualizar o painel fixo do Discord")
@@ -80,6 +82,21 @@ func (c *Client) refreshStatusDashboardWithTimeout(parent context.Context) {
 
 	// A limpeza do canal nao depende da disponibilidade do AMP.
 	c.cleanupExpiredChannelMessages()
+}
+
+func (c *Client) recordDashboardRefresh(refreshErr error) {
+	c.diagnosticsMu.Lock()
+	defer c.diagnosticsMu.Unlock()
+
+	now := time.Now()
+	if refreshErr == nil {
+		c.lastDashboardSuccess = now
+		c.lastDashboardError = ""
+		return
+	}
+
+	c.lastDashboardFailure = now
+	c.lastDashboardError = sanitizeAuditText(refreshErr.Error(), 500)
 }
 
 func (c *Client) refreshStatusDashboard(ctx context.Context) error {
