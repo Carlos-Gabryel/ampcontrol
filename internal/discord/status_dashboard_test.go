@@ -299,6 +299,14 @@ func TestBuildAMPCommandGuideEmbedsDocumentsEveryCommand(t *testing.T) {
 	if !strings.Contains(embeds[0].Description, "não funcionam em outros canais") {
 		t.Fatal("o guia deveria explicar a restrição de canal")
 	}
+	guideText := embeds[0].Description
+	for _, field := range fields {
+		guideText += "\n" + field.Name + "\n" + field.Value
+	}
+	if !strings.Contains(guideText, "Proteção de partidas") ||
+		!strings.Contains(guideText, "jogadores conectados") {
+		t.Fatal("o guia deveria explicar a proteção de partidas em andamento")
+	}
 	for _, field := range fields {
 		if strings.Contains(field.Name, "/ampconfig") ||
 			strings.Contains(field.Value, "/ampconfig") {

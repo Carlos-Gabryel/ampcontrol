@@ -330,6 +330,11 @@ func (c *Client) handleAMPControlCommand(
 		event.Token(),
 		instance,
 		operation,
+		ampCommandBypassesPlayerProtection(
+			event.User().ID,
+			event.Member(),
+			c.ownerUserID,
+		),
 	)
 }
 
@@ -338,6 +343,7 @@ func (c *Client) executeAMPControlOperation(
 	interactionToken string,
 	instance amp.ManagedInstance,
 	commandOperation ampCommandOperation,
+	bypassPlayerProtection bool,
 ) {
 	defer c.requestStatusRefresh()
 
@@ -430,6 +436,45 @@ func (c *Client) executeAMPControlOperation(
 		ampControlTimeout,
 	)
 	defer cancel()
+
+	protection := c.checkAMPPlayerProtection(
+		ctx,
+		instance,
+		commandOperation,
+		bypassPlayerProtection,
+	)
+	if !protection.Allowed {
+		c.log.Warn().
+			Err(protection.Err).
+			Str("instance", instance.Name).
+			Str("operation", string(commandOperation)).
+			Int("players", protection.PlayerCount).
+			Msg("Operação AMP recusada pela proteção de jogadores")
+
+		c.updateInteractionMessageByToken(
+			applicationID,
+			interactionToken,
+			protection.RefusalMessage(instance, commandOperation),
+		)
+
+		return
+	}
+
+	if protection.Bypassed &&
+		(protection.PlayerCount > 0 || protection.Err != nil) {
+		c.log.Warn().
+			Err(protection.Err).
+			Str("instance", instance.Name).
+			Str("operation", string(commandOperation)).
+			Int("players", protection.PlayerCount).
+			Msg("Proteção de jogadores ignorada por usuário privilegiado")
+
+		c.updateInteractionMessageByToken(
+			applicationID,
+			interactionToken,
+			protection.BypassMessage(instance, commandOperation),
+		)
+	}
 
 	c.log.Info().
 		Str("instance", instance.Name).

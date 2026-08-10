@@ -45,6 +45,11 @@ func buildAMPCommandGuideEmbeds() []disgoDiscord.Embed {
 			"Atualiza a instância selecionada. Exige confirmação e reinicia a instância caso ela esteja ligada, interrompendo o servidor durante o processo. **Disponível para todos.**",
 			false,
 		).
+		AddField(
+			"🛡️ Proteção de partidas em andamento",
+			"Usuários comuns não podem parar, reiniciar, desligar ou atualizar um servidor enquanto houver jogadores conectados. Se a quantidade de jogadores não puder ser confirmada, esses comandos também serão bloqueados por segurança.",
+			false,
+		).
 		WithFooter(
 			"Todos os comandos /amp estão disponíveis para os usuários deste canal.",
 			"",
