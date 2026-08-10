@@ -55,6 +55,17 @@ func (c *Client) handleAMPInteractionEvent(
 		data,
 		channelAllowed,
 	)
+	var cooldownDecision ampCommandCooldownDecision
+	if auditAccepted && data.CommandName() == "amp" {
+		cooldownDecision = c.reserveAMPCommandCooldown(
+			event.User().ID,
+			data,
+		)
+		if !cooldownDecision.Allowed {
+			auditAccepted = false
+			auditReason = cooldownDecision.AuditReason()
+		}
+	}
 	c.beginCommandAudit(
 		event.Token(),
 		newCommandAuditRecord(
@@ -74,6 +85,22 @@ func (c *Client) handleAMPInteractionEvent(
 			event,
 			"⛔ O AmpControl só aceita comandos no canal <#"+
 				c.notificationChannelID.String()+">.",
+		)
+
+		return
+	}
+
+	if data.CommandName() == "amp" && !cooldownDecision.Allowed {
+		c.log.Warn().
+			Str("user_id", event.User().ID.String()).
+			Str("server", cooldownDecision.Server).
+			Dur("remaining", cooldownDecision.Remaining).
+			Str("scope", string(cooldownDecision.Scope)).
+			Msg("Comando AMP recusado por cooldown")
+
+		c.sendInteractionMessage(
+			event,
+			cooldownDecision.UserMessage(),
 		)
 
 		return

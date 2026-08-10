@@ -35,6 +35,7 @@ type Client struct {
 	commandInventoryMu      sync.RWMutex
 	commandInventory        string
 	commandAudits           sync.Map
+	commandCooldowns        *ampCommandCooldowns
 	diagnosticsMu           sync.RWMutex
 	discordConnectedAt      time.Time
 	lastDashboardSuccess    time.Time
@@ -78,6 +79,8 @@ type ClientConfig struct {
 	GameOverrides           map[string]string
 	PlayerCountResolver     PlayerCountResolver
 	IdleRegisteredInstances []string
+	CommandUserCooldown     time.Duration
+	CommandServerCooldown   time.Duration
 }
 
 func New(
@@ -129,9 +132,13 @@ func New(
 		preferences:           preferences,
 		idleRegistered:        instanceNameMap(config.IdleRegisteredInstances),
 		statusRefreshRequests: make(chan struct{}, 1),
-		gameOverrides:         copyStringMap(config.GameOverrides),
-		playerCountResolver:   config.PlayerCountResolver,
-		log:                   log,
+		commandCooldowns: newAMPCommandCooldowns(
+			config.CommandUserCooldown,
+			config.CommandServerCooldown,
+		),
+		gameOverrides:       copyStringMap(config.GameOverrides),
+		playerCountResolver: config.PlayerCountResolver,
+		log:                 log,
 	}
 
 	disgoClient.AddEventListeners(

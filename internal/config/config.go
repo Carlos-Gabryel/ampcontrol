@@ -17,6 +17,8 @@ type Config struct {
 	DiscordOwnerUserID           string
 	DiscordNotificationTTL       time.Duration
 	DiscordStatusRefreshInterval time.Duration
+	DiscordCommandUserCooldown   time.Duration
+	DiscordCommandServerCooldown time.Duration
 	AMPUsername                  string
 	AMPPassword                  string
 	AMPADSURL                    string
@@ -147,10 +149,48 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	userCooldownSeconds, err := nonNegativeEnvironmentInteger(
+		"DISCORD_COMMAND_USER_COOLDOWN_SECONDS",
+		5,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	serverCooldownSeconds, err := nonNegativeEnvironmentInteger(
+		"DISCORD_COMMAND_SERVER_COOLDOWN_SECONDS",
+		15,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg.DiscordNotificationTTL = time.Duration(notificationTTLMinutes) * time.Minute
 	cfg.DiscordStatusRefreshInterval = time.Duration(statusRefreshSeconds) * time.Second
+	cfg.DiscordCommandUserCooldown = time.Duration(userCooldownSeconds) * time.Second
+	cfg.DiscordCommandServerCooldown = time.Duration(serverCooldownSeconds) * time.Second
 
 	return cfg, nil
+}
+
+func nonNegativeEnvironmentInteger(
+	name string,
+	defaultValue int,
+) (int, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return 0, fmt.Errorf(
+			"%s precisa ser um número inteiro maior ou igual a zero",
+			name,
+		)
+	}
+
+	return value, nil
 }
 
 func positiveEnvironmentInteger(
