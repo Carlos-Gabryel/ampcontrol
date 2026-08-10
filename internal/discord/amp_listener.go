@@ -39,10 +39,26 @@ func (c *Client) handleAMPInteractionEvent(
 	}
 
 	channelID := event.Channel().ID()
-	if !ampCommandChannelAllowed(
+	channelAllowed := ampCommandChannelAllowed(
 		channelID,
 		c.notificationChannelID,
-	) {
+	)
+
+	auditAccepted, auditReason := c.commandAuditDecision(
+		event,
+		data,
+		channelAllowed,
+	)
+	go c.sendCommandAudit(
+		newCommandAuditRecord(
+			event,
+			data,
+			auditAccepted,
+			auditReason,
+		),
+	)
+
+	if !channelAllowed {
 		c.log.Warn().
 			Str("channel_id", channelID.String()).
 			Msg("Comando AMP recusado fora do canal autorizado")

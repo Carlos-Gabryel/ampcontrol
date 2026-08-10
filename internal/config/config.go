@@ -13,6 +13,7 @@ import (
 type Config struct {
 	DiscordToken                 string
 	DiscordNotificationChannelID string
+	DiscordAuditChannelID        string
 	DiscordOwnerUserID           string
 	DiscordNotificationTTL       time.Duration
 	DiscordStatusRefreshInterval time.Duration
@@ -31,6 +32,9 @@ func Load() (*Config, error) {
 		),
 		DiscordNotificationChannelID: strings.TrimSpace(
 			os.Getenv("DISCORD_NOTIFICATION_CHANNEL_ID"),
+		),
+		DiscordAuditChannelID: strings.TrimSpace(
+			os.Getenv("DISCORD_AUDIT_CHANNEL_ID"),
 		),
 		DiscordOwnerUserID: strings.TrimSpace(
 			os.Getenv("DISCORD_OWNER_USER_ID"),
@@ -74,6 +78,24 @@ func Load() (*Config, error) {
 	if cfg.DiscordOwnerUserID == "" {
 		return nil, fmt.Errorf(
 			"DISCORD_OWNER_USER_ID não foi configurado",
+		)
+	}
+
+	if cfg.DiscordAuditChannelID == "" {
+		return nil, fmt.Errorf(
+			"DISCORD_AUDIT_CHANNEL_ID não foi configurado",
+		)
+	}
+
+	auditChannelID, err := strconv.ParseUint(
+		cfg.DiscordAuditChannelID,
+		10,
+		64,
+	)
+	if err != nil || auditChannelID == 0 {
+		return nil, fmt.Errorf(
+			"DISCORD_AUDIT_CHANNEL_ID é inválido: %w",
+			err,
 		)
 	}
 

@@ -23,6 +23,7 @@ type Client struct {
 	interactions          rest.Interactions
 	channels              rest.Channels
 	notificationChannelID snowflake.ID
+	auditChannelID        snowflake.ID
 	ownerUserID           snowflake.ID
 	notificationTTL       time.Duration
 	statusRefreshInterval time.Duration
@@ -60,6 +61,7 @@ type PlayerCountResolver interface {
 
 type ClientConfig struct {
 	NotificationChannelID   string
+	AuditChannelID          string
 	OwnerUserID             string
 	NotificationTTL         time.Duration
 	StatusRefreshInterval   time.Duration
@@ -110,6 +112,7 @@ func New(
 		interactions:          interactions,
 		channels:              channels,
 		notificationChannelID: snowflake.MustParse(config.NotificationChannelID),
+		auditChannelID:        snowflake.MustParse(config.AuditChannelID),
 		ownerUserID:           snowflake.MustParse(config.OwnerUserID),
 		notificationTTL:       config.NotificationTTL,
 		statusRefreshInterval: config.StatusRefreshInterval,
@@ -156,6 +159,16 @@ func (c *Client) handleReadyEvent(
 			c.bot.ApplicationID.String(),
 		).
 		Msg("Application ID")
+
+	if err := c.validateCommandAuditChannel(); err != nil {
+		c.log.Error().
+			Err(err).
+			Msg("Não foi possível preparar o canal de auditoria do Discord")
+	} else {
+		c.log.Info().
+			Str("channel_id", c.auditChannelID.String()).
+			Msg("Canal de auditoria do Discord pronto")
+	}
 
 	err := c.registerCommands(context.Background())
 	if err != nil {
