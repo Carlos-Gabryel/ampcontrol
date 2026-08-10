@@ -25,6 +25,7 @@ func RegisterCommands(
 	restClient rest.Rest,
 	applicationID snowflake.ID,
 	gameOverrides map[string]string,
+	presentationOverrides []instancePresentationOverride,
 	hiddenInstanceNames []string,
 	idleRegisteredNames []string,
 ) ([]amp.ManagedInstance, error) {
@@ -46,6 +47,7 @@ func RegisterCommands(
 	}
 
 	applyCommandGameNames(instances, gameOverrides)
+	applyInstancePresentationOverrides(instances, presentationOverrides)
 	visibleInstances, hiddenInstances := splitAMPInstancesByVisibility(
 		instances,
 		hiddenInstanceNames,
@@ -105,6 +107,7 @@ func (c *Client) registerCommands(ctx context.Context) error {
 		c.bot.Rest,
 		c.bot.ApplicationID,
 		c.gameOverridesSnapshot(),
+		c.instancePresentationSettingsSnapshot(),
 		c.hiddenInstanceNames(),
 		c.idleRegisteredInstanceNames(),
 	)
@@ -212,6 +215,14 @@ func buildAMPConfigCommand(
 	hiddenChoices []discord.ApplicationCommandOptionChoiceString,
 	idleCandidateChoices []discord.ApplicationCommandOptionChoiceString,
 ) discord.SlashCommandCreate {
+	configurationChoices := append(
+		append([]discord.ApplicationCommandOptionChoiceString(nil), visibleChoices...),
+		hiddenChoices...,
+	)
+	minimumTextLength := 1
+	maximumTextLength := 80
+	minimumPlayers := 1
+	maximumPlayers := 100000
 	return discord.SlashCommandCreate{
 		Name:        "ampconfig",
 		Description: "Configura a apresentação das instâncias do AmpControl",
@@ -228,6 +239,59 @@ func buildAMPConfigCommand(
 				"Oculta uma instância do painel e dos comandos",
 				"Instância que deixará de aparecer no Discord",
 				visibleChoices,
+			),
+			discord.ApplicationCommandOptionSubCommand{
+				Name:        "configurar",
+				Description: "Altera nome, jogo, limite ou detector de uma instância",
+				Options: []discord.ApplicationCommandOption{
+					discord.ApplicationCommandOptionString{
+						Name:        "servidor",
+						Description: "Instância que será configurada",
+						Required:    true,
+						Choices:     configurationChoices,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "nome",
+						Description: "Novo nome exibido no Discord",
+						MinLength:   &minimumTextLength,
+						MaxLength:   &maximumTextLength,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "jogo",
+						Description: "Nome correto do jogo",
+						MinLength:   &minimumTextLength,
+						MaxLength:   &maximumTextLength,
+					},
+					discord.ApplicationCommandOptionInt{
+						Name:        "maximo",
+						Description: "Quantidade máxima de jogadores exibida no painel",
+						MinValue:    &minimumPlayers,
+						MaxValue:    &maximumPlayers,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "detector",
+						Description: "Método usado para confirmar jogadores conectados",
+						Choices: []discord.ApplicationCommandOptionChoiceString{
+							{Name: "API do AMP", Value: "amp"},
+							{Name: "API AMP + RCON Palworld", Value: "amp_palworld_rcon"},
+							{Name: "API AMP + RCON Project Zomboid", Value: "amp_project_zomboid_rcon"},
+						},
+					},
+				},
+			},
+			buildAMPControlSubCommand(
+				"detalhes",
+				"Mostra a configuração atual de uma instância",
+				"Instância que será consultada",
+				configurationChoices,
+			),
+			buildAMPConfirmedControlSubCommand(
+				"restaurar",
+				"Remove personalizações e restaura os valores originais",
+				"Instância que voltará à configuração original",
+				"Confirma a remoção das personalizações",
+				"Sim, restaurar a configuração original",
+				configurationChoices,
 			),
 			buildAMPControlSubCommand(
 				"exibir",

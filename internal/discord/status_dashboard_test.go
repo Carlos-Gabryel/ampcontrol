@@ -347,3 +347,18 @@ func TestAMPCommandGuideFitsDiscordLimits(t *testing.T) {
 		t.Fatalf("o guia excede o limite total de caracteres: %d", totalCharacters)
 	}
 }
+
+func TestBuildAMPStatusEmbedsUsesConfiguredMaximumWhenCountUnavailable(t *testing.T) {
+	embeds := buildAMPStatusEmbeds([]ampInstanceStatusView{{
+		Instance: amp.ManagedInstance{
+			Name: "Servidor01", FriendlyName: "Servidor", Game: "Minecraft", Running: true,
+		},
+		PlayerMaxOverride: 40,
+	}}, time.Now())
+	if len(embeds) < 1 || len(embeds[0].Fields) < 1 {
+		t.Fatal("painel não contém o servidor")
+	}
+	if !strings.Contains(embeds[0].Fields[0].Value, "?/40") {
+		t.Fatalf("limite personalizado não apareceu: %q", embeds[0].Fields[0].Value)
+	}
+}

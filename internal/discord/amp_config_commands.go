@@ -25,7 +25,7 @@ func (c *Client) handleAMPConfigCommand(
 			Msg("Comando administrativo do AmpControl recusado")
 		c.sendInteractionMessage(
 			event,
-			"⛔ Somente o proprietário configurado pode alterar a visibilidade das instâncias.",
+			"⛔ Somente o proprietário configurado pode alterar as configurações das instâncias.",
 		)
 		return
 	}
@@ -54,11 +54,254 @@ func (c *Client) handleAMPConfigCommand(
 	case "idle-adicionar":
 		c.handleAMPIdleRegistrationCommand(event, data)
 
+	case "configurar":
+		c.handleAMPInstanceSettingsCommand(event, data)
+
+	case "detalhes":
+		c.handleAMPInstanceSettingsDetailsCommand(event, data)
+
+	case "restaurar":
+		c.handleAMPInstanceSettingsResetCommand(event, data)
+
 	default:
 		c.sendInteractionMessage(
 			event,
 			"⚠️ Subcomando de configuração não reconhecido.",
 		)
+	}
+}
+
+func (c *Client) handleAMPInstanceSettingsCommand(
+	event *events.ApplicationCommandInteractionCreate,
+	data disgoDiscord.SlashCommandInteractionData,
+) {
+	if !c.deferAMPInteraction(event) {
+		return
+	}
+
+	instanceName, exists := data.OptString("servidor")
+	instanceName = strings.TrimSpace(instanceName)
+	if !exists || instanceName == "" {
+		c.updateInteractionMessage(event, "⚠️ A instância AMP não foi informada.")
+		return
+	}
+	instance, err := c.resolveAMPInstance(instanceName)
+	if err != nil {
+		c.updateInteractionMessage(event, "⚠️ A instância selecionada não existe ou não pode ser controlada.")
+		return
+	}
+
+	nameValue, hasName := data.OptString("nome")
+	gameValue, hasGame := data.OptString("jogo")
+	maximumValue, hasMaximum := data.OptInt("maximo")
+	detectorValue, hasDetector := data.OptString("detector")
+	nameValue = strings.TrimSpace(nameValue)
+	gameValue = strings.TrimSpace(gameValue)
+	if !hasName && !hasGame && !hasMaximum && !hasDetector {
+		c.updateInteractionMessage(event, "⚠️ Informe pelo menos uma configuração para alterar.")
+		return
+	}
+	if (hasName && nameValue == "") || (hasGame && gameValue == "") {
+		c.updateInteractionMessage(event, "⚠️ Nome e jogo não podem ficar vazios.")
+		return
+	}
+
+	var previousDetection IdleDetectionSettings
+	var updatedDetection IdleDetectionSettings
+	detectionChanged := false
+	manager := c.idleDetectionConfigurator()
+	if hasDetector {
+		if manager == nil {
+			c.updateInteractionMessage(event, "❌ O gerenciador de detectores do Idle não está disponível.")
+			return
+		}
+		previousDetection, err = manager.IdleDetectionSettings(instance.Name)
+		if err != nil {
+			c.updateInteractionMessage(event, "❌ Essa instância precisa ser adicionada ao Idle antes de configurar seu detector.")
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), ampDiscoveryTimeout)
+		updatedDetection, err = manager.SetIdleDetectionMethod(ctx, instance.Name, detectorValue)
+		cancel()
+		if err != nil {
+			c.log.Error().Err(err).Str("instance", instance.Name).Msg("Não foi possível alterar o detector da instância")
+			c.updateInteractionMessage(event, fmt.Sprintf(
+				"❌ Não foi possível alterar o método de detecção de **%s**.\nErro: `%s`",
+				ampInstanceDisplayName(instance), sanitizeAMPError(err),
+			))
+			return
+		}
+		detectionChanged = true
+	}
+
+	var namePointer *string
+	var gamePointer *string
+	var maximumPointer *int
+	if hasName {
+		namePointer = &nameValue
+	}
+	if hasGame {
+		gamePointer = &gameValue
+	}
+	if hasMaximum {
+		maximumPointer = &maximumValue
+	}
+	setting, _ := c.instancePresentationSettings(instance.Name)
+	if hasName || hasGame || hasMaximum {
+		setting, err = c.setInstancePresentationSettings(
+			instance.Name,
+			namePointer,
+			gamePointer,
+			maximumPointer,
+		)
+		if err != nil {
+			if detectionChanged {
+				rollbackCtx, cancel := context.WithTimeout(context.Background(), ampDiscoveryTimeout)
+				_, _ = manager.SetIdleDetectionMethod(rollbackCtx, instance.Name, previousDetection.Method)
+				cancel()
+			}
+			c.updateInteractionMessage(event, "❌ Não foi possível salvar as configurações de apresentação.")
+			return
+		}
+	}
+
+	c.requestStatusRefresh()
+	ctx, cancel := context.WithTimeout(context.Background(), ampDiscoveryTimeout)
+	registrationErr := c.registerCommands(ctx)
+	cancel()
+
+	displayName := instance.FriendlyName
+	game := instance.Game
+	maximum := "automático pelo servidor"
+	if setting.DisplayName != "" {
+		displayName = setting.DisplayName
+	}
+	if setting.Game != "" {
+		game = setting.Game
+	}
+	if setting.MaximumPlayers > 0 {
+		maximum = fmt.Sprintf("%d", setting.MaximumPlayers)
+	}
+	detector := "API do AMP"
+	if hasDetector {
+		detector = describeIdleDetectionMethod(updatedDetection.Method)
+	} else if manager != nil {
+		if currentDetection, detectionErr := manager.IdleDetectionSettings(instance.Name); detectionErr == nil {
+			detector = describeIdleDetectionMethod(currentDetection.Method)
+		}
+	}
+	message := fmt.Sprintf(
+		"✅ Configuração de **%s** atualizada.\n"+
+			"Nome: **%s**\nJogo: `%s`\nMáximo: `%s`\nDetector: `%s`",
+		instance.Name, displayName, game, maximum, detector,
+	)
+	if registrationErr != nil {
+		message += "\n⚠️ As preferências foram salvas, mas a lista dos comandos será atualizada na próxima conexão."
+	}
+	c.updateInteractionMessage(event, message)
+	c.deleteInteractionResponseLater(event, 20*time.Second)
+}
+
+func (c *Client) handleAMPInstanceSettingsDetailsCommand(
+	event *events.ApplicationCommandInteractionCreate,
+	data disgoDiscord.SlashCommandInteractionData,
+) {
+	if !c.deferAMPInteraction(event) {
+		return
+	}
+	instanceName, exists := data.OptString("servidor")
+	if !exists {
+		c.updateInteractionMessage(event, "⚠️ A instância AMP não foi informada.")
+		return
+	}
+	instance, err := c.resolveAMPInstance(instanceName)
+	if err != nil {
+		c.updateInteractionMessage(event, "⚠️ A instância selecionada não existe.")
+		return
+	}
+	setting, customized := c.instancePresentationSettings(instance.Name)
+	maximum := "automático pelo servidor"
+	if setting.MaximumPlayers > 0 {
+		maximum = fmt.Sprintf("%d", setting.MaximumPlayers)
+	}
+	detector := "não cadastrada no Idle"
+	rcon := "não configurado"
+	if manager := c.idleDetectionConfigurator(); manager != nil {
+		if detection, detectionErr := manager.IdleDetectionSettings(instance.Name); detectionErr == nil {
+			detector = describeIdleDetectionMethod(detection.Method)
+			if detection.RCONConfigured {
+				rcon = "configurado"
+			}
+		}
+	}
+	c.updateInteractionMessage(event, fmt.Sprintf(
+		"⚙️ **Configuração de %s**\n"+
+			"Instância: `%s`\nJogo: `%s`\nMáximo: `%s`\nDetector: `%s`\nRCON: `%s`\nPersonalização: `%t`",
+		ampInstanceDisplayName(instance), instance.Name, instance.Game, maximum, detector, rcon, customized,
+	))
+	c.deleteInteractionResponseLater(event, 30*time.Second)
+}
+
+func (c *Client) handleAMPInstanceSettingsResetCommand(
+	event *events.ApplicationCommandInteractionCreate,
+	data disgoDiscord.SlashCommandInteractionData,
+) {
+	if !ampCommandConfirmed(data) {
+		c.sendInteractionMessage(event, "⚠️ A restauração das configurações não foi confirmada.")
+		return
+	}
+	if !c.deferAMPInteraction(event) {
+		return
+	}
+	instanceName, exists := data.OptString("servidor")
+	if !exists {
+		c.updateInteractionMessage(event, "⚠️ A instância AMP não foi informada.")
+		return
+	}
+	instance, err := c.resolveAMPInstance(instanceName)
+	if err != nil {
+		c.updateInteractionMessage(event, "⚠️ A instância selecionada não existe.")
+		return
+	}
+
+	if manager := c.idleDetectionConfigurator(); manager != nil && c.idleInstanceRegistered(instance.Name) {
+		ctx, cancel := context.WithTimeout(context.Background(), ampDiscoveryTimeout)
+		_, err = manager.ResetIdleDetectionMethod(ctx, instance.Name)
+		cancel()
+		if err != nil {
+			c.updateInteractionMessage(event, fmt.Sprintf("❌ Não foi possível restaurar o detector: `%s`", sanitizeAMPError(err)))
+			return
+		}
+	}
+	removed, err := c.resetInstancePresentationSettings(instance.Name)
+	if err != nil {
+		c.updateInteractionMessage(event, "❌ O detector foi restaurado, mas não foi possível remover a apresentação personalizada.")
+		return
+	}
+	c.requestStatusRefresh()
+	ctx, cancel := context.WithTimeout(context.Background(), ampDiscoveryTimeout)
+	registrationErr := c.registerCommands(ctx)
+	cancel()
+
+	message := fmt.Sprintf("✅ As configurações de **%s** foram restauradas para os valores originais.", instance.Name)
+	if !removed {
+		message = fmt.Sprintf("✅ O detector de **%s** foi restaurado; não havia apresentação personalizada.", instance.Name)
+	}
+	if registrationErr != nil {
+		message += "\n⚠️ A lista dos comandos será atualizada na próxima conexão."
+	}
+	c.updateInteractionMessage(event, message)
+	c.deleteInteractionResponseLater(event, 15*time.Second)
+}
+
+func describeIdleDetectionMethod(method string) string {
+	switch method {
+	case "amp_palworld_rcon":
+		return "API AMP + RCON Palworld"
+	case "amp_project_zomboid_rcon":
+		return "API AMP + RCON Project Zomboid"
+	default:
+		return "API do AMP"
 	}
 }
 

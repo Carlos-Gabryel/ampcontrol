@@ -18,6 +18,7 @@ import (
 
 const idleObserverConfigPath = "config/idle.json"
 const idleAdditionalServersPath = "data/idle_servers.json"
+const idleDetectionOverridesPath = "data/idle_detection_overrides.json"
 const idleObserverStatePath = "data/idle_state.json"
 
 var errIdleObservationOnly = errors.New(
@@ -29,6 +30,7 @@ type idleObserver struct {
 	config         idle.Config
 	configMu       sync.RWMutex
 	registrationMu sync.Mutex
+	configChanged  func(idle.Config)
 	healthMu       sync.RWMutex
 	running        bool
 	startedAt      time.Time
@@ -554,6 +556,24 @@ func (o *idleObserver) configSnapshot() idle.Config {
 	}
 }
 
+func (o *idleObserver) SetConfigChangedHandler(handler func(idle.Config)) {
+	if o == nil {
+		return
+	}
+	o.registrationMu.Lock()
+	o.configChanged = handler
+	o.registrationMu.Unlock()
+}
+
+func (o *idleObserver) publishConfig(next idle.Config) {
+	o.configMu.Lock()
+	o.config = next
+	o.configMu.Unlock()
+	if o.configChanged != nil {
+		o.configChanged(next)
+	}
+}
+
 func (o *idleObserver) serverMode(instance string) idle.ServerMode {
 	config := o.configSnapshot()
 	server, exists := config.FindServer(instance)
@@ -574,7 +594,7 @@ func (o *idleObserver) RegisterIdleServer(
 	o.registrationMu.Lock()
 	defer o.registrationMu.Unlock()
 
-	next, err := idle.RegisterAdditionalServer(
+	_, err := idle.RegisterAdditionalServer(
 		idleObserverConfigPath,
 		idleAdditionalServersPath,
 		idle.ServerRegistration{
@@ -586,6 +606,14 @@ func (o *idleObserver) RegisterIdleServer(
 	if err != nil {
 		return err
 	}
+	next, err := idle.LoadCombinedWithDetectionOverrides(
+		idleObserverConfigPath,
+		idleAdditionalServersPath,
+		idleDetectionOverridesPath,
+	)
+	if err != nil {
+		return fmt.Errorf("o cadastro foi salvo, mas a configuração combinada falhou: %w", err)
+	}
 	if err := o.engine.ReplaceConfig(next); err != nil {
 		return fmt.Errorf(
 			"o cadastro foi salvo, mas não pôde ser aplicado ao motor: %w",
@@ -593,9 +621,7 @@ func (o *idleObserver) RegisterIdleServer(
 		)
 	}
 
-	o.configMu.Lock()
-	o.config = next
-	o.configMu.Unlock()
+	o.publishConfig(next)
 
 	o.log.Info().
 		Str("server", instance.Name).
@@ -604,4 +630,140 @@ func (o *idleObserver) RegisterIdleServer(
 		Msg("Instância adicionada ao motor de Idle em tempo real")
 
 	return nil
+}
+
+func (o *idleObserver) IdleDetectionSettings(
+	instance string,
+) (discordClient.IdleDetectionSettings, error) {
+	server, exists := o.configSnapshot().FindServer(instance)
+	if !exists {
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf("a instância %s não está cadastrada no Idle", instance)
+	}
+	return discordClient.IdleDetectionSettings{
+		Method:           idleDetectionMethod(server),
+		Detector:         string(server.Detector),
+		FallbackDetector: string(server.FallbackDetector),
+		RCONConfigured: strings.TrimSpace(server.RCONAddress) != "" &&
+			strings.TrimSpace(server.RCONPasswordEnv) != "",
+	}, nil
+}
+
+func (o *idleObserver) SetIdleDetectionMethod(
+	_ context.Context,
+	instance string,
+	method string,
+) (discordClient.IdleDetectionSettings, error) {
+	if o == nil || o.engine == nil {
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf("o motor de Idle não está disponível")
+	}
+
+	o.registrationMu.Lock()
+	defer o.registrationMu.Unlock()
+
+	detector, fallback, err := parseIdleDetectionMethod(method)
+	if err != nil {
+		return discordClient.IdleDetectionSettings{}, err
+	}
+	current := o.configSnapshot()
+	next, err := idle.ApplyDetectionOverrides(current, []idle.DetectionOverride{{
+		Instance:         instance,
+		Detector:         detector,
+		FallbackDetector: fallback,
+	}})
+	if err != nil {
+		return discordClient.IdleDetectionSettings{}, err
+	}
+	if err := o.engine.ReplaceConfig(next); err != nil {
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf("não foi possível aplicar o detector ao motor: %w", err)
+	}
+	if err := idle.SetDetectionOverride(
+		idleDetectionOverridesPath,
+		idle.DetectionOverride{
+			Instance:         instance,
+			Detector:         detector,
+			FallbackDetector: fallback,
+		},
+	); err != nil {
+		_ = o.engine.ReplaceConfig(current)
+		return discordClient.IdleDetectionSettings{}, err
+	}
+
+	o.publishConfig(next)
+	settings, _ := o.IdleDetectionSettings(instance)
+	o.log.Info().
+		Str("server", instance).
+		Str("detector", string(detector)).
+		Str("fallback_detector", string(fallback)).
+		Msg("Método de detecção atualizado em tempo real")
+	return settings, nil
+}
+
+func (o *idleObserver) ResetIdleDetectionMethod(
+	_ context.Context,
+	instance string,
+) (discordClient.IdleDetectionSettings, error) {
+	if o == nil || o.engine == nil {
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf("o motor de Idle não está disponível")
+	}
+
+	o.registrationMu.Lock()
+	defer o.registrationMu.Unlock()
+
+	base, err := idle.LoadCombined(idleObserverConfigPath, idleAdditionalServersPath)
+	if err != nil {
+		return discordClient.IdleDetectionSettings{}, err
+	}
+	if _, exists := base.FindServer(instance); !exists {
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf("a instância %s não está cadastrada no Idle", instance)
+	}
+	overrides, err := idle.LoadDetectionOverrides(idleDetectionOverridesPath)
+	if err != nil {
+		return discordClient.IdleDetectionSettings{}, err
+	}
+	filtered := make([]idle.DetectionOverride, 0, len(overrides))
+	for _, override := range overrides {
+		if !strings.EqualFold(override.Instance, instance) {
+			filtered = append(filtered, override)
+		}
+	}
+	next, err := idle.ApplyDetectionOverrides(base, filtered)
+	if err != nil {
+		return discordClient.IdleDetectionSettings{}, err
+	}
+	current := o.configSnapshot()
+	if err := o.engine.ReplaceConfig(next); err != nil {
+		return discordClient.IdleDetectionSettings{}, err
+	}
+	if _, err := idle.RemoveDetectionOverride(idleDetectionOverridesPath, instance); err != nil {
+		_ = o.engine.ReplaceConfig(current)
+		return discordClient.IdleDetectionSettings{}, err
+	}
+
+	o.publishConfig(next)
+	settings, _ := o.IdleDetectionSettings(instance)
+	return settings, nil
+}
+
+func parseIdleDetectionMethod(method string) (idle.Detector, idle.Detector, error) {
+	switch strings.ToLower(strings.TrimSpace(method)) {
+	case "amp":
+		return idle.DetectorAMPPlayers, "", nil
+	case "amp_palworld_rcon":
+		return idle.DetectorAMPPlayers, idle.DetectorPalworldRCON, nil
+	case "amp_project_zomboid_rcon":
+		return idle.DetectorAMPPlayers, idle.DetectorProjectZomboidRCON, nil
+	default:
+		return "", "", fmt.Errorf("o método de detecção %q não é reconhecido", method)
+	}
+}
+
+func idleDetectionMethod(server idle.Server) string {
+	switch server.FallbackDetector {
+	case idle.DetectorPalworldRCON:
+		return "amp_palworld_rcon"
+	case idle.DetectorProjectZomboidRCON:
+		return "amp_project_zomboid_rcon"
+	default:
+		return "amp"
+	}
 }

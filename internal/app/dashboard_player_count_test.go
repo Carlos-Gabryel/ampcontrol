@@ -92,3 +92,24 @@ func TestDashboardPlayerCountResolverSkipsServerWithoutFallback(t *testing.T) {
 		t.Fatal("um servidor sem fallback não deveria ser alterado")
 	}
 }
+
+func TestDashboardPlayerCountResolverReplaceConfig(t *testing.T) {
+	detectors, err := idle.NewDetectorRegistry(
+		dashboardFakePlayerDetector{detectorType: idle.DetectorAMPPlayers, playerCount: 0},
+		dashboardFakePlayerDetector{detectorType: idle.DetectorPalworldRCON, playerCount: 3},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver := dashboardPlayerCountResolver{
+		config:    idle.Config{Servers: []idle.Server{{Instance: "KalagaPal01", Enabled: true, Detector: idle.DetectorAMPPlayers}}},
+		detectors: detectors,
+	}
+	resolver.ReplaceConfig(idle.Config{Servers: []idle.Server{{
+		Instance: "KalagaPal01", Enabled: true, Detector: idle.DetectorAMPPlayers, FallbackDetector: idle.DetectorPalworldRCON,
+	}}})
+	count, applies, err := resolver.ResolvePlayerCount(context.Background(), "KalagaPal01")
+	if err != nil || !applies || count != 3 {
+		t.Fatalf("configuração substituída não foi usada: count=%d applies=%v err=%v", count, applies, err)
+	}
+}

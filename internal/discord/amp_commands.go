@@ -36,6 +36,7 @@ type ampInstanceStatusView struct {
 	ApplicationError  error
 	PlayerCounts      *amp.PlayerCounts
 	PlayerError       error
+	PlayerMaxOverride int
 }
 
 func (c *Client) handleAMPCommand(
@@ -162,6 +163,9 @@ func (c *Client) collectAMPInstanceStatuses(
 
 	for index, instance := range instances {
 		statuses[index].Instance = instance
+		if presentation, exists := c.instancePresentationSettings(instance.Name); exists {
+			statuses[index].PlayerMaxOverride = presentation.MaximumPlayers
+		}
 
 		if !instance.Running {
 			continue
@@ -257,6 +261,9 @@ func (c *Client) collectAMPInstanceStatuses(
 			}
 
 			countsCopy := counts
+			if statuses[statusIndex].PlayerMaxOverride > 0 {
+				countsCopy.Maximum = statuses[statusIndex].PlayerMaxOverride
+			}
 			statuses[statusIndex].PlayerCounts = &countsCopy
 		}(
 			index,
@@ -995,6 +1002,12 @@ func buildAMPStatusEmbeds(
 					statusView.PlayerCounts.Current,
 					statusView.PlayerCounts.Maximum,
 				)
+			} else if statusView.PlayerMaxOverride > 0 {
+				current := "?"
+				if !statusView.Instance.Running {
+					current = "0"
+				}
+				players = fmt.Sprintf("%s/%d", current, statusView.PlayerMaxOverride)
 			} else if !statusView.Instance.Running {
 				players = "0/?"
 			}

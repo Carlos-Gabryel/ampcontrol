@@ -4,14 +4,37 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
 	"github.com/alabamaamp/ampcontrol/internal/idle"
 )
 
 type dashboardPlayerCountResolver struct {
+	configMu  sync.RWMutex
 	config    idle.Config
 	detectors *idle.DetectorRegistry
+}
+
+func (r *dashboardPlayerCountResolver) ReplaceConfig(config idle.Config) {
+	if r == nil {
+		return
+	}
+	r.configMu.Lock()
+	r.config = idle.Config{
+		CheckInterval: config.CheckInterval,
+		Servers:       append([]idle.Server(nil), config.Servers...),
+	}
+	r.configMu.Unlock()
+}
+
+func (r *dashboardPlayerCountResolver) configSnapshot() idle.Config {
+	r.configMu.RLock()
+	defer r.configMu.RUnlock()
+	return idle.Config{
+		CheckInterval: r.config.CheckInterval,
+		Servers:       append([]idle.Server(nil), r.config.Servers...),
+	}
 }
 
 func newDashboardPlayerCountResolver(
@@ -62,7 +85,7 @@ func (r *dashboardPlayerCountResolver) ResolvePlayerCount(
 		)
 	}
 
-	server, exists := r.config.FindServer(instance)
+	server, exists := r.configSnapshot().FindServer(instance)
 	if !exists || strings.TrimSpace(string(server.FallbackDetector)) == "" {
 		return 0, false, nil
 	}

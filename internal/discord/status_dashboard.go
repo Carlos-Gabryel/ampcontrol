@@ -176,6 +176,7 @@ func (c *Client) applyGameOverrides(instances []amp.ManagedInstance) {
 			}
 		}
 	}
+	applyInstancePresentationOverrides(instances, c.instancePresentationSettingsSnapshot())
 }
 
 func (c *Client) gameOverridesSnapshot() map[string]string {

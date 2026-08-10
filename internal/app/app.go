@@ -36,9 +36,10 @@ func New() (*App, error) {
 
 	operationManager := operation.NewManager()
 
-	idleConfig, err := idle.LoadCombined(
+	idleConfig, err := idle.LoadCombinedWithDetectionOverrides(
 		idleObserverConfigPath,
 		idleAdditionalServersPath,
+		idleDetectionOverridesPath,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -107,6 +108,7 @@ func New() (*App, error) {
 	if err := discord.SetIdleServerRegistrar(idleObserver); err != nil {
 		return nil, err
 	}
+	idleObserver.SetConfigChangedHandler(playerCountResolver.ReplaceConfig)
 
 	discord.EnableAMPCommandHandling()
 

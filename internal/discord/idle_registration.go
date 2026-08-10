@@ -16,6 +16,19 @@ type IdleServerRegistrar interface {
 	) error
 }
 
+type IdleDetectionSettings struct {
+	Method           string
+	Detector         string
+	FallbackDetector string
+	RCONConfigured   bool
+}
+
+type IdleDetectionManager interface {
+	IdleDetectionSettings(instance string) (IdleDetectionSettings, error)
+	SetIdleDetectionMethod(ctx context.Context, instance string, method string) (IdleDetectionSettings, error)
+	ResetIdleDetectionMethod(ctx context.Context, instance string) (IdleDetectionSettings, error)
+}
+
 type IdleDiagnosticsSnapshot struct {
 	Running           bool
 	StartedAt         time.Time
@@ -46,11 +59,20 @@ func (c *Client) SetIdleServerRegistrar(
 
 	c.idleRegistrationMu.Lock()
 	c.idleServerRegistrar = registrar
+	if manager, ok := registrar.(IdleDetectionManager); ok {
+		c.idleDetectionManager = manager
+	}
 	if diagnostics, ok := registrar.(IdleDiagnosticsProvider); ok {
 		c.idleDiagnosticsProvider = diagnostics
 	}
 	c.idleRegistrationMu.Unlock()
 	return nil
+}
+
+func (c *Client) idleDetectionConfigurator() IdleDetectionManager {
+	c.idleRegistrationMu.RLock()
+	defer c.idleRegistrationMu.RUnlock()
+	return c.idleDetectionManager
 }
 
 func instanceNameMap(instances []string) map[string]string {
