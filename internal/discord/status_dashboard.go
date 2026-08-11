@@ -112,7 +112,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	instances = c.visibleAMPInstances(instances)
 
 	statuses := c.collectAMPInstanceStatuses(instances)
-	cards := buildAMPStatusCards(statuses, time.Now(), c.gameServerAddress)
+	pages := buildAMPStatusPages(statuses, time.Now(), c.gameServerAddress)
 
 	// O guia precisa ser a primeira mensagem do canal. Em instalações
 	// antigas, o upsert do painel abaixo faz uma migração única para que o
@@ -121,7 +121,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.upsertStatusDashboardMessages(cards); err != nil {
+	if err := c.upsertStatusDashboardMessages(pages, statuses); err != nil {
 		return err
 	}
 
@@ -198,7 +198,7 @@ func (c *Client) setGameOverride(instance string, game string) {
 	c.gameOverridesMu.Unlock()
 }
 
-func (c *Client) upsertStatusDashboardMessages(cards []ampStatusCard) error {
+func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComponent, statuses []ampInstanceStatusView) error {
 	state, err := loadStatusDashboardState(c.statusStatePath)
 	if err != nil {
 		return err
@@ -207,23 +207,28 @@ func (c *Client) upsertStatusDashboardMessages(cards []ampStatusCard) error {
 	if len(oldIDs) == 0 && strings.TrimSpace(state.MessageID) != "" {
 		oldIDs = []string{state.MessageID}
 	}
-	newIDs := make([]string, 0, len(cards))
+	newIDs := make([]string, 0, len(pages))
 	usedOld := make(map[string]struct{})
 
-	for index, card := range cards {
-		logoFilename := gameIconFilename(card.Game)
+	for index, page := range pages {
+		game := ""
+		logoFilename := ""
+		if index < len(statuses) {
+			game = dashboardGameName(statuses[index].Instance)
+			logoFilename = gameIconFilename(game)
+		}
 		var messageID snowflake.ID
 		if index < len(oldIDs) {
 			parsed, parseErr := snowflake.Parse(oldIDs[index])
 			if parseErr == nil {
 				existing, getErr := c.channels.GetMessage(c.notificationChannelID, parsed)
-				if getErr == nil && existing.Author.ID == c.bot.ID() && !existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
+				if getErr == nil && existing.Author.ID == c.bot.ID() && existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
 					messageID = parsed
-					update := disgoDiscord.NewMessageUpdate().WithEmbeds(card.Embed).WithComponents(card.Components...)
+					update := disgoDiscord.NewMessageUpdateV2(page...)
 					if !dashboardMessageHasLogo(existing.Attachments, logoFilename) {
 						attachments := []disgoDiscord.AttachmentUpdate{}
 						update.Attachments = &attachments
-						logo, logoErr := gameIconFile(card.Game)
+						logo, logoErr := gameIconFile(game)
 						if logoErr != nil {
 							return logoErr
 						}
@@ -242,8 +247,8 @@ func (c *Client) upsertStatusDashboardMessages(cards []ampStatusCard) error {
 			}
 		}
 		if messageID == 0 {
-			create := disgoDiscord.NewMessageCreate().WithEmbeds(card.Embed).WithComponents(card.Components...)
-			logo, logoErr := gameIconFile(card.Game)
+			create := disgoDiscord.NewMessageCreateV2(page...)
+			logo, logoErr := gameIconFile(game)
 			if logoErr != nil {
 				return logoErr
 			}

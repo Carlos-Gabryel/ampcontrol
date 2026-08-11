@@ -21,61 +21,6 @@ const (
 //go:embed game-logos/*.png
 var gameLogoAssets embed.FS
 
-type ampStatusCard struct {
-	Embed      disgoDiscord.Embed
-	Components []disgoDiscord.LayoutComponent
-	Game       string
-}
-
-func buildAMPStatusCards(statuses []ampInstanceStatusView, updatedAt time.Time, defaultAddress string) []ampStatusCard {
-	if len(statuses) == 0 {
-		return []ampStatusCard{{
-			Embed: disgoDiscord.NewEmbed().
-				WithTitle("Estado dos servidores").
-				WithDescription("Nenhuma instância controlável foi encontrada.").
-				WithColor(0x5865F2).
-				WithTimestamp(updatedAt),
-		}}
-	}
-	cards := make([]ampStatusCard, 0, len(statuses))
-	for index, status := range statuses {
-		game := dashboardGameName(status.Instance)
-		uptime := "0 min"
-		if status.ApplicationStatus != nil {
-			uptime = formatAMPUptime(status.ApplicationStatus.Uptime)
-		}
-		cpu, memory := dashboardResourceUsage(status.ApplicationStatus)
-		_, state := describeAMPInstanceStatus(status)
-
-		embed := disgoDiscord.NewEmbed().
-			WithTitle(ampInstanceDisplayName(status.Instance)).
-			WithDescription("**Jogo**\n`"+game+"`").
-			AddField("Status do servidor", "**"+state+"**", false).
-			AddField("Endereço do servidor", "`"+dashboardInstanceAddress(instancePresentationOverride{Address: status.Address}, defaultAddress)+"`", false).
-			AddField("CPU", "`"+cpu+"`", true).
-			AddField("Memória", "`"+memory+"`", true).
-			AddField("Tempo online", "`"+uptime+"`", true).
-			AddField("Jogadores", "`"+dashboardPlayerCount(status)+"`", true).
-			WithColor(dashboardStatusColor(status)).
-			WithTimestamp(updatedAt)
-		if imageURL := gameIconURL(game); imageURL != "" {
-			embed = embed.WithThumbnail(imageURL)
-		}
-		if index == len(statuses)-1 {
-			embed = embed.WithFooter("🟢 Online  •  🟡 Idle  •  🔴 Offline", "")
-		} else {
-			embed = embed.WithFooter("AmpControl", "")
-		}
-
-		cards = append(cards, ampStatusCard{
-			Embed:      embed,
-			Components: []disgoDiscord.LayoutComponent{buildAMPServerActionRow(status)},
-			Game:       game,
-		})
-	}
-	return cards
-}
-
 func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, defaultAddress string) [][]disgoDiscord.LayoutComponent {
 	if len(statuses) == 0 {
 		return [][]disgoDiscord.LayoutComponent{{
@@ -134,7 +79,21 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 		address, cpu, memory, uptime, players,
 	))
 
-	row := buildAMPServerActionRow(status)
+	phase := amp.ApplicationPhaseUnknown
+	if status.ApplicationStatus != nil {
+		phase = status.ApplicationStatus.Phase()
+	}
+	startDisabled := status.Instance.Running && phase != amp.ApplicationPhaseIdle
+	stopDisabled := !status.Instance.Running || phase != amp.ApplicationPhaseOnline
+	restartDisabled := stopDisabled
+
+	row := disgoDiscord.NewActionRow(
+		disgoDiscord.NewSuccessButton("Iniciar", dashboardComponentID("start", status.Instance.Name)).WithDisabled(startDisabled),
+		disgoDiscord.NewDangerButton("Parar", dashboardComponentID("stop", status.Instance.Name)).WithDisabled(stopDisabled),
+		disgoDiscord.NewSecondaryButton("Reiniciar", dashboardComponentID("restart", status.Instance.Name)).WithDisabled(restartDisabled),
+		disgoDiscord.NewPrimaryButton("Atualizar", dashboardComponentID("update", status.Instance.Name)),
+		disgoDiscord.NewSecondaryButton("Detalhes", dashboardComponentID("details", status.Instance.Name)),
+	)
 
 	return disgoDiscord.NewContainer(
 		header,
@@ -145,23 +104,6 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 		disgoDiscord.NewLargeSeparator(),
 		row,
 	).WithAccentColor(dashboardStatusColor(status))
-}
-
-func buildAMPServerActionRow(status ampInstanceStatusView) disgoDiscord.ActionRowComponent {
-	phase := amp.ApplicationPhaseUnknown
-	if status.ApplicationStatus != nil {
-		phase = status.ApplicationStatus.Phase()
-	}
-	startDisabled := status.Instance.Running && phase != amp.ApplicationPhaseIdle
-	stopDisabled := !status.Instance.Running || phase != amp.ApplicationPhaseOnline
-
-	return disgoDiscord.NewActionRow(
-		disgoDiscord.NewSuccessButton("Iniciar", dashboardComponentID("start", status.Instance.Name)).WithDisabled(startDisabled),
-		disgoDiscord.NewDangerButton("Parar", dashboardComponentID("stop", status.Instance.Name)).WithDisabled(stopDisabled),
-		disgoDiscord.NewSecondaryButton("Reiniciar", dashboardComponentID("restart", status.Instance.Name)).WithDisabled(stopDisabled),
-		disgoDiscord.NewPrimaryButton("Atualizar", dashboardComponentID("update", status.Instance.Name)),
-		disgoDiscord.NewSecondaryButton("Detalhes", dashboardComponentID("details", status.Instance.Name)),
-	)
 }
 
 func dashboardComponentID(action, instance string) string {
