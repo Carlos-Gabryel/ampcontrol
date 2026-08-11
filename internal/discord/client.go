@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +29,8 @@ type Client struct {
 	notificationTTL         time.Duration
 	statusRefreshInterval   time.Duration
 	adsURL                  string
+	ampPublicURL            string
+	gameServerAddress       string
 	statusStatePath         string
 	statusRefreshRequests   chan struct{}
 	statusRefreshMu         sync.Mutex
@@ -75,6 +78,8 @@ type ClientConfig struct {
 	NotificationTTL         time.Duration
 	StatusRefreshInterval   time.Duration
 	ADSURL                  string
+	AMPPublicURL            string
+	GameServerAddress       string
 	StatusStatePath         string
 	PreferencesPath         string
 	GameOverrides           map[string]string
@@ -128,6 +133,8 @@ func New(
 		notificationTTL:       config.NotificationTTL,
 		statusRefreshInterval: config.StatusRefreshInterval,
 		adsURL:                config.ADSURL,
+		ampPublicURL:          strings.TrimRight(strings.TrimSpace(config.AMPPublicURL), "/"),
+		gameServerAddress:     strings.TrimSpace(config.GameServerAddress),
 		statusStatePath:       config.StatusStatePath,
 		preferencesPath:       config.PreferencesPath,
 		preferences:           preferences,

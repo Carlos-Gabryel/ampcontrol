@@ -23,9 +23,10 @@ const statusDashboardTimeout = 45 * time.Second
 const statusDashboardMessageOrderVersion = 1
 
 type statusDashboardState struct {
-	MessageID           string `json:"message_id"`
-	GuideMessageID      string `json:"guide_message_id,omitempty"`
-	MessageOrderVersion int    `json:"message_order_version,omitempty"`
+	MessageID           string   `json:"message_id"`
+	MessageIDs          []string `json:"message_ids,omitempty"`
+	GuideMessageID      string   `json:"guide_message_id,omitempty"`
+	MessageOrderVersion int      `json:"message_order_version,omitempty"`
 }
 
 func (c *Client) runStatusDashboard(ctx context.Context) {
@@ -111,7 +112,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 	instances = c.visibleAMPInstances(instances)
 
 	statuses := c.collectAMPInstanceStatuses(instances)
-	embeds := buildAMPStatusEmbeds(statuses, time.Now())
+	pages := buildAMPStatusPages(statuses, time.Now(), c.gameServerAddress)
 
 	// O guia precisa ser a primeira mensagem do canal. Em instalações
 	// antigas, o upsert do painel abaixo faz uma migração única para que o
@@ -120,7 +121,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.upsertStatusDashboardMessage(embeds); err != nil {
+	if err := c.upsertStatusDashboardMessages(pages); err != nil {
 		return err
 	}
 
@@ -195,6 +196,70 @@ func (c *Client) setGameOverride(instance string, game string) {
 	c.gameOverridesMu.Lock()
 	c.gameOverrides[instance] = game
 	c.gameOverridesMu.Unlock()
+}
+
+func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComponent) error {
+	state, err := loadStatusDashboardState(c.statusStatePath)
+	if err != nil {
+		return err
+	}
+	oldIDs := append([]string(nil), state.MessageIDs...)
+	if len(oldIDs) == 0 && strings.TrimSpace(state.MessageID) != "" {
+		oldIDs = []string{state.MessageID}
+	}
+	newIDs := make([]string, 0, len(pages))
+	usedOld := make(map[string]struct{})
+
+	for index, page := range pages {
+		var messageID snowflake.ID
+		if index < len(oldIDs) {
+			parsed, parseErr := snowflake.Parse(oldIDs[index])
+			if parseErr == nil {
+				existing, getErr := c.channels.GetMessage(c.notificationChannelID, parsed)
+				if getErr == nil && existing.Author.ID == c.bot.ID() && existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
+					messageID = parsed
+					_, err = c.channels.UpdateMessage(c.notificationChannelID, parsed, disgoDiscord.NewMessageUpdateV2(page...))
+					if err != nil {
+						return fmt.Errorf("não foi possível atualizar o painel %d: %w", index+1, err)
+					}
+					usedOld[oldIDs[index]] = struct{}{}
+				} else if getErr != nil && !isDiscordNotFound(getErr) {
+					return fmt.Errorf("não foi possível consultar o painel %d: %w", index+1, getErr)
+				}
+			}
+		}
+		if messageID == 0 {
+			created, createErr := c.channels.CreateMessage(c.notificationChannelID, disgoDiscord.NewMessageCreateV2(page...))
+			if createErr != nil {
+				return fmt.Errorf("não foi possível criar o painel %d: %w", index+1, createErr)
+			}
+			messageID = created.ID
+		}
+		newIDs = append(newIDs, messageID.String())
+		if pinErr := c.channels.PinMessage(c.notificationChannelID, messageID); pinErr != nil {
+			c.log.Warn().Err(pinErr).Str("message_id", messageID.String()).Msg("Painel atualizado, mas não foi possível fixá-lo")
+		}
+	}
+
+	for _, oldID := range oldIDs {
+		if _, keep := usedOld[oldID]; keep {
+			continue
+		}
+		parsed, parseErr := snowflake.Parse(oldID)
+		if parseErr == nil && parsed != 0 {
+			if deleteErr := c.channels.DeleteMessage(c.notificationChannelID, parsed); deleteErr != nil && !isDiscordNotFound(deleteErr) {
+				c.log.Warn().Err(deleteErr).Str("message_id", oldID).Msg("Não foi possível remover um painel antigo")
+			}
+		}
+	}
+
+	state.MessageIDs = newIDs
+	state.MessageID = ""
+	if len(newIDs) > 0 {
+		state.MessageID = newIDs[0]
+	}
+	state.MessageOrderVersion = statusDashboardMessageOrderVersion
+	return saveStatusDashboardState(c.statusStatePath, state)
 }
 
 func (c *Client) upsertStatusDashboardMessage(
@@ -410,6 +475,12 @@ func (c *Client) cleanupExpiredChannelMessages() {
 	}
 
 	dashboardID, _ := snowflake.Parse(state.MessageID)
+	dashboardIDs := make(map[snowflake.ID]struct{}, len(state.MessageIDs))
+	for _, rawID := range state.MessageIDs {
+		if parsed, parseErr := snowflake.Parse(rawID); parseErr == nil && parsed != 0 {
+			dashboardIDs[parsed] = struct{}{}
+		}
+	}
 	guideID, _ := snowflake.Parse(state.GuideMessageID)
 	cutoff := time.Now().Add(-c.notificationTTL)
 	before := snowflake.ID(0)
@@ -433,6 +504,9 @@ func (c *Client) cleanupExpiredChannelMessages() {
 		}
 
 		for _, message := range messages {
+			if _, protected := dashboardIDs[message.ID]; protected {
+				continue
+			}
 			if !shouldDeleteChannelMessage(
 				message.ID,
 				dashboardID,

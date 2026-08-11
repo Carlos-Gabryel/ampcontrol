@@ -221,6 +221,7 @@ func buildAMPConfigCommand(
 	)
 	minimumTextLength := 1
 	maximumTextLength := 80
+	maximumAddressLength := 120
 	minimumPlayers := 1
 	maximumPlayers := 100000
 	return discord.SlashCommandCreate{
@@ -242,7 +243,7 @@ func buildAMPConfigCommand(
 			),
 			discord.ApplicationCommandOptionSubCommand{
 				Name:        "configurar",
-				Description: "Altera nome, jogo, limite ou detector de uma instância",
+				Description: "Altera nome, jogo, endereço, limite ou detector",
 				Options: []discord.ApplicationCommandOption{
 					discord.ApplicationCommandOptionString{
 						Name:        "servidor",
@@ -267,6 +268,12 @@ func buildAMPConfigCommand(
 						Description: "Quantidade máxima de jogadores exibida no painel",
 						MinValue:    &minimumPlayers,
 						MaxValue:    &maximumPlayers,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "endereco",
+						Description: "IP, domínio e porta usados para entrar no servidor",
+						MinLength:   &minimumTextLength,
+						MaxLength:   &maximumAddressLength,
 					},
 					discord.ApplicationCommandOptionString{
 						Name:        "detector",

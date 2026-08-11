@@ -37,6 +37,7 @@ type ampInstanceStatusView struct {
 	PlayerCounts      *amp.PlayerCounts
 	PlayerError       error
 	PlayerMaxOverride int
+	Address           string
 }
 
 func (c *Client) handleAMPCommand(
@@ -165,6 +166,7 @@ func (c *Client) collectAMPInstanceStatuses(
 		statuses[index].Instance = instance
 		if presentation, exists := c.instancePresentationSettings(instance.Name); exists {
 			statuses[index].PlayerMaxOverride = presentation.MaximumPlayers
+			statuses[index].Address = strings.TrimSpace(presentation.Address)
 		}
 
 		if !instance.Running {

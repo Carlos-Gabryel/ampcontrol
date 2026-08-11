@@ -120,7 +120,7 @@ func TestClientInstancePresentationSettingsPersistAndApply(t *testing.T) {
 	game := "Project Zomboid"
 	maximum := 32
 	setting, err := client.setInstancePresentationSettings(
-		"TheWalkingRats01", &name, &game, &maximum,
+		"TheWalkingRats01", &name, &game, &maximum, nil,
 	)
 	if err != nil || setting.MaximumPlayers != 32 {
 		t.Fatalf("não foi possível salvar a apresentação: %#v err=%v", setting, err)

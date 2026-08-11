@@ -22,6 +22,8 @@ type Config struct {
 	AMPUsername                  string
 	AMPPassword                  string
 	AMPADSURL                    string
+	AMPPublicURL                 string
+	AMPGameServerAddress         string
 	LogLevel                     string
 }
 
@@ -47,6 +49,12 @@ func Load() (*Config, error) {
 		AMPPassword: os.Getenv("AMP_PASSWORD"),
 		AMPADSURL: strings.TrimSpace(
 			os.Getenv("AMP_ADS_URL"),
+		),
+		AMPPublicURL: strings.TrimRight(strings.TrimSpace(
+			os.Getenv("AMP_PUBLIC_URL"),
+		), "/"),
+		AMPGameServerAddress: strings.TrimSpace(
+			os.Getenv("AMP_GAME_SERVER_ADDRESS"),
 		),
 		LogLevel: strings.TrimSpace(
 			os.Getenv("LOG_LEVEL"),

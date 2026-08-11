@@ -94,14 +94,16 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 	nameValue, hasName := data.OptString("nome")
 	gameValue, hasGame := data.OptString("jogo")
 	maximumValue, hasMaximum := data.OptInt("maximo")
+	addressValue, hasAddress := data.OptString("endereco")
 	detectorValue, hasDetector := data.OptString("detector")
 	nameValue = strings.TrimSpace(nameValue)
 	gameValue = strings.TrimSpace(gameValue)
-	if !hasName && !hasGame && !hasMaximum && !hasDetector {
+	addressValue = strings.TrimSpace(addressValue)
+	if !hasName && !hasGame && !hasMaximum && !hasAddress && !hasDetector {
 		c.updateInteractionMessage(event, "⚠️ Informe pelo menos uma configuração para alterar.")
 		return
 	}
-	if (hasName && nameValue == "") || (hasGame && gameValue == "") {
+	if (hasName && nameValue == "") || (hasGame && gameValue == "") || (hasAddress && addressValue == "") {
 		c.updateInteractionMessage(event, "⚠️ Nome e jogo não podem ficar vazios.")
 		return
 	}
@@ -137,6 +139,7 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 	var namePointer *string
 	var gamePointer *string
 	var maximumPointer *int
+	var addressPointer *string
 	if hasName {
 		namePointer = &nameValue
 	}
@@ -146,13 +149,17 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 	if hasMaximum {
 		maximumPointer = &maximumValue
 	}
+	if hasAddress {
+		addressPointer = &addressValue
+	}
 	setting, _ := c.instancePresentationSettings(instance.Name)
-	if hasName || hasGame || hasMaximum {
+	if hasName || hasGame || hasMaximum || hasAddress {
 		setting, err = c.setInstancePresentationSettings(
 			instance.Name,
 			namePointer,
 			gamePointer,
 			maximumPointer,
+			addressPointer,
 		)
 		if err != nil {
 			if detectionChanged {
@@ -192,8 +199,9 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 	}
 	message := fmt.Sprintf(
 		"✅ Configuração de **%s** atualizada.\n"+
-			"Nome: **%s**\nJogo: `%s`\nMáximo: `%s`\nDetector: `%s`",
-		instance.Name, displayName, game, maximum, detector,
+			"Nome: **%s**\nJogo: `%s`\nMáximo: `%s`\nEndereço: `%s`\nDetector: `%s`",
+		instance.Name, displayName, game, maximum,
+		dashboardInstanceAddress(setting, c.gameServerAddress), detector,
 	)
 	if registrationErr != nil {
 		message += "\n⚠️ As preferências foram salvas, mas a lista dos comandos será atualizada na próxima conexão."
@@ -236,8 +244,9 @@ func (c *Client) handleAMPInstanceSettingsDetailsCommand(
 	}
 	c.updateInteractionMessage(event, fmt.Sprintf(
 		"⚙️ **Configuração de %s**\n"+
-			"Instância: `%s`\nJogo: `%s`\nMáximo: `%s`\nDetector: `%s`\nRCON: `%s`\nPersonalização: `%t`",
-		ampInstanceDisplayName(instance), instance.Name, instance.Game, maximum, detector, rcon, customized,
+			"Instância: `%s`\nJogo: `%s`\nMáximo: `%s`\nEndereço: `%s`\nDetector: `%s`\nRCON: `%s`\nPersonalização: `%t`",
+		ampInstanceDisplayName(instance), instance.Name, instance.Game, maximum,
+		dashboardInstanceAddress(setting, c.gameServerAddress), detector, rcon, customized,
 	))
 	c.deleteInteractionResponseLater(event, 30*time.Second)
 }

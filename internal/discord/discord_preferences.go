@@ -22,6 +22,7 @@ type instancePresentationOverride struct {
 	DisplayName    string `json:"display_name,omitempty"`
 	Game           string `json:"game,omitempty"`
 	MaximumPlayers int    `json:"maximum_players,omitempty"`
+	Address        string `json:"address,omitempty"`
 }
 
 func loadDiscordPreferences(path string) (discordPreferences, error) {
@@ -271,6 +272,7 @@ func normalizeInstancePresentationOverrides(
 		override.Instance = strings.TrimSpace(override.Instance)
 		override.DisplayName = strings.TrimSpace(override.DisplayName)
 		override.Game = strings.TrimSpace(override.Game)
+		override.Address = strings.TrimSpace(override.Address)
 		if override.Instance == "" {
 			return nil, fmt.Errorf("há uma configuração de apresentação sem instância")
 		}
@@ -317,6 +319,7 @@ func (c *Client) setInstancePresentationSettings(
 	displayName *string,
 	game *string,
 	maximumPlayers *int,
+	address *string,
 ) (instancePresentationOverride, error) {
 	instance = strings.TrimSpace(instance)
 	if instance == "" {
@@ -351,6 +354,9 @@ func (c *Client) setInstancePresentationSettings(
 	}
 	if maximumPlayers != nil {
 		setting.MaximumPlayers = *maximumPlayers
+	}
+	if address != nil {
+		setting.Address = strings.TrimSpace(*address)
 	}
 	if setting.MaximumPlayers < 0 || setting.MaximumPlayers > 100000 {
 		return instancePresentationOverride{}, fmt.Errorf("o limite de jogadores precisa estar entre 0 e 100000")

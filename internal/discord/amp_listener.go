@@ -18,6 +18,13 @@ func (c *Client) EnableAMPCommandHandling() {
 			},
 		),
 	)
+	c.bot.AddEventListeners(
+		bot.NewListenerFunc(
+			func(event *events.ComponentInteractionCreate) {
+				c.handleDashboardComponent(event)
+			},
+		),
+	)
 }
 
 func (c *Client) handleAMPInteractionEvent(

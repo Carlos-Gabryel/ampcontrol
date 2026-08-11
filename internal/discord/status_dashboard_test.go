@@ -2,6 +2,7 @@ package discord
 
 import (
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -122,7 +123,7 @@ func TestStatusDashboardStateRoundTrip(t *testing.T) {
 		t.Fatalf("loadStatusDashboardState retornou erro: %v", err)
 	}
 
-	if actual != expected {
+	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("estado inesperado: %+v", actual)
 	}
 }

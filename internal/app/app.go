@@ -75,6 +75,8 @@ func New() (*App, error) {
 			CommandUserCooldown:   cfg.DiscordCommandUserCooldown,
 			CommandServerCooldown: cfg.DiscordCommandServerCooldown,
 			ADSURL:                cfg.AMPADSURL,
+			AMPPublicURL:          cfg.AMPPublicURL,
+			GameServerAddress:     cfg.AMPGameServerAddress,
 			StatusStatePath:       "data/discord_status.json",
 			PreferencesPath:       "data/discord_preferences.json",
 			GameOverrides:         gameOverrides,
