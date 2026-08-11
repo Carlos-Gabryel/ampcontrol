@@ -110,7 +110,7 @@ func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 	}
 }
 
-func TestBuildAMPStatusPagesUsesThreeVerticalCardsPerMessage(t *testing.T) {
+func TestBuildAMPStatusPagesUsesOneCardPerMessage(t *testing.T) {
 	statuses := make([]ampInstanceStatusView, 6)
 	for index := range statuses {
 		statuses[index].Instance = amp.ManagedInstance{
@@ -118,17 +118,15 @@ func TestBuildAMPStatusPagesUsesThreeVerticalCardsPerMessage(t *testing.T) {
 		}
 	}
 	pages := buildAMPStatusPages(statuses, time.Unix(1_700_000_000, 0), "192.168.1.22")
-	if len(pages) != 2 {
-		t.Fatalf("seis servidores deveriam ocupar duas mensagens: %#v", pages)
+	if len(pages) != 6 {
+		t.Fatalf("seis servidores deveriam ocupar seis mensagens: %#v", pages)
 	}
 	for pageIndex, page := range pages {
-		if len(page) != 4 {
-			t.Fatalf("página %d deveria ter três cartões e um rodapé: %d", pageIndex, len(page))
+		if len(page) != 2 {
+			t.Fatalf("página %d deveria ter um cartão e um rodapé: %d", pageIndex, len(page))
 		}
-		for index := 0; index < 3; index++ {
-			if _, ok := page[index].(disgoDiscord.ContainerComponent); !ok {
-				t.Fatalf("componente %d da página %d deveria ser um cartão", index, pageIndex)
-			}
+		if _, ok := page[0].(disgoDiscord.ContainerComponent); !ok {
+			t.Fatalf("primeiro componente da página %d deveria ser um cartão", pageIndex)
 		}
 	}
 }
@@ -148,20 +146,24 @@ func TestBuildAMPStatusPagesDoesNotEmitNullSectionAccessory(t *testing.T) {
 	}
 }
 
-func TestGameIconURLUsesSteamLogosAndOfficialNonSteamAssets(t *testing.T) {
+func TestGameIconURLUsesNormalizedRepositoryAssets(t *testing.T) {
 	tests := map[string]string{
-		"PalWorld (Modded)": "/1623730/logo.png",
-		"Project Zomboid":   "/108600/logo.png",
-		"Valheim":           "/892970/logo.png",
-		"Satisfactory":      "/526870/logo.png",
-		"Minecraft":         "minecraft.net/",
-		"Hytale":            "accounts.hytale.com/",
-		"TeamSpeak":         "teamspeak.com/",
+		"PalWorld (Modded)": "palworld.png",
+		"Project Zomboid":   "project-zomboid.png",
+		"Valheim":           "valheim.png",
+		"Satisfactory":      "satisfactory.png",
+		"Minecraft":         "minecraft.png",
+		"Hytale":            "hytale.png",
+		"TeamSpeak":         "teamspeak.png",
 	}
 	for game, expected := range tests {
-		if actual := gameIconURL(game); !strings.Contains(actual, expected) {
+		actual := gameIconURL(game)
+		if !strings.HasPrefix(actual, "https://raw.githubusercontent.com/Carlos-Gabryel/ampcontrol/main/assets/game-logos/") || !strings.HasSuffix(actual, expected) {
 			t.Fatalf("imagem inesperada para %s: %q", game, actual)
 		}
+	}
+	if actual := gameIconURL("Jogo desconhecido"); actual != "" {
+		t.Fatalf("jogo sem asset deveria omitir a imagem: %q", actual)
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	dashboardServersPerMessage = 3
+	dashboardServersPerMessage = 1
 	dashboardComponentPrefix   = "ampdash"
 )
 
@@ -59,8 +59,8 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 	name := ampInstanceDisplayName(status.Instance)
 
 	headerText := disgoDiscord.NewTextDisplay(fmt.Sprintf(
-		"## %s\n**Status do servidor**\n%s\n\n**Jogo**\n`%s`",
-		name, state, game,
+		"## %s\n### %s",
+		name, game,
 	))
 	var header disgoDiscord.ContainerSubComponent = headerText
 	if imageURL := gameIconURL(game); imageURL != "" {
@@ -68,10 +68,15 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 			WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription("Logo de " + game))
 	}
 
+	statusBlock := disgoDiscord.NewTextDisplay(fmt.Sprintf(
+		"### Status do servidor\n**%s**",
+		state,
+	))
 	details := disgoDiscord.NewTextDisplay(fmt.Sprintf(
-		"**Endereço do servidor**\n`%s`\n\n"+
+		"### Endereço do servidor\n`%s`\n\n"+
+			"### Desempenho\n"+
 			"**CPU**　　**Memória**　　**Tempo online**\n`%s`　　`%s`　　`%s`\n\n"+
-			"**Jogadores**\n`%s`",
+			"### Jogadores\n`%s`",
 		address, cpu, memory, uptime, players,
 	))
 
@@ -93,9 +98,11 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 
 	return disgoDiscord.NewContainer(
 		header,
+		disgoDiscord.NewLargeSeparator(),
+		statusBlock,
 		disgoDiscord.NewSmallSeparator(),
 		details,
-		disgoDiscord.NewSmallSeparator(),
+		disgoDiscord.NewLargeSeparator(),
 		row,
 	).WithAccentColor(dashboardStatusColor(status))
 }
@@ -286,36 +293,23 @@ func collectSingleAMPStatus(c *Client, instance amp.ManagedInstance) ampInstance
 
 func gameIconURL(game string) string {
 	lower := strings.ToLower(game)
+	const baseURL = "https://raw.githubusercontent.com/Carlos-Gabryel/ampcontrol/main/assets/game-logos/"
 	switch {
 	case strings.Contains(lower, "minecraft"):
-		return "https://www.minecraft.net/content/dam/minecraftnet/community/events/cy2025/sandstorm/Wallpapers_Carousel_MCM-Creeper_1110x624.jpg"
+		return baseURL + "minecraft.png"
 	case strings.Contains(lower, "hytale"):
-		return "https://accounts.hytale.com/images/logo-leaves.webp"
+		return baseURL + "hytale.png"
 	case strings.Contains(lower, "team"):
-		return "https://www.teamspeak.com/user/themes/teamspeak/assets/images/mediakit/TS_Stacked_BlueLight.png"
-	}
-
-	appID := ""
-	switch {
+		return baseURL + "teamspeak.png"
 	case strings.Contains(lower, "palworld"):
-		appID = "1623730"
+		return baseURL + "palworld.png"
 	case strings.Contains(lower, "zomboid"):
-		appID = "108600"
+		return baseURL + "project-zomboid.png"
 	case strings.Contains(lower, "valheim"):
-		appID = "892970"
+		return baseURL + "valheim.png"
 	case strings.Contains(lower, "satisfactory"):
-		appID = "526870"
-	case strings.Contains(lower, "terraria"):
-		appID = "105600"
-	case strings.Contains(lower, "7 days"):
-		appID = "251570"
-	case strings.Contains(lower, "enshrouded"):
-		appID = "1203620"
-	case strings.Contains(lower, "v rising"):
-		appID = "1604030"
-	}
-	if appID == "" {
+		return baseURL + "satisfactory.png"
+	default:
 		return ""
 	}
-	return "https://cdn.cloudflare.steamstatic.com/steam/apps/" + appID + "/logo.png"
 }
