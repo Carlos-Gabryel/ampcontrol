@@ -131,6 +131,35 @@ func TestBuildAMPStatusPagesUsesOneCardPerMessage(t *testing.T) {
 	}
 }
 
+func TestBuildAMPStatusCardsPreservesVisualDataAndControls(t *testing.T) {
+	status := ampInstanceStatusView{
+		Instance:          amp.ManagedInstance{Name: "Valheim01", FriendlyName: "Valheim", Game: "Valheim", Running: true},
+		ApplicationStatus: &amp.ApplicationStatus{State: amp.ApplicationStateReady, Uptime: "0:01:30:00"},
+		PlayerCounts:      &amp.PlayerCounts{Current: 2, Maximum: 10},
+		Address:           "valheim.example.com:2456",
+	}
+	cards := buildAMPStatusCards([]ampInstanceStatusView{status}, time.Unix(1_700_000_000, 0), "192.168.1.22")
+	if len(cards) != 1 {
+		t.Fatalf("esperava um cartão: %#v", cards)
+	}
+	card := cards[0]
+	if card.Embed.Title != "Valheim" || card.Embed.Thumbnail == nil || card.Embed.Thumbnail.URL != "attachment://valheim.png" {
+		t.Fatalf("cabeçalho ou logo inesperados: %#v", card.Embed)
+	}
+	if len(card.Embed.Fields) != 6 || len(card.Components) != 1 {
+		t.Fatalf("informações ou controles ausentes: embed=%#v components=%#v", card.Embed, card.Components)
+	}
+	payload, err := json.Marshal(card.Components)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, label := range []string{"Iniciar", "Parar", "Reiniciar", "Atualizar", "Detalhes"} {
+		if !bytes.Contains(payload, []byte(`"label":"`+label+`"`)) {
+			t.Fatalf("botão %s ausente: %s", label, payload)
+		}
+	}
+}
+
 func TestBuildAMPStatusPagesDoesNotEmitNullSectionAccessory(t *testing.T) {
 	statuses := []ampInstanceStatusView{
 		{Instance: amp.ManagedInstance{Name: "Minecraft01", Game: "Minecraft"}},
