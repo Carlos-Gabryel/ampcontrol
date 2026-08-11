@@ -121,7 +121,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.upsertStatusDashboardMessages(pages); err != nil {
+	if err := c.upsertStatusDashboardMessages(pages, statuses); err != nil {
 		return err
 	}
 
@@ -198,7 +198,7 @@ func (c *Client) setGameOverride(instance string, game string) {
 	c.gameOverridesMu.Unlock()
 }
 
-func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComponent) error {
+func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComponent, statuses []ampInstanceStatusView) error {
 	state, err := loadStatusDashboardState(c.statusStatePath)
 	if err != nil {
 		return err
@@ -211,6 +211,12 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 	usedOld := make(map[string]struct{})
 
 	for index, page := range pages {
+		game := ""
+		logoFilename := ""
+		if index < len(statuses) {
+			game = dashboardGameName(statuses[index].Instance)
+			logoFilename = gameIconFilename(game)
+		}
 		var messageID snowflake.ID
 		if index < len(oldIDs) {
 			parsed, parseErr := snowflake.Parse(oldIDs[index])
@@ -218,7 +224,19 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 				existing, getErr := c.channels.GetMessage(c.notificationChannelID, parsed)
 				if getErr == nil && existing.Author.ID == c.bot.ID() && existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
 					messageID = parsed
-					_, err = c.channels.UpdateMessage(c.notificationChannelID, parsed, disgoDiscord.NewMessageUpdateV2(page...))
+					update := disgoDiscord.NewMessageUpdateV2(page...)
+					if !dashboardMessageHasLogo(existing.Attachments, logoFilename) {
+						attachments := []disgoDiscord.AttachmentUpdate{}
+						update.Attachments = &attachments
+						logo, logoErr := gameIconFile(game)
+						if logoErr != nil {
+							return logoErr
+						}
+						if logo != nil {
+							update = update.WithFiles(logo)
+						}
+					}
+					_, err = c.channels.UpdateMessage(c.notificationChannelID, parsed, update)
 					if err != nil {
 						return fmt.Errorf("não foi possível atualizar o painel %d: %w", index+1, err)
 					}
@@ -229,7 +247,15 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 			}
 		}
 		if messageID == 0 {
-			created, createErr := c.channels.CreateMessage(c.notificationChannelID, disgoDiscord.NewMessageCreateV2(page...))
+			create := disgoDiscord.NewMessageCreateV2(page...)
+			logo, logoErr := gameIconFile(game)
+			if logoErr != nil {
+				return logoErr
+			}
+			if logo != nil {
+				create = create.WithFiles(logo)
+			}
+			created, createErr := c.channels.CreateMessage(c.notificationChannelID, create)
 			if createErr != nil {
 				return fmt.Errorf("não foi possível criar o painel %d: %w", index+1, createErr)
 			}
@@ -260,6 +286,18 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 	}
 	state.MessageOrderVersion = statusDashboardMessageOrderVersion
 	return saveStatusDashboardState(c.statusStatePath, state)
+}
+
+func dashboardMessageHasLogo(attachments []disgoDiscord.Attachment, filename string) bool {
+	if filename == "" {
+		return len(attachments) == 0
+	}
+	for _, attachment := range attachments {
+		if attachment.Filename == filename {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) upsertStatusDashboardMessage(

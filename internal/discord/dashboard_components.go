@@ -1,6 +1,8 @@
 package discord
 
 import (
+	"bytes"
+	"embed"
 	"fmt"
 	"net/url"
 	"strings"
@@ -15,6 +17,9 @@ const (
 	dashboardServersPerMessage = 1
 	dashboardComponentPrefix   = "ampdash"
 )
+
+//go:embed game-logos/*.png
+var gameLogoAssets embed.FS
 
 func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, defaultAddress string) [][]disgoDiscord.LayoutComponent {
 	if len(statuses) == 0 {
@@ -42,13 +47,7 @@ func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, 
 
 func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string) disgoDiscord.ContainerComponent {
 	_, state := describeAMPInstanceStatus(status)
-	game := strings.TrimSpace(status.Instance.Game)
-	if game == "" {
-		game = strings.TrimSpace(status.Instance.Module)
-	}
-	if game == "" {
-		game = "Desconhecido"
-	}
+	game := dashboardGameName(status.Instance)
 	uptime := "0 min"
 	if status.ApplicationStatus != nil {
 		uptime = formatAMPUptime(status.ApplicationStatus.Uptime)
@@ -249,7 +248,7 @@ func (c *Client) handleDashboardDetails(event *events.ComponentInteractionCreate
 	}
 	cpu, memory := dashboardResourceUsage(status.ApplicationStatus)
 	embed := disgoDiscord.NewEmbed().
-		WithAuthor(ampInstanceDisplayName(instance), "", gameIconURL(instance.Game)).
+		WithAuthor(ampInstanceDisplayName(instance), "", "").
 		AddField("Status", icon+" "+state, true).
 		AddField("Jogo", instance.Game, true).
 		AddField("Endereço", dashboardInstanceAddress(setting, c.gameServerAddress), false).
@@ -292,24 +291,54 @@ func collectSingleAMPStatus(c *Client, instance amp.ManagedInstance) ampInstance
 }
 
 func gameIconURL(game string) string {
+	filename := gameIconFilename(game)
+	if filename == "" {
+		return ""
+	}
+	return "attachment://" + filename
+}
+
+func gameIconFilename(game string) string {
 	lower := strings.ToLower(game)
-	const baseURL = "https://raw.githubusercontent.com/Carlos-Gabryel/ampcontrol/main/assets/game-logos/"
 	switch {
 	case strings.Contains(lower, "minecraft"):
-		return baseURL + "minecraft.png"
+		return "minecraft.png"
 	case strings.Contains(lower, "hytale"):
-		return baseURL + "hytale.png"
+		return "hytale.png"
 	case strings.Contains(lower, "team"):
-		return baseURL + "teamspeak.png"
+		return "teamspeak.png"
 	case strings.Contains(lower, "palworld"):
-		return baseURL + "palworld.png"
+		return "palworld.png"
 	case strings.Contains(lower, "zomboid"):
-		return baseURL + "project-zomboid.png"
+		return "project-zomboid.png"
 	case strings.Contains(lower, "valheim"):
-		return baseURL + "valheim.png"
+		return "valheim.png"
 	case strings.Contains(lower, "satisfactory"):
-		return baseURL + "satisfactory.png"
+		return "satisfactory.png"
 	default:
 		return ""
 	}
+}
+
+func gameIconFile(game string) (*disgoDiscord.File, error) {
+	filename := gameIconFilename(game)
+	if filename == "" {
+		return nil, nil
+	}
+	data, err := gameLogoAssets.ReadFile("game-logos/" + filename)
+	if err != nil {
+		return nil, fmt.Errorf("não foi possível carregar a logo %s: %w", filename, err)
+	}
+	return disgoDiscord.NewFile(filename, "Logo de "+game, bytes.NewReader(data)), nil
+}
+
+func dashboardGameName(instance amp.ManagedInstance) string {
+	game := strings.TrimSpace(instance.Game)
+	if game == "" {
+		game = strings.TrimSpace(instance.Module)
+	}
+	if game == "" {
+		return "Desconhecido"
+	}
+	return game
 }

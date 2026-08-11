@@ -158,8 +158,12 @@ func TestGameIconURLUsesNormalizedRepositoryAssets(t *testing.T) {
 	}
 	for game, expected := range tests {
 		actual := gameIconURL(game)
-		if !strings.HasPrefix(actual, "https://raw.githubusercontent.com/Carlos-Gabryel/ampcontrol/main/assets/game-logos/") || !strings.HasSuffix(actual, expected) {
+		if actual != "attachment://"+expected {
 			t.Fatalf("imagem inesperada para %s: %q", game, actual)
+		}
+		file, err := gameIconFile(game)
+		if err != nil || file == nil || file.Name != expected {
+			t.Fatalf("asset embutido inesperado para %s: file=%v err=%v", game, file, err)
 		}
 	}
 	if actual := gameIconURL("Jogo desconhecido"); actual != "" {
