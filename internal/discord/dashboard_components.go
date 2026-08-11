@@ -59,9 +59,10 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 	name := ampInstanceDisplayName(status.Instance)
 
 	header := disgoDiscord.NewSection(
-		disgoDiscord.NewTextDisplay(fmt.Sprintf("## %s　　　　　　　　　%s", name, icon)),
-		disgoDiscord.NewTextDisplay(fmt.Sprintf("**Status do servidor**\n%s", state)),
-		disgoDiscord.NewTextDisplay(fmt.Sprintf("**Jogo**\n`%s`", game)),
+		disgoDiscord.NewTextDisplay(fmt.Sprintf(
+			"## %s　　　　　　　　　%s\n**Status do servidor**\n%s\n\n**Jogo**\n`%s`",
+			name, icon, state, game,
+		)),
 	).WithAccessory(disgoDiscord.NewThumbnail(gameIconURL(game)).WithDescription("Ícone de " + game))
 
 	details := disgoDiscord.NewTextDisplay(fmt.Sprintf(
