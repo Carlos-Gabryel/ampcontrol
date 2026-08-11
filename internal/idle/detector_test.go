@@ -174,7 +174,7 @@ func TestDetectorRegistryUsesFallbackWhenPrimaryFails(t *testing.T) {
 	}
 }
 
-func TestDetectorRegistrySkipsFallbackWhenPrimaryHasPlayers(t *testing.T) {
+func TestDetectorRegistryPrefersFallbackWhenAMPHasGhostPlayer(t *testing.T) {
 	primary := &fakePlayerDetector{
 		detectorType: DetectorAMPPlayers,
 		playerCount:  3,
@@ -199,11 +199,11 @@ func TestDetectorRegistrySkipsFallbackWhenPrimaryHasPlayers(t *testing.T) {
 		t.Fatalf("PlayerCount retornou erro: %v", err)
 	}
 
-	if count != 3 {
+	if count != 0 {
 		t.Fatalf("contagem inesperada: %d", count)
 	}
-	if fallback.calls != 0 {
-		t.Fatalf("o fallback não deveria ser consultado; chamadas=%d", fallback.calls)
+	if fallback.calls != 1 {
+		t.Fatalf("o fallback deveria ser consultado; chamadas=%d", fallback.calls)
 	}
 }
 

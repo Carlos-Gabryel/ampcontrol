@@ -186,11 +186,10 @@ func (r *DetectorRegistry) PlayerCount(
 		strings.TrimSpace(string(server.FallbackDetector)),
 	)
 
-	// A API do AMP é a fonte principal. Quando ela falha, o detector
-	// específico assume. Quando a API informa zero, o fallback confirma
-	// esse zero antes que o cronômetro de Idle avance.
-	if fallbackType != "" &&
-		(err != nil || playerCount == 0) {
+	// Quando existe um detector específico, ele é a fonte autoritativa.
+	// A telemetria do AMP pode manter jogadores desconectados como ativos,
+	// especialmente em servidores Palworld modificados.
+	if fallbackType != "" {
 		fallbackCount, fallbackErr := r.playerCountForDetector(
 			ctx,
 			server,
@@ -205,6 +204,11 @@ func (r *DetectorRegistry) PlayerCount(
 					fallbackType,
 					fallbackErr,
 				)
+			}
+			if playerCount > 0 {
+				// Na dúvida, preservar a sessão indicada pelo AMP evita que
+				// uma falha temporária do RCON encerre uma partida ativa.
+				return playerCount, nil
 			}
 
 			return 0, fmt.Errorf(
