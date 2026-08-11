@@ -10,53 +10,29 @@ import (
 const commandGuideContent = "— Como usar os comandos"
 
 func buildAMPCommandGuideEmbeds() []disgoDiscord.Embed {
-	operations := disgoDiscord.NewEmbed().
-		WithDescription(
-			"Escolha o comando digitando `/` neste canal e selecione o servidor na lista. "+
-				"Os comandos não funcionam em outros canais.",
-		).
-		AddField(
-			"### /amp status",
-			"Atualiza o painel fixo de servidores. Não inicia, reinicia ou para nenhuma instância. **Disponível para todos.**",
-			false,
-		).
-		AddField(
-			"### /amp iniciar servidor:<servidor>",
-			"Liga a instância AMP, se necessário, inicia o processo do jogo e aguarda o estado Online. O início é manual, pode levar alguns minutos e está **disponível para todos**.",
-			false,
-		).
-		AddField(
-			"### /amp parar servidor:<servidor>",
-			"Para somente o processo do jogo. A instância AMP permanece ligada e o painel mostra a bolinha amarela de **Idle**. **Disponível para todos.**",
-			false,
-		).
-		AddField(
-			"### /amp reiniciar servidor:<servidor>",
-			"Reinicia somente o processo do jogo e aguarda que ele volte a ficar Online. **Disponível para todos.**",
-			false,
-		).
-		AddField(
-			"### /amp desligar servidor:<servidor> confirmar:sim",
-			"Desliga completamente a instância AMP. Exige a confirmação oferecida pelo Discord e o painel passa a mostrar **Offline**. **Disponível para todos.**",
-			false,
-		).
-		AddField(
-			"### /amp atualizar servidor:<servidor> confirmar:sim",
-			"Atualiza a instância selecionada. Exige confirmação e reinicia a instância caso ela esteja ligada, interrompendo o servidor durante o processo. **Disponível para todos.**",
-			false,
-		).
-		AddField(
-			"🛡️ Proteção de partidas em andamento",
-			"Usuários comuns não podem parar, reiniciar, desligar ou atualizar um servidor enquanto houver jogadores conectados. Se a quantidade de jogadores não puder ser confirmada, esses comandos também serão bloqueados por segurança.",
-			false,
-		).
-		WithFooter(
-			"Todos os comandos /amp estão disponíveis para os usuários deste canal.",
-			"",
-		).
-		WithColor(0x5865F2)
-
-	return []disgoDiscord.Embed{operations}
+	intro := "Escolha o comando digitando `/` neste canal e selecione o servidor na lista. Os comandos não funcionam em outros canais.\n\n"
+	commands := []struct{ title, description string }{
+		{"/amp status", "Atualiza o painel fixo de servidores. Não inicia, reinicia ou para nenhuma instância. **Disponível para todos.**"},
+		{"/amp iniciar servidor:<servidor>", "Liga a instância AMP, se necessário, inicia o processo do jogo e aguarda o estado Online. O início é manual, pode levar alguns minutos e está **disponível para todos**."},
+		{"/amp parar servidor:<servidor>", "Para somente o processo do jogo. A instância AMP permanece ligada e o painel passa a mostrar **Idle**. **Disponível para todos.**"},
+		{"/amp reiniciar servidor:<servidor>", "Reinicia somente o processo do jogo e aguarda que ele volte a ficar Online. **Disponível para todos.**"},
+		{"/amp desligar servidor:<servidor> confirmar:sim", "Desliga completamente a instância AMP. Exige a confirmação oferecida pelo Discord e o painel passa a mostrar **Offline**. **Disponível para todos.**"},
+		{"/amp atualizar servidor:<servidor> confirmar:sim", "Atualiza a instância selecionada. Exige confirmação e reinicia a instância caso ela esteja ligada, interrompendo o servidor durante o processo. **Disponível para todos.**"},
+	}
+	embeds := make([]disgoDiscord.Embed, 0, len(commands)+1)
+	for index, command := range commands {
+		description := command.description
+		if index == 0 {
+			description = intro + description
+		}
+		embeds = append(embeds, disgoDiscord.NewEmbed().WithTitle(command.title).WithDescription(description).WithColor(0x5865F2))
+	}
+	embeds = append(embeds, disgoDiscord.NewEmbed().
+		WithTitle("🛡️ Proteção de partidas em andamento").
+		WithDescription("Usuários comuns não podem parar, reiniciar, desligar ou atualizar um servidor enquanto houver jogadores conectados. Se a quantidade de jogadores não puder ser confirmada, esses comandos também serão bloqueados por segurança.").
+		WithFooter("Todos os comandos /amp estão disponíveis para os usuários deste canal.", "").
+		WithColor(0x57F287))
+	return embeds
 }
 
 func (c *Client) upsertCommandGuideMessage() error {

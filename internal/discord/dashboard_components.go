@@ -41,7 +41,7 @@ func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, 
 }
 
 func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string) disgoDiscord.ContainerComponent {
-	icon, state := describeAMPInstanceStatus(status)
+	_, state := describeAMPInstanceStatus(status)
 	game := strings.TrimSpace(status.Instance.Game)
 	if game == "" {
 		game = strings.TrimSpace(status.Instance.Module)
@@ -60,10 +60,13 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 
 	header := disgoDiscord.NewSection(
 		disgoDiscord.NewTextDisplay(fmt.Sprintf(
-			"## %s　　　　　　　　　%s\n**Status do servidor**\n%s\n\n**Jogo**\n`%s`",
-			name, icon, state, game,
+			"## %s\n**Status do servidor**\n%s\n\n**Jogo**\n`%s`",
+			name, state, game,
 		)),
-	).WithAccessory(disgoDiscord.NewThumbnail(gameIconURL(game)).WithDescription("Ícone de " + game))
+	)
+	if imageURL := gameIconURL(game); imageURL != "" {
+		header = header.WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription("Capa de " + game + " na Steam"))
+	}
 
 	details := disgoDiscord.NewTextDisplay(fmt.Sprintf(
 		"**Endereço do servidor**\n`%s`\n\n"+
@@ -262,7 +265,7 @@ func (c *Client) handleDashboardDetails(event *events.ComponentInteractionCreate
 	)
 	components := []disgoDiscord.LayoutComponent{actionRow}
 	if event.User().ID == c.ownerUserID && c.ampPublicURL != "" && instance.ID != "" {
-		manageURL := c.ampPublicURL + "/#Instance=" + url.QueryEscape(instance.ID)
+		manageURL := strings.TrimRight(c.ampPublicURL, "/") + "/instance/" + url.PathEscape(instance.ID)
 		components = append(components, disgoDiscord.NewActionRow(disgoDiscord.NewLinkButton("Abrir no AMP", manageURL)))
 	}
 	message := disgoDiscord.NewMessageUpdate().WithEmbeds(embed).WithComponents(components...)
@@ -282,23 +285,28 @@ func collectSingleAMPStatus(c *Client, instance amp.ManagedInstance) ampInstance
 }
 
 func gameIconURL(game string) string {
-	domain := "cubecoders.com"
 	lower := strings.ToLower(game)
+	appID := ""
 	switch {
-	case strings.Contains(lower, "minecraft"):
-		domain = "minecraft.net"
 	case strings.Contains(lower, "palworld"):
-		domain = "palworldgame.com"
+		appID = "1623730"
 	case strings.Contains(lower, "zomboid"):
-		domain = "projectzomboid.com"
+		appID = "108600"
 	case strings.Contains(lower, "valheim"):
-		domain = "valheimgame.com"
+		appID = "892970"
 	case strings.Contains(lower, "satisfactory"):
-		domain = "satisfactorygame.com"
-	case strings.Contains(lower, "hytale"):
-		domain = "hytale.com"
-	case strings.Contains(lower, "team"):
-		domain = "teamspeak.com"
+		appID = "526870"
+	case strings.Contains(lower, "terraria"):
+		appID = "105600"
+	case strings.Contains(lower, "7 days"):
+		appID = "251570"
+	case strings.Contains(lower, "enshrouded"):
+		appID = "1203620"
+	case strings.Contains(lower, "v rising"):
+		appID = "1604030"
 	}
-	return "https://www.google.com/s2/favicons?sz=128&domain=" + domain
+	if appID == "" {
+		return ""
+	}
+	return "https://cdn.cloudflare.steamstatic.com/steam/apps/" + appID + "/header.jpg"
 }

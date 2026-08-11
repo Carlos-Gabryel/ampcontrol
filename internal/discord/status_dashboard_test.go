@@ -295,11 +295,10 @@ func TestStatusDashboardOrderMigrationRunsOnlyOnce(t *testing.T) {
 
 func TestBuildAMPCommandGuideEmbedsDocumentsEveryCommand(t *testing.T) {
 	embeds := buildAMPCommandGuideEmbeds()
-	if len(embeds) != 1 {
+	if len(embeds) != 7 {
 		t.Fatalf("quantidade inesperada de embeds do guia: %d", len(embeds))
 	}
 
-	fields := embeds[0].Fields
 	expectedCommands := []string{
 		"/amp status",
 		"/amp iniciar",
@@ -311,8 +310,8 @@ func TestBuildAMPCommandGuideEmbedsDocumentsEveryCommand(t *testing.T) {
 
 	for _, command := range expectedCommands {
 		found := false
-		for _, field := range fields {
-			if strings.Contains(field.Name, command) {
+		for _, embed := range embeds {
+			if strings.Contains(embed.Title, command) {
 				found = true
 				break
 			}
@@ -325,17 +324,17 @@ func TestBuildAMPCommandGuideEmbedsDocumentsEveryCommand(t *testing.T) {
 	if !strings.Contains(embeds[0].Description, "não funcionam em outros canais") {
 		t.Fatal("o guia deveria explicar a restrição de canal")
 	}
-	guideText := embeds[0].Description
-	for _, field := range fields {
-		guideText += "\n" + field.Name + "\n" + field.Value
+	guideText := ""
+	for _, embed := range embeds {
+		guideText += "\n" + embed.Title + "\n" + embed.Description
 	}
 	if !strings.Contains(guideText, "Proteção de partidas") ||
 		!strings.Contains(guideText, "jogadores conectados") {
 		t.Fatal("o guia deveria explicar a proteção de partidas em andamento")
 	}
-	for _, field := range fields {
-		if strings.Contains(field.Name, "/ampconfig") ||
-			strings.Contains(field.Value, "/ampconfig") {
+	for _, embed := range embeds {
+		if strings.Contains(embed.Title, "/ampconfig") ||
+			strings.Contains(embed.Description, "/ampconfig") {
 			t.Fatal("o guia público não deve revelar comandos privados de configuração")
 		}
 	}
