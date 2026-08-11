@@ -65,7 +65,7 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 	var header disgoDiscord.ContainerSubComponent = headerText
 	if imageURL := gameIconURL(game); imageURL != "" {
 		header = disgoDiscord.NewSection(headerText).
-			WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription("Capa de " + game + " na Steam"))
+			WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription("Logo de " + game))
 	}
 
 	details := disgoDiscord.NewTextDisplay(fmt.Sprintf(
@@ -286,6 +286,15 @@ func collectSingleAMPStatus(c *Client, instance amp.ManagedInstance) ampInstance
 
 func gameIconURL(game string) string {
 	lower := strings.ToLower(game)
+	switch {
+	case strings.Contains(lower, "minecraft"):
+		return "https://www.minecraft.net/content/dam/minecraftnet/community/events/cy2025/sandstorm/Wallpapers_Carousel_MCM-Creeper_1110x624.jpg"
+	case strings.Contains(lower, "hytale"):
+		return "https://accounts.hytale.com/images/logo-leaves.webp"
+	case strings.Contains(lower, "team"):
+		return "https://www.teamspeak.com/user/themes/teamspeak/assets/images/mediakit/TS_Stacked_BlueLight.png"
+	}
+
 	appID := ""
 	switch {
 	case strings.Contains(lower, "palworld"):
@@ -308,5 +317,5 @@ func gameIconURL(game string) string {
 	if appID == "" {
 		return ""
 	}
-	return "https://cdn.cloudflare.steamstatic.com/steam/apps/" + appID + "/header.jpg"
+	return "https://cdn.cloudflare.steamstatic.com/steam/apps/" + appID + "/logo.png"
 }

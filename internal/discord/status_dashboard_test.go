@@ -148,6 +148,23 @@ func TestBuildAMPStatusPagesDoesNotEmitNullSectionAccessory(t *testing.T) {
 	}
 }
 
+func TestGameIconURLUsesSteamLogosAndOfficialNonSteamAssets(t *testing.T) {
+	tests := map[string]string{
+		"PalWorld (Modded)": "/1623730/logo.png",
+		"Project Zomboid":   "/108600/logo.png",
+		"Valheim":           "/892970/logo.png",
+		"Satisfactory":      "/526870/logo.png",
+		"Minecraft":         "minecraft.net/",
+		"Hytale":            "accounts.hytale.com/",
+		"TeamSpeak":         "teamspeak.com/",
+	}
+	for game, expected := range tests {
+		if actual := gameIconURL(game); !strings.Contains(actual, expected) {
+			t.Fatalf("imagem inesperada para %s: %q", game, actual)
+		}
+	}
+}
+
 func TestStatusDashboardStateRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data", "discord_status.json")
 	expected := statusDashboardState{
