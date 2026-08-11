@@ -230,8 +230,7 @@ func (c *Client) collectAMPInstanceStatuses(
 				return
 			}
 
-			if counts.Current == 0 &&
-				status.Phase() == amp.ApplicationPhaseOnline &&
+			if status.Phase() == amp.ApplicationPhaseOnline &&
 				c.playerCountResolver != nil {
 				resolverCtx, resolverCancel := context.WithTimeout(
 					context.Background(),
