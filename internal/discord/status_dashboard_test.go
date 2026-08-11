@@ -1,6 +1,8 @@
 package discord
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -128,6 +130,21 @@ func TestBuildAMPStatusPagesUsesThreeVerticalCardsPerMessage(t *testing.T) {
 				t.Fatalf("componente %d da página %d deveria ser um cartão", index, pageIndex)
 			}
 		}
+	}
+}
+
+func TestBuildAMPStatusPagesDoesNotEmitNullSectionAccessory(t *testing.T) {
+	statuses := []ampInstanceStatusView{
+		{Instance: amp.ManagedInstance{Name: "Minecraft01", Game: "Minecraft"}},
+		{Instance: amp.ManagedInstance{Name: "Valheim01", Game: "Valheim"}},
+	}
+	pages := buildAMPStatusPages(statuses, time.Unix(1_700_000_000, 0), "192.168.1.22")
+	payload, err := json.Marshal(pages)
+	if err != nil {
+		t.Fatalf("não foi possível serializar o painel: %v", err)
+	}
+	if bytes.Contains(payload, []byte(`"accessory":null`)) {
+		t.Fatalf("painel contém accessory nulo rejeitado pelo Discord: %s", payload)
 	}
 }
 

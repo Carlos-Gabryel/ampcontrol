@@ -58,14 +58,14 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 	address := dashboardInstanceAddress(instancePresentationOverride{Address: status.Address}, defaultAddress)
 	name := ampInstanceDisplayName(status.Instance)
 
-	header := disgoDiscord.NewSection(
-		disgoDiscord.NewTextDisplay(fmt.Sprintf(
-			"## %s\n**Status do servidor**\n%s\n\n**Jogo**\n`%s`",
-			name, state, game,
-		)),
-	)
+	headerText := disgoDiscord.NewTextDisplay(fmt.Sprintf(
+		"## %s\n**Status do servidor**\n%s\n\n**Jogo**\n`%s`",
+		name, state, game,
+	))
+	var header disgoDiscord.ContainerSubComponent = headerText
 	if imageURL := gameIconURL(game); imageURL != "" {
-		header = header.WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription("Capa de " + game + " na Steam"))
+		header = disgoDiscord.NewSection(headerText).
+			WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription("Capa de " + game + " na Steam"))
 	}
 
 	details := disgoDiscord.NewTextDisplay(fmt.Sprintf(
