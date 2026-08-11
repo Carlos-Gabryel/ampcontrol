@@ -12,28 +12,61 @@ import (
 )
 
 const (
-	dashboardServersPerMessage = 3
+	dashboardServersPerMessage = 25
 	dashboardComponentPrefix   = "ampdash"
 )
 
-func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, defaultAddress string) [][]disgoDiscord.LayoutComponent {
+type dashboardMessagePage struct {
+	Embeds     []disgoDiscord.Embed
+	Components []disgoDiscord.LayoutComponent
+}
+
+func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, defaultAddress string) []dashboardMessagePage {
 	if len(statuses) == 0 {
-		return [][]disgoDiscord.LayoutComponent{{
-			disgoDiscord.NewContainer(disgoDiscord.NewTextDisplay("Nenhuma instância controlável foi encontrada.")).WithAccentColor(0x5865F2),
+		return []dashboardMessagePage{{
+			Embeds: []disgoDiscord.Embed{disgoDiscord.NewEmbed().WithDescription("Nenhuma instância controlável foi encontrada.").WithColor(0x5865F2)},
 		}}
 	}
 
-	pages := make([][]disgoDiscord.LayoutComponent, 0, (len(statuses)+dashboardServersPerMessage-1)/dashboardServersPerMessage)
+	pages := make([]dashboardMessagePage, 0, (len(statuses)+dashboardServersPerMessage-1)/dashboardServersPerMessage)
 	for start := 0; start < len(statuses); start += dashboardServersPerMessage {
 		end := min(start+dashboardServersPerMessage, len(statuses))
-		components := make([]disgoDiscord.LayoutComponent, 0, end-start+1)
+		embed := disgoDiscord.NewEmbed().WithTitle("Estado dos servidores").WithColor(0x5865F2)
+		buttons := make([]disgoDiscord.InteractiveComponent, 0, end-start)
 		for _, status := range statuses[start:end] {
-			components = append(components, buildAMPServerContainer(status, defaultAddress))
+			icon, state := describeAMPInstanceStatus(status)
+			game := strings.TrimSpace(status.Instance.Game)
+			if game == "" {
+				game = "Desconhecido"
+			}
+			uptime := "0 min"
+			if status.ApplicationStatus != nil {
+				uptime = formatAMPUptime(status.ApplicationStatus.Uptime)
+			}
+			cpu, memory := dashboardResourceUsage(status.ApplicationStatus)
+			embed = embed.AddField(
+				fmt.Sprintf("%s　%s", ampInstanceDisplayName(status.Instance), icon),
+				fmt.Sprintf(
+					"**Jogo:** `%s`\n**IP:** `%s`\n**CPU:** `%s` • **RAM:** `%s`\n**Online:** `%s` • **Jogadores:** `%s`\n**Estado:** %s",
+					game, dashboardInstanceAddress(instancePresentationOverride{Address: status.Address}, defaultAddress),
+					cpu, memory, uptime, dashboardPlayerCount(status), state,
+				),
+				true,
+			)
+			buttons = append(buttons, disgoDiscord.NewSecondaryButton(
+				ampInstanceDisplayName(status.Instance), dashboardComponentID("details", status.Instance.Name),
+			))
 		}
-		components = append(components, disgoDiscord.NewTextDisplay(fmt.Sprintf(
-			"🟢 Online  •  🟡 Idle  •  🔴 Offline\nAtualizado <t:%d:R>", updatedAt.Unix(),
-		)))
-		pages = append(pages, components)
+		if end == len(statuses) {
+			embed = embed.WithFooter("🟢 Online  •  🟡 Idle  •  🔴 Offline", "")
+		}
+		embed = embed.WithDescription(fmt.Sprintf("Atualizado <t:%d:R> • Selecione um servidor abaixo para controlar.", updatedAt.Unix()))
+		rows := make([]disgoDiscord.LayoutComponent, 0, (len(buttons)+4)/5)
+		for rowStart := 0; rowStart < len(buttons); rowStart += 5 {
+			rowEnd := min(rowStart+5, len(buttons))
+			rows = append(rows, disgoDiscord.NewActionRow(buttons[rowStart:rowEnd]...))
+		}
+		pages = append(pages, dashboardMessagePage{Embeds: []disgoDiscord.Embed{embed}, Components: rows})
 	}
 	return pages
 }
@@ -243,19 +276,74 @@ func dashboardOperation(action string) (ampCommandOperation, bool) {
 
 func (c *Client) handleDashboardDetails(event *events.ComponentInteractionCreate, instance amp.ManagedInstance) {
 	setting, _ := c.instancePresentationSettings(instance.Name)
-	content := fmt.Sprintf(
-		"## %s %s\n**Jogo:** `%s`\n**Endereço:** `%s`\n**Instância AMP:** `%s`",
-		gameIcon(instance.Game), ampInstanceDisplayName(instance), instance.Game,
-		dashboardInstanceAddress(setting, c.gameServerAddress), instance.Name,
+	status := collectSingleAMPStatus(c, instance)
+	icon, state := describeAMPInstanceStatus(status)
+	uptime := "0 min"
+	if status.ApplicationStatus != nil {
+		uptime = formatAMPUptime(status.ApplicationStatus.Uptime)
+	}
+	cpu, memory := dashboardResourceUsage(status.ApplicationStatus)
+	embed := disgoDiscord.NewEmbed().
+		WithAuthor(ampInstanceDisplayName(instance), "", gameIconURL(instance.Game)).
+		AddField("Status", icon+" "+state, true).
+		AddField("Jogo", instance.Game, true).
+		AddField("Endereço", dashboardInstanceAddress(setting, c.gameServerAddress), false).
+		AddField("CPU", cpu, true).
+		AddField("Memória", memory, true).
+		AddField("Tempo online", uptime, true).
+		AddField("Jogadores", dashboardPlayerCount(status), true).
+		WithColor(dashboardStatusColor(status)).
+		WithFooter("Instância AMP: "+instance.Name, "")
+
+	phase := amp.ApplicationPhaseUnknown
+	if status.ApplicationStatus != nil {
+		phase = status.ApplicationStatus.Phase()
+	}
+	actionRow := disgoDiscord.NewActionRow(
+		disgoDiscord.NewSuccessButton("Iniciar", dashboardComponentID("start", instance.Name)).WithDisabled(instance.Running && phase != amp.ApplicationPhaseIdle),
+		disgoDiscord.NewDangerButton("Parar", dashboardComponentID("stop", instance.Name)).WithDisabled(!instance.Running || phase != amp.ApplicationPhaseOnline),
+		disgoDiscord.NewSecondaryButton("Reiniciar", dashboardComponentID("restart", instance.Name)).WithDisabled(!instance.Running || phase != amp.ApplicationPhaseOnline),
+		disgoDiscord.NewPrimaryButton("Atualizar", dashboardComponentID("update", instance.Name)),
 	)
-	message := disgoDiscord.NewMessageUpdate().WithContent(content)
+	components := []disgoDiscord.LayoutComponent{actionRow}
 	if event.User().ID == c.ownerUserID && c.ampPublicURL != "" && instance.ID != "" {
 		manageURL := c.ampPublicURL + "/#Instance=" + url.QueryEscape(instance.ID)
-		message = message.WithComponents(disgoDiscord.NewActionRow(disgoDiscord.NewLinkButton("Abrir no AMP", manageURL)))
+		components = append(components, disgoDiscord.NewActionRow(disgoDiscord.NewLinkButton("Abrir no AMP", manageURL)))
 	}
+	message := disgoDiscord.NewMessageUpdate().WithEmbeds(embed).WithComponents(components...)
 	_, _ = c.interactions.UpdateInteractionResponse(event.ApplicationID(), event.Token(), message)
 	go c.createDetachedCommandAudit(commandAuditRecord{
 		UserID: event.User().ID, UserName: event.User().EffectiveName(), ChannelID: event.Channel().ID(),
 		Command: "/painel detalhes", Server: instance.Name, Accepted: true, Reason: "Consultado pelo painel", CreatedAt: time.Now(),
 	}, commandAuditPresentation{Phase: commandAuditPhaseCompleted, Result: "Detalhes exibidos", FinalState: "Sem alteração", UpdatedAt: time.Now()})
+}
+
+func collectSingleAMPStatus(c *Client, instance amp.ManagedInstance) ampInstanceStatusView {
+	statuses := c.collectAMPInstanceStatuses([]amp.ManagedInstance{instance})
+	if len(statuses) == 1 {
+		return statuses[0]
+	}
+	return ampInstanceStatusView{Instance: instance}
+}
+
+func gameIconURL(game string) string {
+	domain := "cubecoders.com"
+	lower := strings.ToLower(game)
+	switch {
+	case strings.Contains(lower, "minecraft"):
+		domain = "minecraft.net"
+	case strings.Contains(lower, "palworld"):
+		domain = "palworldgame.com"
+	case strings.Contains(lower, "zomboid"):
+		domain = "projectzomboid.com"
+	case strings.Contains(lower, "valheim"):
+		domain = "valheimgame.com"
+	case strings.Contains(lower, "satisfactory"):
+		domain = "satisfactorygame.com"
+	case strings.Contains(lower, "hytale"):
+		domain = "hytale.com"
+	case strings.Contains(lower, "team"):
+		domain = "teamspeak.com"
+	}
+	return "https://www.google.com/s2/favicons?sz=128&domain=" + domain
 }

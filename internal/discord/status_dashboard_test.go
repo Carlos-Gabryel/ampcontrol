@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -103,6 +104,27 @@ func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 	if embeds[2].Description !=
 		"**Legenda:**  🟢 Online   •   🟡 Idle   •   🔴 Offline" {
 		t.Fatalf("legenda inesperada: %q", embeds[2].Description)
+	}
+}
+
+func TestBuildAMPStatusPagesUsesSingleThreeColumnGrid(t *testing.T) {
+	statuses := make([]ampInstanceStatusView, 6)
+	for index := range statuses {
+		statuses[index].Instance = amp.ManagedInstance{
+			Name: fmt.Sprintf("Server%02d", index), FriendlyName: fmt.Sprintf("Servidor %d", index+1), Game: "Minecraft",
+		}
+	}
+	pages := buildAMPStatusPages(statuses, time.Unix(1_700_000_000, 0), "192.168.1.22")
+	if len(pages) != 1 || len(pages[0].Embeds) != 1 {
+		t.Fatalf("seis servidores deveriam ocupar uma mensagem: %#v", pages)
+	}
+	if len(pages[0].Embeds[0].Fields) != 6 || len(pages[0].Components) != 2 {
+		t.Fatalf("grid ou seletores inesperados: fields=%d rows=%d", len(pages[0].Embeds[0].Fields), len(pages[0].Components))
+	}
+	for _, field := range pages[0].Embeds[0].Fields {
+		if field.Inline == nil || !*field.Inline {
+			t.Fatal("cada servidor deveria ocupar uma coluna inline")
+		}
 	}
 }
 

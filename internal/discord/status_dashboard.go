@@ -198,7 +198,7 @@ func (c *Client) setGameOverride(instance string, game string) {
 	c.gameOverridesMu.Unlock()
 }
 
-func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComponent) error {
+func (c *Client) upsertStatusDashboardMessages(pages []dashboardMessagePage) error {
 	state, err := loadStatusDashboardState(c.statusStatePath)
 	if err != nil {
 		return err
@@ -216,9 +216,9 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 			parsed, parseErr := snowflake.Parse(oldIDs[index])
 			if parseErr == nil {
 				existing, getErr := c.channels.GetMessage(c.notificationChannelID, parsed)
-				if getErr == nil && existing.Author.ID == c.bot.ID() && existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
+				if getErr == nil && existing.Author.ID == c.bot.ID() && !existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
 					messageID = parsed
-					_, err = c.channels.UpdateMessage(c.notificationChannelID, parsed, disgoDiscord.NewMessageUpdateV2(page...))
+					_, err = c.channels.UpdateMessage(c.notificationChannelID, parsed, disgoDiscord.NewMessageUpdate().WithContent("— Estado dos servidores").WithEmbeds(page.Embeds...).WithComponents(page.Components...))
 					if err != nil {
 						return fmt.Errorf("não foi possível atualizar o painel %d: %w", index+1, err)
 					}
@@ -229,7 +229,7 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 			}
 		}
 		if messageID == 0 {
-			created, createErr := c.channels.CreateMessage(c.notificationChannelID, disgoDiscord.NewMessageCreateV2(page...))
+			created, createErr := c.channels.CreateMessage(c.notificationChannelID, disgoDiscord.NewMessageCreate().WithContent("— Estado dos servidores").WithEmbeds(page.Embeds...).WithComponents(page.Components...))
 			if createErr != nil {
 				return fmt.Errorf("não foi possível criar o painel %d: %w", index+1, createErr)
 			}

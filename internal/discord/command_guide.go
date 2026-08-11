@@ -16,32 +16,32 @@ func buildAMPCommandGuideEmbeds() []disgoDiscord.Embed {
 				"Os comandos não funcionam em outros canais.",
 		).
 		AddField(
-			"`/amp status`",
+			"### /amp status",
 			"Atualiza o painel fixo de servidores. Não inicia, reinicia ou para nenhuma instância. **Disponível para todos.**",
 			false,
 		).
 		AddField(
-			"`/amp iniciar servidor:<servidor>`",
+			"### /amp iniciar servidor:<servidor>",
 			"Liga a instância AMP, se necessário, inicia o processo do jogo e aguarda o estado Online. O início é manual, pode levar alguns minutos e está **disponível para todos**.",
 			false,
 		).
 		AddField(
-			"`/amp parar servidor:<servidor>`",
+			"### /amp parar servidor:<servidor>",
 			"Para somente o processo do jogo. A instância AMP permanece ligada e o painel mostra a bolinha amarela de **Idle**. **Disponível para todos.**",
 			false,
 		).
 		AddField(
-			"`/amp reiniciar servidor:<servidor>`",
+			"### /amp reiniciar servidor:<servidor>",
 			"Reinicia somente o processo do jogo e aguarda que ele volte a ficar Online. **Disponível para todos.**",
 			false,
 		).
 		AddField(
-			"`/amp desligar servidor:<servidor> confirmar:sim`",
+			"### /amp desligar servidor:<servidor> confirmar:sim",
 			"Desliga completamente a instância AMP. Exige a confirmação oferecida pelo Discord e o painel passa a mostrar **Offline**. **Disponível para todos.**",
 			false,
 		).
 		AddField(
-			"`/amp atualizar servidor:<servidor> confirmar:sim`",
+			"### /amp atualizar servidor:<servidor> confirmar:sim",
 			"Atualiza a instância selecionada. Exige confirmação e reinicia a instância caso ela esteja ligada, interrompendo o servidor durante o processo. **Disponível para todos.**",
 			false,
 		).
