@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alabamaamp/ampcontrol/internal/amp"
+	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -107,7 +108,7 @@ func TestBuildAMPStatusEmbedsUsesReadableTwoColumnGrid(t *testing.T) {
 	}
 }
 
-func TestBuildAMPStatusPagesUsesSingleThreeColumnGrid(t *testing.T) {
+func TestBuildAMPStatusPagesUsesThreeVerticalCardsPerMessage(t *testing.T) {
 	statuses := make([]ampInstanceStatusView, 6)
 	for index := range statuses {
 		statuses[index].Instance = amp.ManagedInstance{
@@ -115,15 +116,17 @@ func TestBuildAMPStatusPagesUsesSingleThreeColumnGrid(t *testing.T) {
 		}
 	}
 	pages := buildAMPStatusPages(statuses, time.Unix(1_700_000_000, 0), "192.168.1.22")
-	if len(pages) != 1 || len(pages[0].Embeds) != 1 {
-		t.Fatalf("seis servidores deveriam ocupar uma mensagem: %#v", pages)
+	if len(pages) != 2 {
+		t.Fatalf("seis servidores deveriam ocupar duas mensagens: %#v", pages)
 	}
-	if len(pages[0].Embeds[0].Fields) != 6 || len(pages[0].Components) != 2 {
-		t.Fatalf("grid ou seletores inesperados: fields=%d rows=%d", len(pages[0].Embeds[0].Fields), len(pages[0].Components))
-	}
-	for _, field := range pages[0].Embeds[0].Fields {
-		if field.Inline == nil || !*field.Inline {
-			t.Fatal("cada servidor deveria ocupar uma coluna inline")
+	for pageIndex, page := range pages {
+		if len(page) != 4 {
+			t.Fatalf("página %d deveria ter três cartões e um rodapé: %d", pageIndex, len(page))
+		}
+		for index := 0; index < 3; index++ {
+			if _, ok := page[index].(disgoDiscord.ContainerComponent); !ok {
+				t.Fatalf("componente %d da página %d deveria ser um cartão", index, pageIndex)
+			}
 		}
 	}
 }
