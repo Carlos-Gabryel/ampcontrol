@@ -131,39 +131,12 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 func (c *Client) discoverAMPInstances(
 	ctx context.Context,
 ) ([]amp.ManagedInstance, error) {
-	instances, err := c.ampClient.DiscoverManagedInstances(
-		ctx,
-		c.adsURL,
-	)
-	if err == nil {
-		c.applyGameOverrides(instances)
-		return instances, nil
+	instances, err := c.inventory.DiscoverInstances(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	c.log.Warn().
-		Err(err).
-		Msg("Inventário pela API ADS falhou; usando ampinstmgr como fallback")
-
-	fallback, fallbackErr := amp.DiscoverInstances(ctx)
-	if fallbackErr != nil {
-		return nil, fmt.Errorf(
-			"inventário ADS falhou (%v) e o fallback ampinstmgr também falhou: %w",
-			err,
-			fallbackErr,
-		)
-	}
-
-	for index := range fallback {
-		if strings.EqualFold(fallback[index].Module, "Minecraft") {
-			fallback[index].Game = "Minecraft"
-		} else {
-			fallback[index].Game = fallback[index].Module
-		}
-	}
-
-	c.applyGameOverrides(fallback)
-
-	return fallback, nil
+	c.applyGameOverrides(instances)
+	return instances, nil
 }
 
 func (c *Client) applyGameOverrides(instances []amp.ManagedInstance) {

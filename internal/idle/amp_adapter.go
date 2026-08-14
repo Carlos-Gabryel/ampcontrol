@@ -61,6 +61,16 @@ func NewAMPAdapter(
 	)
 }
 
+func NewAMPAdapterWithInventory(
+	client AMPApplicationClient,
+	inventory amp.InstanceDiscoverer,
+) (*AMPAdapter, error) {
+	if inventory == nil {
+		return nil, fmt.Errorf("o inventário AMP não foi informado")
+	}
+	return newAMPAdapter(client, inventory.DiscoverInstances)
+}
+
 func newAMPAdapter(
 	client AMPApplicationClient,
 	discover ampDiscoverInstancesFunc,

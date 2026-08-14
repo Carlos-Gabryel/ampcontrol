@@ -20,10 +20,10 @@ const (
 )
 
 func RegisterCommands(
-	ctx context.Context,
 	restClient rest.Rest,
 	applicationID snowflake.ID,
 	guildID snowflake.ID,
+	instances []amp.ManagedInstance,
 	gameOverrides map[string]string,
 	presentationOverrides []instancePresentationOverride,
 	hiddenInstanceNames []string,
@@ -37,14 +37,6 @@ func RegisterCommands(
 		applicationID,
 		[]discord.ApplicationCommandCreate{},
 	)
-
-	instances, err := amp.DiscoverInstances(ctx)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"não foi possível descobrir as instâncias para registrar os comandos: %w",
-			err,
-		)
-	}
 
 	applyCommandGameNames(instances, gameOverrides)
 	applyInstancePresentationOverrides(instances, presentationOverrides)
@@ -95,14 +87,22 @@ func RegisterCommands(
 }
 
 func (c *Client) registerCommands(ctx context.Context) error {
+	instances, err := c.discoverAMPInstances(ctx)
+	if err != nil {
+		return fmt.Errorf("não foi possível descobrir as instâncias para registrar os comandos: %w", err)
+	}
+	return c.registerCommandsWithInstances(instances)
+}
+
+func (c *Client) registerCommandsWithInstances(instances []amp.ManagedInstance) error {
 	c.commandRegistrationMu.Lock()
 	defer c.commandRegistrationMu.Unlock()
 
 	instances, err := RegisterCommands(
-		ctx,
 		c.bot.Rest,
 		c.bot.ApplicationID,
 		c.guildID,
+		instances,
 		c.gameOverridesSnapshot(),
 		c.instancePresentationSettingsSnapshot(),
 		c.hiddenInstanceNames(),
@@ -146,7 +146,7 @@ func (c *Client) refreshCommandsForInventory(
 		return
 	}
 
-	if err := c.registerCommands(ctx); err != nil {
+	if err := c.registerCommandsWithInstances(instances); err != nil {
 		c.log.Warn().
 			Err(err).
 			Msg("Inventário AMP mudou, mas os comandos não puderam ser atualizados")

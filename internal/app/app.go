@@ -41,6 +41,10 @@ func New() (*App, error) {
 		cfg.AMPUsername,
 		cfg.AMPPassword,
 	)
+	inventory, err := amp.NewInventory(ampAPIClient, cfg.AMPADSURL)
+	if err != nil {
+		return nil, err
+	}
 
 	operationManager := operation.NewManager()
 
@@ -65,6 +69,7 @@ func New() (*App, error) {
 
 	playerCountResolver, err := newDashboardPlayerCountResolver(
 		ampAPIClient,
+		inventory,
 		idleConfig,
 	)
 	if err != nil {
@@ -93,6 +98,7 @@ func New() (*App, error) {
 			PreferencesPath:        "data/discord_preferences.json",
 			GameOverrides:          gameOverrides,
 			PlayerCountResolver:    playerCountResolver,
+			Inventory:              inventory,
 			IdleRegisteredInstances: idleRegisteredInstanceNames(
 				idleConfig,
 			),
@@ -111,6 +117,7 @@ func New() (*App, error) {
 
 	idleObserver, err := newIdleObserver(
 		ampAPIClient,
+		inventory,
 		operationManager,
 		discord,
 		idleConfig,

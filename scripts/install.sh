@@ -65,7 +65,7 @@ done
 [[ "$EUID" -eq 0 ]] || fail "execute este instalador com sudo"
 [[ -t 0 ]] || fail "o instalador precisa de um terminal interativo"
 
-for command_name in systemctl systemd-creds install getent sudo visudo; do
+for command_name in systemctl systemd-creds install getent sudo visudo find sort; do
     command -v "$command_name" >/dev/null 2>&1 || fail "dependência ausente: $command_name"
 done
 
@@ -194,6 +194,50 @@ AMP_INSTANCE_COUNT="$(grep -c 'Instance Name' <<<"$AMP_INVENTORY_OUTPUT" || true
 printf '%s instância(s) AMP encontrada(s).\n' "$AMP_INSTANCE_COUNT"
 unset AMP_INVENTORY_OUTPUT
 
+PRESERVE_EXISTING_IDLE=false
+if [[ -f "$STATE_DIRECTORY/config/idle.json" ]]; then
+    PRESERVE_EXISTING_IDLE="$(prompt_yes_no 'Manter a configuração de Idle da instalação existente?' 'true')"
+fi
+
+mapfile -t DETECTED_INSTANCES < <(
+    find "$AMP_INSTANCES_DIRECTORY" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
+        while IFS= read -r instance_name; do
+            if [[ "$instance_name" != "ADS01" && "$instance_name" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                printf '%s\n' "$instance_name"
+            fi
+        done | sort
+)
+SELECTED_IDLE_INSTANCES=()
+if [[ "$PRESERVE_EXISTING_IDLE" == false ]] && ((${#DETECTED_INSTANCES[@]} > 0)); then
+    printf '\nInstâncias disponíveis para Idle automático:\n'
+    for index in "${!DETECTED_INSTANCES[@]}"; do
+        printf '  %d) %s\n' "$((index + 1))" "${DETECTED_INSTANCES[$index]}"
+    done
+    read -r -p 'Ativar Idle de 15 minutos em quais instâncias? Use todos, nenhum ou números separados por vírgula [nenhum]: ' IDLE_SELECTION
+    IDLE_SELECTION="${IDLE_SELECTION:-nenhum}"
+    case "${IDLE_SELECTION,,}" in
+        todos)
+            SELECTED_IDLE_INSTANCES=("${DETECTED_INSTANCES[@]}")
+            ;;
+        nenhum)
+            ;;
+        *)
+            IFS=',' read -r -a IDLE_INDEXES <<<"$IDLE_SELECTION"
+            declare -A SELECTED_IDLE_INDEXES=()
+            for selected_index in "${IDLE_INDEXES[@]}"; do
+                selected_index="${selected_index//[[:space:]]/}"
+                [[ "$selected_index" =~ ^[0-9]+$ ]] || fail "seleção de Idle inválida: $selected_index"
+                selected_index="$((10#$selected_index))"
+                ((selected_index >= 1 && selected_index <= ${#DETECTED_INSTANCES[@]})) || fail "índice de Idle fora da lista: $selected_index"
+                if [[ -z "${SELECTED_IDLE_INDEXES[$selected_index]:-}" ]]; then
+                    SELECTED_IDLE_INSTANCES+=("${DETECTED_INSTANCES[$((selected_index - 1))]}")
+                    SELECTED_IDLE_INDEXES[$selected_index]=1
+                fi
+            done
+            ;;
+    esac
+fi
+
 DISCORD_GUILD_ID="$(prompt_required 'ID do servidor Discord')"
 DISCORD_PANEL_CHANNEL_ID="$(prompt_required 'ID do canal do painel e comandos')"
 DISCORD_AUDIT_CHANNEL_ID="$(prompt_required 'ID do canal privado de auditoria')"
@@ -274,7 +318,38 @@ install -d -o root -g root -m 0755 "$LIB_DIRECTORY"
 install -d -o root -g root -m 0700 "$CREDENTIAL_DIRECTORY"
 install -o root -g root -m 0755 "$BINARY_SOURCE" "$LIB_DIRECTORY/ampcontrol"
 install -o root -g root -m 0755 "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" "$WRAPPER_PATH"
-install -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0640 "$PROJECT_DIRECTORY/config/idle.json" "$STATE_DIRECTORY/config/idle.json"
+if [[ "$PRESERVE_EXISTING_IDLE" == false ]]; then
+    install -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0640 "$PROJECT_DIRECTORY/config/idle.json" "$STATE_DIRECTORY/config/idle.json"
+fi
+
+IDLE_SERVERS_PATH="$STATE_DIRECTORY/data/idle_servers.json"
+IDLE_SERVERS_TEMP="$IDLE_SERVERS_PATH.new"
+if [[ "$PRESERVE_EXISTING_IDLE" == false ]]; then
+{
+    printf '{\n  "servers": ['
+    for index in "${!SELECTED_IDLE_INSTANCES[@]}"; do
+        instance_name="${SELECTED_IDLE_INSTANCES[$index]}"
+        ((index == 0)) || printf ','
+        printf '\n    {\n'
+        printf '      "instance": "%s",\n' "$instance_name"
+        printf '      "display_name": "%s",\n' "$instance_name"
+        printf '      "enabled": true,\n'
+        printf '      "mode": "active",\n'
+        printf '      "detector": "amp_players",\n'
+        printf '      "idle_timeout_minutes": 15,\n'
+        printf '      "startup_grace_minutes": 5\n'
+        printf '    }'
+    done
+    if ((${#SELECTED_IDLE_INSTANCES[@]} > 0)); then
+        printf '\n  ]\n}\n'
+    else
+        printf ']\n}\n'
+    fi
+} > "$IDLE_SERVERS_TEMP"
+chown "$SERVICE_USER":"$SERVICE_GROUP" "$IDLE_SERVERS_TEMP"
+chmod 0600 "$IDLE_SERVERS_TEMP"
+mv -f -- "$IDLE_SERVERS_TEMP" "$IDLE_SERVERS_PATH"
+fi
 
 printf 'AMPINSTMGR=%q\nINSTANCES_DIRECTORY=%q\n' "$AMP_MANAGER_PATH" "$AMP_INSTANCES_DIRECTORY" > "$CONFIG_DIRECTORY/amp-runtime.conf"
 chown root:root "$CONFIG_DIRECTORY/amp-runtime.conf"

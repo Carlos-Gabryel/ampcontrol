@@ -21,6 +21,7 @@ import (
 type Client struct {
 	bot                     *bot.Client
 	ampClient               *amp.APIClient
+	inventory               amp.InstanceDiscoverer
 	interactions            rest.Interactions
 	channels                rest.Channels
 	guildID                 snowflake.ID
@@ -92,6 +93,7 @@ type ClientConfig struct {
 	PreferencesPath         string
 	GameOverrides           map[string]string
 	PlayerCountResolver     PlayerCountResolver
+	Inventory               amp.InstanceDiscoverer
 	IdleRegisteredInstances []string
 	CommandUserCooldown     time.Duration
 	CommandServerCooldown   time.Duration
@@ -106,6 +108,9 @@ func New(
 	preferences, err := loadDiscordPreferences(config.PreferencesPath)
 	if err != nil {
 		return nil, err
+	}
+	if config.Inventory == nil {
+		return nil, fmt.Errorf("o inventário AMP não foi informado")
 	}
 	adminRoleIDs, err := parseSnowflakeSet(config.AdminRoleIDs)
 	if err != nil {
@@ -137,6 +142,7 @@ func New(
 	client := &Client{
 		bot:                    disgoClient,
 		ampClient:              ampClient,
+		inventory:              config.Inventory,
 		interactions:           interactions,
 		channels:               channels,
 		guildID:                snowflake.MustParse(config.GuildID),

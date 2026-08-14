@@ -39,9 +39,10 @@ func (r *dashboardPlayerCountResolver) configSnapshot() idle.Config {
 
 func newDashboardPlayerCountResolver(
 	ampClient *amp.APIClient,
+	inventory amp.InstanceDiscoverer,
 	idleConfig idle.Config,
 ) (*dashboardPlayerCountResolver, error) {
-	ampAdapter, err := idle.NewAMPAdapter(ampClient)
+	ampAdapter, err := idle.NewAMPAdapterWithInventory(ampClient, inventory)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"não foi possível criar o adaptador AMP do painel: %w",
