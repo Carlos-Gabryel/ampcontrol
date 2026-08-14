@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 )
 
 type discordPreferences struct {

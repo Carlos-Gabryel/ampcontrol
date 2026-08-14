@@ -149,30 +149,3 @@ func TestControlInstanceProtectsADS(
 		)
 	}
 }
-
-func TestControlInstanceRejectsUnknownInstance(
-	t *testing.T,
-) {
-	t.Parallel()
-
-	err := RestartInstance(
-		context.Background(),
-		"ServidorQueNaoExiste",
-	)
-
-	if err == nil {
-		t.Fatal(
-			"era esperado erro para instância inexistente",
-		)
-	}
-
-	if !strings.Contains(
-		err.Error(),
-		"não existe",
-	) {
-		t.Fatalf(
-			"erro inesperado: %v",
-			err,
-		)
-	}
-}

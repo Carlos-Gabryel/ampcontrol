@@ -1,0 +1,21 @@
+[Unit]
+Description=AmpControl Discord Bot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ampcontrol
+Group=ampcontrol
+WorkingDirectory=/var/lib/ampcontrol
+ExecStart=/usr/lib/ampcontrol/ampcontrol
+Environment=AMPCONTROL_CONFIG=/etc/ampcontrol/config.toml
+LoadCredentialEncrypted=discord_token:/etc/credstore.encrypted/ampcontrol.discord_token
+LoadCredentialEncrypted=amp_password:/etc/credstore.encrypted/ampcontrol.amp_password
+Restart=on-failure
+RestartSec=5s
+PrivateTmp=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

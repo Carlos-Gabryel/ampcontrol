@@ -3,7 +3,7 @@ package discord
 import (
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -43,13 +43,16 @@ func TestApplyCommandGameNamesUsesConfiguredOverride(t *testing.T) {
 
 func TestAMPCommandChannelAllowedRequiresConfiguredChannel(t *testing.T) {
 	allowed := snowflake.ID(123)
-	if !ampCommandChannelAllowed(allowed, allowed) {
+	if !ampCommandChannelAllowed(allowed, allowed, true) {
 		t.Fatal("o canal configurado deveria aceitar comandos")
 	}
-	if ampCommandChannelAllowed(snowflake.ID(456), allowed) {
+	if ampCommandChannelAllowed(snowflake.ID(456), allowed, true) {
 		t.Fatal("outro canal não deveria aceitar comandos")
 	}
-	if ampCommandChannelAllowed(0, allowed) {
+	if ampCommandChannelAllowed(0, allowed, true) {
 		t.Fatal("uma interação sem canal não deveria ser aceita")
+	}
+	if !ampCommandChannelAllowed(snowflake.ID(456), allowed, false) {
+		t.Fatal("qualquer canal válido deveria ser aceito quando a restrição está desativada")
 	}
 }

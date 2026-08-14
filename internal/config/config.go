@@ -7,32 +7,46 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/secret"
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	DiscordToken                 string
-	DiscordNotificationChannelID string
-	DiscordAuditChannelID        string
-	DiscordOwnerUserID           string
-	DiscordNotificationTTL       time.Duration
-	DiscordStatusRefreshInterval time.Duration
-	DiscordCommandUserCooldown   time.Duration
-	DiscordCommandServerCooldown time.Duration
-	AMPUsername                  string
-	AMPPassword                  string
-	AMPADSURL                    string
-	AMPPublicURL                 string
-	AMPGameServerAddress         string
-	LogLevel                     string
+	DiscordToken                  string
+	DiscordGuildID                string
+	DiscordNotificationChannelID  string
+	DiscordAuditChannelID         string
+	DiscordOwnerUserID            string
+	DiscordAdminRoleIDs           []string
+	DiscordRestrictCommandChannel bool
+	DiscordAllowAdministrators    bool
+	DiscordNotificationTTL        time.Duration
+	DiscordStatusRefreshInterval  time.Duration
+	DiscordCommandUserCooldown    time.Duration
+	DiscordCommandServerCooldown  time.Duration
+	AMPUsername                   string
+	AMPPassword                   string
+	AMPADSURL                     string
+	AMPPublicURL                  string
+	AMPGameServerAddress          string
+	AMPSystemUser                 string
+	AMPManagerPath                string
+	AMPWrapperPath                string
+	SudoPath                      string
+	LogLevel                      string
 }
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
+	fileConfig, err := loadFileConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
-		DiscordToken: strings.TrimSpace(
-			os.Getenv("DISCORD_TOKEN"),
+		DiscordGuildID: strings.TrimSpace(
+			os.Getenv("DISCORD_GUILD_ID"),
 		),
 		DiscordNotificationChannelID: strings.TrimSpace(
 			os.Getenv("DISCORD_NOTIFICATION_CHANNEL_ID"),
@@ -46,7 +60,6 @@ func Load() (*Config, error) {
 		AMPUsername: strings.TrimSpace(
 			os.Getenv("AMP_USERNAME"),
 		),
-		AMPPassword: os.Getenv("AMP_PASSWORD"),
 		AMPADSURL: strings.TrimSpace(
 			os.Getenv("AMP_ADS_URL"),
 		),
@@ -60,6 +73,16 @@ func Load() (*Config, error) {
 			os.Getenv("LOG_LEVEL"),
 		),
 	}
+	applyFileDefaults(cfg, fileConfig)
+
+	cfg.DiscordToken, err = secret.ReadRequired("discord_token", "DISCORD_TOKEN")
+	if err != nil {
+		return nil, err
+	}
+	cfg.AMPPassword, err = secret.ReadRequired("amp_password", "AMP_PASSWORD")
+	if err != nil {
+		return nil, err
+	}
 
 	if cfg.DiscordToken == "" {
 		return nil, fmt.Errorf(
@@ -67,58 +90,23 @@ func Load() (*Config, error) {
 		)
 	}
 
-	if cfg.DiscordNotificationChannelID == "" {
-		return nil, fmt.Errorf(
-			"DISCORD_NOTIFICATION_CHANNEL_ID não foi configurado",
-		)
+	if err := validateDiscordID("DISCORD_GUILD_ID", cfg.DiscordGuildID); err != nil {
+		return nil, err
 	}
 
-	_, err := strconv.ParseUint(
-		cfg.DiscordNotificationChannelID,
-		10,
-		64,
-	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"DISCORD_NOTIFICATION_CHANNEL_ID é inválido: %w",
-			err,
-		)
+	for name, value := range map[string]string{
+		"DISCORD_NOTIFICATION_CHANNEL_ID": cfg.DiscordNotificationChannelID,
+		"DISCORD_AUDIT_CHANNEL_ID":        cfg.DiscordAuditChannelID,
+		"DISCORD_OWNER_USER_ID":           cfg.DiscordOwnerUserID,
+	} {
+		if err := validateDiscordID(name, value); err != nil {
+			return nil, err
+		}
 	}
-
-	if cfg.DiscordOwnerUserID == "" {
-		return nil, fmt.Errorf(
-			"DISCORD_OWNER_USER_ID não foi configurado",
-		)
-	}
-
-	if cfg.DiscordAuditChannelID == "" {
-		return nil, fmt.Errorf(
-			"DISCORD_AUDIT_CHANNEL_ID não foi configurado",
-		)
-	}
-
-	auditChannelID, err := strconv.ParseUint(
-		cfg.DiscordAuditChannelID,
-		10,
-		64,
-	)
-	if err != nil || auditChannelID == 0 {
-		return nil, fmt.Errorf(
-			"DISCORD_AUDIT_CHANNEL_ID é inválido: %w",
-			err,
-		)
-	}
-
-	ownerUserID, err := strconv.ParseUint(
-		cfg.DiscordOwnerUserID,
-		10,
-		64,
-	)
-	if err != nil || ownerUserID == 0 {
-		return nil, fmt.Errorf(
-			"DISCORD_OWNER_USER_ID é inválido: %w",
-			err,
-		)
+	for _, roleID := range cfg.DiscordAdminRoleIDs {
+		if err := validateDiscordID("discord.admin_role_ids", roleID); err != nil {
+			return nil, err
+		}
 	}
 
 	if cfg.AMPUsername == "" {
@@ -143,7 +131,7 @@ func Load() (*Config, error) {
 
 	notificationTTLMinutes, err := positiveEnvironmentInteger(
 		"DISCORD_NOTIFICATION_TTL_MINUTES",
-		10,
+		valueOrDefault(fileConfig.Discord.NotificationTTLMinutes, 10),
 	)
 	if err != nil {
 		return nil, err
@@ -151,7 +139,7 @@ func Load() (*Config, error) {
 
 	statusRefreshSeconds, err := positiveEnvironmentInteger(
 		"DISCORD_STATUS_REFRESH_SECONDS",
-		60,
+		valueOrDefault(fileConfig.Discord.StatusRefreshSeconds, 60),
 	)
 	if err != nil {
 		return nil, err
@@ -159,7 +147,7 @@ func Load() (*Config, error) {
 
 	userCooldownSeconds, err := nonNegativeEnvironmentInteger(
 		"DISCORD_COMMAND_USER_COOLDOWN_SECONDS",
-		5,
+		valueOrDefault(fileConfig.Discord.CommandUserCooldownSeconds, 5),
 	)
 	if err != nil {
 		return nil, err
@@ -167,7 +155,7 @@ func Load() (*Config, error) {
 
 	serverCooldownSeconds, err := nonNegativeEnvironmentInteger(
 		"DISCORD_COMMAND_SERVER_COOLDOWN_SECONDS",
-		15,
+		valueOrDefault(fileConfig.Discord.CommandServerCooldownSeconds, 15),
 	)
 	if err != nil {
 		return nil, err
@@ -179,6 +167,19 @@ func Load() (*Config, error) {
 	cfg.DiscordCommandServerCooldown = time.Duration(serverCooldownSeconds) * time.Second
 
 	return cfg, nil
+}
+
+func validateDiscordID(name string, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s não foi configurado", name)
+	}
+
+	id, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || id == 0 {
+		return fmt.Errorf("%s é inválido", name)
+	}
+
+	return nil
 }
 
 func nonNegativeEnvironmentInteger(

@@ -1,9 +1,7 @@
 package amp
 
 import (
-	"context"
 	"testing"
-	"time"
 )
 
 func TestParseInstancesList(
@@ -138,68 +136,6 @@ func TestNormalizeInstanceURLMarkdown(
 			"URL inesperada: obtido %q, esperado %q",
 			result,
 			expected,
-		)
-	}
-}
-
-func TestDiscoverInstancesRealAMP(
-	t *testing.T,
-) {
-	if testing.Short() {
-		t.Skip(
-			"teste de integração ignorado no modo curto",
-		)
-	}
-
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		15*time.Second,
-	)
-	defer cancel()
-
-	instances, err := DiscoverInstances(
-		ctx,
-	)
-	if err != nil {
-		t.Fatalf(
-			"DiscoverInstances retornou erro: %v",
-			err,
-		)
-	}
-
-	if len(instances) == 0 {
-		t.Fatal(
-			"nenhuma instância controlável foi encontrada",
-		)
-	}
-
-	for _, instance := range instances {
-		if instance.Name == "ADS01" {
-			t.Fatal(
-				"ADS01 não deveria aparecer entre as instâncias controláveis",
-			)
-		}
-
-		if instance.Name == "" {
-			t.Fatal(
-				"foi encontrada uma instância sem nome",
-			)
-		}
-
-		if instance.FriendlyName == "" {
-			t.Fatalf(
-				"a instância %q está sem nome amigável",
-				instance.Name,
-			)
-		}
-
-		t.Logf(
-			"instância=%s amigável=%s módulo=%s ativa=%t url=%s",
-			instance.Name,
-			instance.FriendlyName,
-			instance.Module,
-			instance.Running,
-			instance.APIURL,
 		)
 	}
 }

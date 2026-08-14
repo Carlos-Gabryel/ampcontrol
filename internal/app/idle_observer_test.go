@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
-	"github.com/alabamaamp/ampcontrol/internal/idle"
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 	"github.com/rs/zerolog"
 )
 
@@ -62,6 +62,7 @@ func TestNewIdleObserverRejectsNilAMPClient(
 
 	_, err := newIdleObserver(
 		nil,
+		nil,
 		operation.NewManager(),
 		noopIdleNotifier{},
 		idle.Config{},
@@ -98,6 +99,7 @@ func TestNewIdleObserverRejectsNilOperationManager(
 	_, err := newIdleObserver(
 		ampClient,
 		nil,
+		nil,
 		noopIdleNotifier{},
 		idle.Config{},
 		zerolog.Nop(),
@@ -132,6 +134,7 @@ func TestNewIdleObserverRejectsNilNotifier(
 
 	_, err := newIdleObserver(
 		ampClient,
+		nil,
 		operation.NewManager(),
 		nil,
 		idle.Config{},

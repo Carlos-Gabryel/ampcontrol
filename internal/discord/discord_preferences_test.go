@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )
@@ -141,19 +141,24 @@ func TestClientInstancePresentationSettingsPersistAndApply(t *testing.T) {
 }
 
 func TestAMPConfigAuthorizationRequiresExactOwnerAndAdministrator(t *testing.T) {
-	ownerID := snowflake.ID(228297467865595904)
+	ownerID := snowflake.ID(111111111111111111)
 	administrator := &disgoDiscord.ResolvedMember{
 		Permissions: disgoDiscord.PermissionAdministrator,
 	}
 
-	if !ampConfigCommandAuthorized(ownerID, administrator, ownerID) {
+	roles := map[snowflake.ID]struct{}{999: {}}
+	if !ampConfigCommandAuthorized(ownerID, administrator, ownerID, roles, false) {
 		t.Fatal("o proprietário administrador deveria ser autorizado")
 	}
-	if ampConfigCommandAuthorized(snowflake.ID(123), administrator, ownerID) {
+	if ampConfigCommandAuthorized(snowflake.ID(123), administrator, ownerID, roles, false) {
 		t.Fatal("outro administrador não deveria ser autorizado")
 	}
-	if ampConfigCommandAuthorized(ownerID, &disgoDiscord.ResolvedMember{}, ownerID) {
-		t.Fatal("o ID correto sem permissão administrativa não deveria ser autorizado")
+	if !ampConfigCommandAuthorized(ownerID, &disgoDiscord.ResolvedMember{}, ownerID, roles, false) {
+		t.Fatal("o proprietário configurado deveria ser autorizado pelo ID")
+	}
+	roleMember := &disgoDiscord.ResolvedMember{Member: disgoDiscord.Member{RoleIDs: []snowflake.ID{999}}}
+	if !ampConfigCommandAuthorized(snowflake.ID(123), roleMember, ownerID, roles, false) {
+		t.Fatal("o cargo configurado deveria ser autorizado")
 	}
 }
 

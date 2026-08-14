@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )
@@ -20,9 +20,10 @@ func ampCommandBypassesPlayerProtection(
 	userID snowflake.ID,
 	member *disgoDiscord.ResolvedMember,
 	ownerUserID snowflake.ID,
+	adminRoleIDs map[snowflake.ID]struct{},
+	allowAdministrators bool,
 ) bool {
-	return (ownerUserID != 0 && userID == ownerUserID) ||
-		ampCommandAuthorized(member)
+	return ampCommandPrivileged(userID, member, ownerUserID, adminRoleIDs, allowAdministrators)
 }
 
 func ampOperationProtectedFromPlayers(

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 )
 
 const ampDiscoveryCacheTTL = 5 * time.Second
@@ -59,6 +59,16 @@ func NewAMPAdapter(
 		client,
 		amp.DiscoverInstances,
 	)
+}
+
+func NewAMPAdapterWithInventory(
+	client AMPApplicationClient,
+	inventory amp.InstanceDiscoverer,
+) (*AMPAdapter, error) {
+	if inventory == nil {
+		return nil, fmt.Errorf("o inventário AMP não foi informado")
+	}
+	return newAMPAdapter(client, inventory.DiscoverInstances)
 }
 
 func newAMPAdapter(

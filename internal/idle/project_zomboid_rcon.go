@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alabamaamp/ampcontrol/internal/rcon"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/rcon"
 )
 
 // ProjectZomboidRCONDetector consulta jogadores pelo comando players

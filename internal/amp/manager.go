@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-const ampcontrolAMPWrapperPath = "/usr/local/bin/ampcontrol-amp"
-
 type ManagedInstance struct {
 	ID           string
 	Name         string
@@ -30,13 +28,14 @@ type ManagedInstance struct {
 func DiscoverInstances(
 	ctx context.Context,
 ) ([]ManagedInstance, error) {
+	runtime := currentRuntimeConfig()
 	command := exec.CommandContext(
 		ctx,
-		sudoPath,
+		runtime.SudoPath,
 		"-n",
 		"-u",
-		ampSystemUser,
-		ampcontrolAMPWrapperPath,
+		runtime.SystemUser,
+		runtime.WrapperPath,
 		"list",
 	)
 

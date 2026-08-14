@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
-	discordClient "github.com/alabamaamp/ampcontrol/internal/discord"
-	"github.com/alabamaamp/ampcontrol/internal/idle"
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	discordClient "github.com/Carlos-Gabryel/ampcontrol/internal/discord"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 	"github.com/rs/zerolog"
 )
 
@@ -102,6 +102,7 @@ func (s *modeAwareStopper) StopApplication(
 
 func newIdleObserver(
 	ampClient *amp.APIClient,
+	inventory amp.InstanceDiscoverer,
 	operationManager *operation.Manager,
 	notifier idleNotifier,
 	idleConfig idle.Config,
@@ -125,8 +126,9 @@ func newIdleObserver(
 		)
 	}
 
-	ampAdapter, err := idle.NewAMPAdapter(
+	ampAdapter, err := idle.NewAMPAdapterWithInventory(
 		ampClient,
+		inventory,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -644,7 +646,8 @@ func (o *idleObserver) IdleDetectionSettings(
 		Detector:         string(server.Detector),
 		FallbackDetector: string(server.FallbackDetector),
 		RCONConfigured: strings.TrimSpace(server.RCONAddress) != "" &&
-			strings.TrimSpace(server.RCONPasswordEnv) != "",
+			(strings.TrimSpace(server.RCONCredential) != "" ||
+				strings.TrimSpace(server.RCONPasswordEnv) != ""),
 	}, nil
 }
 

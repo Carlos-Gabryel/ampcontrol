@@ -320,6 +320,27 @@ func TestRCONPasswordRejectsMissingEnvironmentVariable(
 	}
 }
 
+func TestRCONPasswordUsesSystemdCredential(t *testing.T) {
+	directory := t.TempDir()
+	t.Setenv("CREDENTIALS_DIRECTORY", directory)
+	if err := os.WriteFile(
+		filepath.Join(directory, "rcon_TestServer01"),
+		[]byte("senha-segura\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	server := Server{
+		Instance:       "TestServer01",
+		RCONCredential: "rcon_TestServer01",
+	}
+	password, err := server.RCONPassword()
+	if err != nil || password != "senha-segura" {
+		t.Fatalf("credencial RCON inesperada: valor=%q erro=%v", password, err)
+	}
+}
+
 func TestFindServer(
 	t *testing.T,
 ) {
@@ -374,120 +395,11 @@ func TestProjectIdleConfigLoads(
 		)
 	}
 
-	if len(config.Servers) != 11 {
+	if len(config.Servers) != 0 {
 		t.Fatalf(
-			"eram esperados 11 servidores, mas foram encontrados %d",
+			"a configuração distribuída deve iniciar vazia, mas contém %d servidores",
 			len(config.Servers),
 		)
-	}
-
-	enabled := config.EnabledServers()
-
-	if len(enabled) != 11 {
-		t.Fatalf(
-			"eram esperados 11 servidores habilitados, mas foram encontrados %d",
-			len(enabled),
-		)
-	}
-
-	active := config.ActiveServers()
-	if len(active) != 11 {
-		t.Fatalf(
-			"eram esperados 11 servidores ativos, mas foram encontrados %d",
-			len(active),
-		)
-	}
-
-	satisfactory, exists := config.FindServer("FabricadeMonstro01")
-	if !exists {
-		t.Fatal("FabricadeMonstro01 não foi encontrada")
-	}
-	if satisfactory.Mode != ServerModeActive {
-		t.Fatalf(
-			"FabricadeMonstro01 deveria estar ativa após a validação da telemetria, modo=%q",
-			satisfactory.Mode,
-		)
-	}
-
-	projectZomboid, exists := config.FindServer("TheWalkingRats01")
-	if !exists {
-		t.Fatal("TheWalkingRats01 não foi encontrada")
-	}
-	if projectZomboid.Mode != ServerModeActive ||
-		projectZomboid.Detector != DetectorAMPPlayers ||
-		projectZomboid.FallbackDetector != DetectorProjectZomboidRCON {
-		t.Fatalf(
-			"configuração inesperada do Project Zomboid: modo=%q primário=%q fallback=%q",
-			projectZomboid.Mode,
-			projectZomboid.Detector,
-			projectZomboid.FallbackDetector,
-		)
-	}
-	if projectZomboid.RCONAddress != "127.0.0.1:27015" ||
-		projectZomboid.RCONPasswordEnv != "THE_WALKING_RATS_RCON_PASSWORD" {
-		t.Fatalf(
-			"configuração RCON inesperada do Project Zomboid: endereço=%q senha_env=%q",
-			projectZomboid.RCONAddress,
-			projectZomboid.RCONPasswordEnv,
-		)
-	}
-
-	for _, instance := range []string{
-		"AIO01",
-		"Cobblemon01",
-		"CursedWalking01",
-		"NightFallCraft01",
-		"Vanilla-202501",
-	} {
-		server, exists := config.FindServer(instance)
-		if !exists {
-			t.Fatalf("%s não foi encontrada", instance)
-		}
-		if server.Mode != ServerModeActive {
-			t.Fatalf(
-				"%s deveria estar ativa após a validação do módulo Minecraft, modo=%q",
-				instance,
-				server.Mode,
-			)
-		}
-	}
-
-	hylabama, exists := config.FindServer("HyLabama01")
-	if !exists {
-		t.Fatal("HyLabama01 não foi encontrada")
-	}
-	if hylabama.Mode != ServerModeActive {
-		t.Fatalf(
-			"HyLabama01 deveria estar ativa após a validação da telemetria, modo=%q",
-			hylabama.Mode,
-		)
-	}
-
-	valheim, exists := config.FindServer("Valheim01")
-	if !exists {
-		t.Fatal("Valheim01 não foi encontrada")
-	}
-	if valheim.Mode != ServerModeActive {
-		t.Fatalf(
-			"Valheim01 deveria estar ativa após a validação da telemetria, modo=%q",
-			valheim.Mode,
-		)
-	}
-
-	alamama, exists := config.FindServer("AlamamaPal01")
-	if !exists {
-		t.Fatal("AlamamaPal01 não foi encontrada")
-	}
-	if alamama.Detector != DetectorAMPPlayers ||
-		alamama.FallbackDetector != DetectorPalworldRCON {
-		t.Fatalf(
-			"cadeia de detectores inesperada: primário=%q fallback=%q",
-			alamama.Detector,
-			alamama.FallbackDetector,
-		)
-	}
-	if alamama.Game != "Palworld" {
-		t.Fatalf("jogo inesperado: %q", alamama.Game)
 	}
 }
 

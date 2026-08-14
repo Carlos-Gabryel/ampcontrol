@@ -10,12 +10,6 @@ import (
 	"strings"
 )
 
-const (
-	sudoPath       = "/usr/bin/sudo"
-	ampinstmgrPath = "/usr/bin/ampinstmgr"
-	ampSystemUser  = "amp"
-)
-
 type ServerState string
 
 const (
@@ -86,13 +80,14 @@ func getAMPInstanceStatuses(
 	ctx context.Context,
 	instances []Instance,
 ) (map[string]bool, error) {
+	runtime := currentRuntimeConfig()
 	command := exec.CommandContext(
 		ctx,
-		sudoPath,
+		runtime.SudoPath,
 		"-n",
 		"-u",
-		ampSystemUser,
-		ampinstmgrPath,
+		runtime.SystemUser,
+		runtime.ManagerPath,
 		"status",
 	)
 
@@ -113,7 +108,7 @@ func getAMPInstanceStatuses(
 
 		return nil, fmt.Errorf(
 			"não foi possível executar ampinstmgr como o usuário %s: %w; saída: %s",
-			ampSystemUser,
+			runtime.SystemUser,
 			err,
 			strings.TrimSpace(string(output)),
 		)

@@ -9,4 +9,8 @@ data/
 *.dylib
 
 /ampcontrol
+coverage.out
+dist/
+__pycache__/
+*.py[cod]
 /.ampcontrol.before-*

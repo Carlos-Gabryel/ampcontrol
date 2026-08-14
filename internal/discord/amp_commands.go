@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
@@ -125,6 +125,27 @@ func ampCommandAuthorized(
 		member.Permissions.Has(
 			disgoDiscord.PermissionAdministrator,
 		)
+}
+
+func ampCommandPrivileged(
+	userID snowflake.ID,
+	member *disgoDiscord.ResolvedMember,
+	ownerUserID snowflake.ID,
+	adminRoleIDs map[snowflake.ID]struct{},
+	allowAdministrators bool,
+) bool {
+	if ownerUserID != 0 && userID == ownerUserID {
+		return true
+	}
+	if member == nil {
+		return false
+	}
+	for _, roleID := range member.RoleIDs {
+		if _, allowed := adminRoleIDs[roleID]; allowed {
+			return true
+		}
+	}
+	return allowAdministrators && ampCommandAuthorized(member)
 }
 
 func ampCommandConfirmed(
@@ -342,6 +363,8 @@ func (c *Client) handleAMPControlCommand(
 			event.User().ID,
 			event.Member(),
 			c.ownerUserID,
+			c.adminRoleIDs,
+			c.allowAdministrators,
 		),
 	)
 }

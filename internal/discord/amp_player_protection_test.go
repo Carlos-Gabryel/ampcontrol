@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )
@@ -51,14 +51,19 @@ func TestAMPCommandBypassesPlayerProtection(t *testing.T) {
 		Permissions: disgoDiscord.PermissionAdministrator,
 	}
 
-	if !ampCommandBypassesPlayerProtection(ownerID, regular, ownerID) {
+	roles := map[snowflake.ID]struct{}{300: {}}
+	if !ampCommandBypassesPlayerProtection(ownerID, regular, ownerID, roles, false) {
 		t.Fatal("o proprietário deveria ignorar a proteção")
 	}
-	if !ampCommandBypassesPlayerProtection(snowflake.ID(200), administrator, ownerID) {
+	if !ampCommandBypassesPlayerProtection(snowflake.ID(200), administrator, ownerID, roles, true) {
 		t.Fatal("um administrador deveria ignorar a proteção")
 	}
-	if ampCommandBypassesPlayerProtection(snowflake.ID(200), regular, ownerID) {
+	if ampCommandBypassesPlayerProtection(snowflake.ID(200), regular, ownerID, roles, false) {
 		t.Fatal("um usuário comum não deveria ignorar a proteção")
+	}
+	roleMember := &disgoDiscord.ResolvedMember{Member: disgoDiscord.Member{RoleIDs: []snowflake.ID{300}}}
+	if !ampCommandBypassesPlayerProtection(snowflake.ID(200), roleMember, ownerID, roles, false) {
+		t.Fatal("um cargo explicitamente autorizado deveria ignorar a proteção")
 	}
 }
 

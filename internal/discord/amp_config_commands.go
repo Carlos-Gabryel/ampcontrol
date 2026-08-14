@@ -19,13 +19,15 @@ func (c *Client) handleAMPConfigCommand(
 		event.User().ID,
 		event.Member(),
 		c.ownerUserID,
+		c.adminRoleIDs,
+		c.allowAdministrators,
 	) {
 		c.log.Warn().
 			Str("user_id", event.User().ID.String()).
 			Msg("Comando administrativo do AmpControl recusado")
 		c.sendInteractionMessage(
 			event,
-			"⛔ Somente o proprietário configurado pode alterar as configurações das instâncias.",
+			"⛔ Somente o proprietário ou um administrador autorizado pode alterar as configurações das instâncias.",
 		)
 		return
 	}
@@ -399,10 +401,10 @@ func ampConfigCommandAuthorized(
 	userID snowflake.ID,
 	member *disgoDiscord.ResolvedMember,
 	ownerUserID snowflake.ID,
+	adminRoleIDs map[snowflake.ID]struct{},
+	allowAdministrators bool,
 ) bool {
-	return ownerUserID != 0 &&
-		userID == ownerUserID &&
-		ampCommandAuthorized(member)
+	return ampCommandPrivileged(userID, member, ownerUserID, adminRoleIDs, allowAdministrators)
 }
 
 func (c *Client) handleAMPInstanceVisibilityCommand(

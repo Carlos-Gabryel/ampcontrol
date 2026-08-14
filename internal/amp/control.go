@@ -34,6 +34,10 @@ func ControlInstance(
 		)
 	}
 
+	if strings.EqualFold(instanceName, "ADS01") {
+		return fmt.Errorf("a instância ADS01 é protegida")
+	}
+
 	if !isValidInstanceOperation(operation) {
 		return fmt.Errorf(
 			"operação AMP inválida: %q",
@@ -41,13 +45,14 @@ func ControlInstance(
 		)
 	}
 
+	runtime := currentRuntimeConfig()
 	command := exec.CommandContext(
 		ctx,
-		sudoPath,
+		runtime.SudoPath,
 		"-n",
 		"-u",
-		ampSystemUser,
-		ampcontrolAMPWrapperPath,
+		runtime.SystemUser,
+		runtime.WrapperPath,
 		string(operation),
 		instanceName,
 	)

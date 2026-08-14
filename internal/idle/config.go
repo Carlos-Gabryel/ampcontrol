@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/secret"
 )
 
 const (
@@ -50,6 +52,7 @@ type Server struct {
 	StartupGrace     time.Duration
 	RCONAddress      string
 	RCONPasswordEnv  string
+	RCONCredential   string
 }
 
 type rawConfig struct {
@@ -72,8 +75,9 @@ type rawServer struct {
 }
 
 type rawRCONConfig struct {
-	Address     string `json:"address"`
-	PasswordEnv string `json:"password_env"`
+	Address            string `json:"address"`
+	PasswordCredential string `json:"password_credential"`
+	PasswordEnv        string `json:"password_env"`
 }
 
 func Load(
@@ -181,12 +185,6 @@ func buildConfig(
 	if defaultTimeoutMinutes <= 0 {
 		return Config{}, fmt.Errorf(
 			"default_idle_timeout_minutes precisa ser maior que zero",
-		)
-	}
-
-	if len(raw.Servers) == 0 {
-		return Config{}, fmt.Errorf(
-			"nenhum servidor foi cadastrado na configuração de Idle",
 		)
 	}
 
@@ -389,6 +387,9 @@ func buildServer(
 		server.RCONPasswordEnv = strings.TrimSpace(
 			raw.RCON.PasswordEnv,
 		)
+		server.RCONCredential = strings.TrimSpace(
+			raw.RCON.PasswordCredential,
+		)
 
 		if server.RCONAddress == "" {
 			return Server{}, fmt.Errorf(
@@ -397,9 +398,9 @@ func buildServer(
 			)
 		}
 
-		if server.RCONPasswordEnv == "" {
+		if server.RCONPasswordCredentialName() == "" && server.RCONPasswordEnv == "" {
 			return Server{}, fmt.Errorf(
-				"a variável de senha RCON da instância %s não foi informada",
+				"a credencial de senha RCON da instância %s não foi informada",
 				instance,
 			)
 		}
@@ -513,24 +514,30 @@ func (s Server) IsActive() bool {
 }
 
 func (s Server) RCONPassword() (string, error) {
-	if strings.TrimSpace(s.RCONPasswordEnv) == "" {
+	credentialName := s.RCONPasswordCredentialName()
+	environmentName := strings.TrimSpace(s.RCONPasswordEnv)
+	if credentialName == "" && environmentName == "" {
 		return "", fmt.Errorf(
-			"a instância %s não possui uma variável de senha RCON configurada",
+			"a instância %s não possui uma credencial de senha RCON configurada",
 			s.Instance,
 		)
 	}
-
-	password := os.Getenv(
-		s.RCONPasswordEnv,
-	)
-
+	if credentialName != "" {
+		password, err := secret.ReadCredential(credentialName)
+		if err == nil {
+			return password, nil
+		}
+		if !os.IsNotExist(err) || environmentName == "" {
+			return "", fmt.Errorf("não foi possível carregar a credencial RCON %s: %w", credentialName, err)
+		}
+	}
+	password := os.Getenv(environmentName)
 	if password == "" {
-		return "", fmt.Errorf(
-			"a variável %s, usada pela instância %s, não foi configurada",
-			s.RCONPasswordEnv,
-			s.Instance,
-		)
+		return "", fmt.Errorf("a variável %s, usada pela instância %s, não foi configurada", environmentName, s.Instance)
 	}
-
 	return password, nil
+}
+
+func (s Server) RCONPasswordCredentialName() string {
+	return strings.TrimSpace(s.RCONCredential)
 }

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )
@@ -334,7 +334,7 @@ func TestStatusDashboardOrderMigrationRunsOnlyOnce(t *testing.T) {
 }
 
 func TestBuildAMPCommandGuideEmbedsDocumentsEveryCommand(t *testing.T) {
-	embeds := buildAMPCommandGuideEmbeds()
+	embeds := buildAMPCommandGuideEmbeds(true)
 	if len(embeds) != 7 {
 		t.Fatalf("quantidade inesperada de embeds do guia: %d", len(embeds))
 	}
@@ -381,7 +381,7 @@ func TestBuildAMPCommandGuideEmbedsDocumentsEveryCommand(t *testing.T) {
 }
 
 func TestAMPCommandGuideFitsDiscordLimits(t *testing.T) {
-	embeds := buildAMPCommandGuideEmbeds()
+	embeds := buildAMPCommandGuideEmbeds(true)
 	if len(commandGuideContent) > 2000 {
 		t.Fatal("o conteúdo do guia excede o limite do Discord")
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
 )
 
 type recordingIdleStopper struct {

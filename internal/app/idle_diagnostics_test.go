@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
 )
 
 func TestIdleEventIsDiagnosticFailure(t *testing.T) {

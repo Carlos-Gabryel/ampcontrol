@@ -2,8 +2,19 @@
 
 set -Eeuo pipefail
 
-readonly AMPINSTMGR="/usr/bin/ampinstmgr"
-readonly INSTANCES_DIRECTORY="/home/amp/.ampdata/instances"
+readonly RUNTIME_CONFIG="/etc/ampcontrol/amp-runtime.conf"
+
+if [[ -r "$RUNTIME_CONFIG" ]]; then
+    # O arquivo é criado pelo instalador, pertence ao root e não é gravável
+    # pelo usuário do serviço ou pelo usuário AMP.
+    # shellcheck source=/dev/null
+    source "$RUNTIME_CONFIG"
+fi
+
+: "${AMPINSTMGR:=/usr/bin/ampinstmgr}"
+: "${INSTANCES_DIRECTORY:=/home/amp/.ampdata/instances}"
+readonly AMPINSTMGR
+readonly INSTANCES_DIRECTORY
 readonly PROTECTED_INSTANCE="ADS01"
 
 show_usage() {

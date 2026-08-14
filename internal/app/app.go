@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
-	"github.com/alabamaamp/ampcontrol/internal/config"
-	discordClient "github.com/alabamaamp/ampcontrol/internal/discord"
-	"github.com/alabamaamp/ampcontrol/internal/idle"
-	"github.com/alabamaamp/ampcontrol/internal/logger"
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/config"
+	discordClient "github.com/Carlos-Gabryel/ampcontrol/internal/discord"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/logger"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 )
 
 type App struct {
@@ -28,11 +28,23 @@ func New() (*App, error) {
 	log := logger.New(
 		cfg.LogLevel,
 	)
+	if err := amp.ConfigureRuntime(amp.RuntimeConfig{
+		SystemUser:  cfg.AMPSystemUser,
+		ManagerPath: cfg.AMPManagerPath,
+		WrapperPath: cfg.AMPWrapperPath,
+		SudoPath:    cfg.SudoPath,
+	}); err != nil {
+		return nil, fmt.Errorf("configuração de execução do AMP inválida: %w", err)
+	}
 
 	ampAPIClient := amp.NewAPIClient(
 		cfg.AMPUsername,
 		cfg.AMPPassword,
 	)
+	inventory, err := amp.NewInventory(ampAPIClient, cfg.AMPADSURL)
+	if err != nil {
+		return nil, err
+	}
 
 	operationManager := operation.NewManager()
 
@@ -57,6 +69,7 @@ func New() (*App, error) {
 
 	playerCountResolver, err := newDashboardPlayerCountResolver(
 		ampAPIClient,
+		inventory,
 		idleConfig,
 	)
 	if err != nil {
@@ -67,20 +80,25 @@ func New() (*App, error) {
 		cfg.DiscordToken,
 		ampAPIClient,
 		discordClient.ClientConfig{
-			NotificationChannelID: cfg.DiscordNotificationChannelID,
-			AuditChannelID:        cfg.DiscordAuditChannelID,
-			OwnerUserID:           cfg.DiscordOwnerUserID,
-			NotificationTTL:       cfg.DiscordNotificationTTL,
-			StatusRefreshInterval: cfg.DiscordStatusRefreshInterval,
-			CommandUserCooldown:   cfg.DiscordCommandUserCooldown,
-			CommandServerCooldown: cfg.DiscordCommandServerCooldown,
-			ADSURL:                cfg.AMPADSURL,
-			AMPPublicURL:          cfg.AMPPublicURL,
-			GameServerAddress:     cfg.AMPGameServerAddress,
-			StatusStatePath:       "data/discord_status.json",
-			PreferencesPath:       "data/discord_preferences.json",
-			GameOverrides:         gameOverrides,
-			PlayerCountResolver:   playerCountResolver,
+			GuildID:                cfg.DiscordGuildID,
+			NotificationChannelID:  cfg.DiscordNotificationChannelID,
+			AuditChannelID:         cfg.DiscordAuditChannelID,
+			OwnerUserID:            cfg.DiscordOwnerUserID,
+			AdminRoleIDs:           cfg.DiscordAdminRoleIDs,
+			RestrictCommandChannel: cfg.DiscordRestrictCommandChannel,
+			AllowAdministrators:    cfg.DiscordAllowAdministrators,
+			NotificationTTL:        cfg.DiscordNotificationTTL,
+			StatusRefreshInterval:  cfg.DiscordStatusRefreshInterval,
+			CommandUserCooldown:    cfg.DiscordCommandUserCooldown,
+			CommandServerCooldown:  cfg.DiscordCommandServerCooldown,
+			ADSURL:                 cfg.AMPADSURL,
+			AMPPublicURL:           cfg.AMPPublicURL,
+			GameServerAddress:      cfg.AMPGameServerAddress,
+			StatusStatePath:        "data/discord_status.json",
+			PreferencesPath:        "data/discord_preferences.json",
+			GameOverrides:          gameOverrides,
+			PlayerCountResolver:    playerCountResolver,
+			Inventory:              inventory,
 			IdleRegisteredInstances: idleRegisteredInstanceNames(
 				idleConfig,
 			),
@@ -99,6 +117,7 @@ func New() (*App, error) {
 
 	idleObserver, err := newIdleObserver(
 		ampAPIClient,
+		inventory,
 		operationManager,
 		discord,
 		idleConfig,

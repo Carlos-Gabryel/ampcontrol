@@ -50,14 +50,13 @@ type commandAuditSession struct {
 }
 
 func (c *Client) validateCommandAuditChannel() error {
-	guildID := snowflake.MustParse(discordGuildID)
 	channel, err := c.channels.GetChannel(c.auditChannelID)
 	if err != nil {
 		return fmt.Errorf("não foi possível acessar o canal de auditoria: %w", err)
 	}
 
 	textChannel, ok := channel.(disgoDiscord.GuildTextChannel)
-	if !ok || textChannel.GuildID() != guildID {
+	if !ok || textChannel.GuildID() != c.guildID {
 		return fmt.Errorf("o canal de auditoria configurado não é um canal de texto deste servidor")
 	}
 
@@ -81,6 +80,8 @@ func (c *Client) commandAuditDecision(
 		event.User().ID,
 		event.Member(),
 		c.ownerUserID,
+		c.adminRoleIDs,
+		c.allowAdministrators,
 	) {
 		return false, "Recusado: usuário sem permissão"
 	}

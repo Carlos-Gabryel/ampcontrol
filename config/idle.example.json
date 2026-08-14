@@ -1,0 +1,21 @@
+{
+  "check_interval_seconds": 30,
+  "default_idle_timeout_minutes": 15,
+  "servers": [
+    {
+      "instance": "MinhaInstancia01",
+      "display_name": "Meu servidor",
+      "game": "Palworld",
+      "enabled": true,
+      "mode": "active",
+      "detector": "amp_players",
+      "fallback_detector": "palworld_rcon",
+      "idle_timeout_minutes": 15,
+      "startup_grace_minutes": 5,
+      "rcon": {
+        "address": "127.0.0.1:25575",
+        "password_credential": "rcon_MinhaInstancia01"
+      }
+    }
+  ]
+}

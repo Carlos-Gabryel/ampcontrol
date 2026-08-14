@@ -9,8 +9,13 @@ import (
 
 const commandGuideContent = "— Como usar os comandos"
 
-func buildAMPCommandGuideEmbeds() []disgoDiscord.Embed {
-	intro := "Escolha o comando digitando `/` neste canal e selecione o servidor na lista. Os comandos não funcionam em outros canais.\n\n"
+func buildAMPCommandGuideEmbeds(restricted bool) []disgoDiscord.Embed {
+	intro := "Escolha o comando digitando `/` e selecione o servidor na lista.\n\n"
+	footer := "Todos os comandos /amp estão disponíveis para os usuários."
+	if restricted {
+		intro = "Escolha o comando digitando `/` neste canal e selecione o servidor na lista. Os comandos não funcionam em outros canais.\n\n"
+		footer = "Todos os comandos /amp estão disponíveis para os usuários deste canal."
+	}
 	commands := []struct{ title, description string }{
 		{"/amp status", "Atualiza o painel fixo de servidores. Não inicia, reinicia ou para nenhuma instância. **Disponível para todos.**"},
 		{"/amp iniciar servidor:<servidor>", "Liga a instância AMP, se necessário, inicia o processo do jogo e aguarda o estado Online. O início é manual, pode levar alguns minutos e está **disponível para todos**."},
@@ -30,7 +35,7 @@ func buildAMPCommandGuideEmbeds() []disgoDiscord.Embed {
 	embeds = append(embeds, disgoDiscord.NewEmbed().
 		WithTitle("🛡️ Proteção de partidas em andamento").
 		WithDescription("Usuários comuns não podem parar, reiniciar, desligar ou atualizar um servidor enquanto houver jogadores conectados. Se a quantidade de jogadores não puder ser confirmada, esses comandos também serão bloqueados por segurança.").
-		WithFooter("Todos os comandos /amp estão disponíveis para os usuários deste canal.", "").
+		WithFooter(footer, "").
 		WithColor(0x57F287))
 	return embeds
 }
@@ -41,7 +46,7 @@ func (c *Client) upsertCommandGuideMessage() error {
 		return err
 	}
 
-	embeds := buildAMPCommandGuideEmbeds()
+	embeds := buildAMPCommandGuideEmbeds(c.restrictCommandChannel)
 	if state.GuideMessageID != "" {
 		messageID, parseErr := snowflake.Parse(state.GuideMessageID)
 		if parseErr == nil && messageID != 0 {
