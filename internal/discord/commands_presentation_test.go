@@ -3,7 +3,7 @@ package discord
 import (
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	"github.com/disgoorg/snowflake/v2"
 )
 

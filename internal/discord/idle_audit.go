@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
 )
 
 // RecordAutomaticIdle registra no canal de auditoria a conclusão da parada

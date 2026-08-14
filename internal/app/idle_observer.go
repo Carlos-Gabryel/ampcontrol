@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
-	discordClient "github.com/alabamaamp/ampcontrol/internal/discord"
-	"github.com/alabamaamp/ampcontrol/internal/idle"
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	discordClient "github.com/Carlos-Gabryel/ampcontrol/internal/discord"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 	"github.com/rs/zerolog"
 )
 

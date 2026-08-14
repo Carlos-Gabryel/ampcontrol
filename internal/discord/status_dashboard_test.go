@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )

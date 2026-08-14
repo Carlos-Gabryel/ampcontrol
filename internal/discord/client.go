@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
-	"github.com/alabamaamp/ampcontrol/internal/config"
-	discordClient "github.com/alabamaamp/ampcontrol/internal/discord"
-	"github.com/alabamaamp/ampcontrol/internal/idle"
-	"github.com/alabamaamp/ampcontrol/internal/logger"
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/config"
+	discordClient "github.com/Carlos-Gabryel/ampcontrol/internal/discord"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/logger"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 )
 
 type App struct {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/omit"

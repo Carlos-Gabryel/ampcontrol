@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/secret"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/secret"
 )
 
 const (

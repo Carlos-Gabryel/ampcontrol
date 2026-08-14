@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 )
 
 type IdleServerRegistrar interface {

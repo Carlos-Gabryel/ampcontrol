@@ -1,4 +1,4 @@
-module github.com/alabamaamp/ampcontrol
+module github.com/Carlos-Gabryel/ampcontrol
 
 go 1.26.6
 

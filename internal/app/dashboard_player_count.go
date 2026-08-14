@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
-	"github.com/alabamaamp/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
 )
 
 type dashboardPlayerCountResolver struct {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 )
 
 // clientOperationManagers mantém a associação entre cada Client do Discord

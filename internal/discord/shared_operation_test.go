@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 )
 
 func TestAcquireSharedOperationRejectsClientWithoutManager(

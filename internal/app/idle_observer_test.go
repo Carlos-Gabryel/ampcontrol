@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alabamaamp/ampcontrol/internal/amp"
-	"github.com/alabamaamp/ampcontrol/internal/idle"
-	"github.com/alabamaamp/ampcontrol/internal/operation"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 	"github.com/rs/zerolog"
 )
 
