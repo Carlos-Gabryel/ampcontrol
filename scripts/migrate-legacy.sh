@@ -5,7 +5,46 @@ umask 077
 
 SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly SCRIPT_DIRECTORY
-readonly LEGACY_DIRECTORY="${1:-/opt/ampcontrol}"
+LEGACY_DIRECTORY="/opt/ampcontrol"
+BINARY_PATH=""
+
+fail() {
+    printf 'Erro: %s\n' "$1" >&2
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Uso: sudo ./scripts/migrate-legacy.sh [DIRETÓRIO] [--binary CAMINHO]
+
+  DIRETÓRIO        instalação legada (padrão: /opt/ampcontrol)
+  --binary CAMINHO usa um binário Linux já compilado
+EOF
+}
+
+while (($# > 0)); do
+    case "$1" in
+        --binary)
+            (($# >= 2)) || fail "--binary exige um caminho"
+            BINARY_PATH="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        -* )
+            fail "opção desconhecida: $1"
+            ;;
+        *)
+            [[ "$LEGACY_DIRECTORY" == "/opt/ampcontrol" ]] || fail "informe somente um diretório legado"
+            LEGACY_DIRECTORY="$1"
+            shift
+            ;;
+    esac
+done
+
+readonly LEGACY_DIRECTORY BINARY_PATH
 readonly BACKUP_ROOT="/var/backups/ampcontrol"
 BACKUP_DIRECTORY="$BACKUP_ROOT/migration-$(date -u +%Y%m%dT%H%M%SZ)"
 readonly BACKUP_DIRECTORY
@@ -23,11 +62,6 @@ readonly MANAGED_PATHS=(
 ROLLBACK_ARMED=false
 SERVICE_WAS_ACTIVE=false
 SERVICE_WAS_ENABLED=false
-
-fail() {
-    printf 'Erro: %s\n' "$1" >&2
-    exit 1
-}
 
 copy_to_snapshot() {
     local source="$1"
@@ -106,9 +140,13 @@ printf 'active=%s\nenabled=%s\nlegacy=%s\n' \
 
 ROLLBACK_ARMED=true
 printf 'Backup transacional criado em %s\n' "$BACKUP_DIRECTORY"
+INSTALL_ARGUMENTS=(--no-start --migrate-legacy "$LEGACY_DIRECTORY")
+if [[ -n "$BINARY_PATH" ]]; then
+    INSTALL_ARGUMENTS+=(--binary "$BINARY_PATH")
+fi
 AMPCONTROL_MIGRATION_TRANSACTION=1 \
 AMPCONTROL_LEGACY_SYSTEMD_ENV_FILE="$SYSTEMD_ENVIRONMENT_FILE" \
-    "$SCRIPT_DIRECTORY/install.sh" --no-start --migrate-legacy "$LEGACY_DIRECTORY"
+    "$SCRIPT_DIRECTORY/install.sh" "${INSTALL_ARGUMENTS[@]}"
 
 systemctl daemon-reload
 systemctl enable ampcontrol.service >/dev/null
