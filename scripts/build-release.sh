@@ -2,8 +2,10 @@
 
 set -Eeuo pipefail
 
-readonly SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-readonly PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIRECTORY/.." && pwd -P)"
+SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly SCRIPT_DIRECTORY
+PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIRECTORY/.." && pwd -P)"
+readonly PROJECT_DIRECTORY
 readonly VERSION="${1:-dev}"
 readonly DIST_DIRECTORY="${AMPCONTROL_DIST_DIRECTORY:-$PROJECT_DIRECTORY/dist}"
 
@@ -38,6 +40,7 @@ for architecture in amd64 arm64; do
     install -m 0755 \
         "$PROJECT_DIRECTORY/scripts/install.sh" \
         "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" \
+        "$PROJECT_DIRECTORY/scripts/migration-preflight.sh" \
         "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" \
         "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" \
         "$PROJECT_DIRECTORY/scripts/legacy_config.py" \

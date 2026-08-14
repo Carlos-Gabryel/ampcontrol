@@ -48,7 +48,8 @@ latest_version() {
 
 backup_current() {
     local version="$1"
-    local backup="$BACKUP_ROOT/update-$(date -u +%Y%m%dT%H%M%SZ)-$version"
+    local backup
+    backup="$BACKUP_ROOT/update-$(date -u +%Y%m%dT%H%M%SZ)-$version"
     install -d -o root -g root -m 0700 "$backup"
     [[ ! -e "$BINARY_PATH" ]] || cp -a -- "$BINARY_PATH" "$backup/ampcontrol"
     [[ ! -e "$WRAPPER_PATH" ]] || cp -a -- "$WRAPPER_PATH" "$backup/ampcontrol-amp"
@@ -95,9 +96,11 @@ validate_staged_binary() {
 
 update_ampcontrol() {
     local requested="${1:-}"
-    local version="${requested:-$(latest_version)}"
+    local version
+    version="${requested:-$(latest_version)}"
     [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || fail "versão inválida: $version"
-    local architecture="$(uname -m)"
+    local architecture
+    architecture="$(uname -m)"
     case "$architecture" in
         x86_64) architecture=amd64 ;;
         aarch64|arm64) architecture=arm64 ;;
@@ -126,7 +129,8 @@ update_ampcontrol() {
         fail "a nova versão rejeitou a configuração atual; nada foi substituído"
     fi
 
-    local backup="$(backup_current "$version")"
+    local backup
+    backup="$(backup_current "$version")"
     if ! mv -f -- "$LIB_DIRECTORY/ampcontrol.new" "$BINARY_PATH" ||
        ! install -o root -g root -m 0755 "$package/scripts/ampcontrol-amp" "$WRAPPER_PATH" ||
        ! install -o root -g root -m 0755 "$package/scripts/ampcontrol-maintenance" "$MAINTENANCE_PATH" ||

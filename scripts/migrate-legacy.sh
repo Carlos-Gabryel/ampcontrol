@@ -3,10 +3,12 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly SCRIPT_DIRECTORY
 readonly LEGACY_DIRECTORY="${1:-/opt/ampcontrol}"
 readonly BACKUP_ROOT="/var/backups/ampcontrol"
-readonly BACKUP_DIRECTORY="$BACKUP_ROOT/migration-$(date -u +%Y%m%dT%H%M%SZ)"
+BACKUP_DIRECTORY="$BACKUP_ROOT/migration-$(date -u +%Y%m%dT%H%M%SZ)"
+readonly BACKUP_DIRECTORY
 readonly SNAPSHOT_DIRECTORY="$BACKUP_DIRECTORY/rootfs"
 readonly MANAGED_PATHS=(
     /etc/ampcontrol

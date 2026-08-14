@@ -42,6 +42,8 @@ jobs:
       - name: Validate shell scripts
         run: |
           bash -n scripts/*.sh
-          shellcheck scripts/*.sh
+          bash -n scripts/ampcontrol-maintenance
+          shellcheck scripts/*.sh scripts/ampcontrol-maintenance
+          python3 -m py_compile scripts/legacy_config.py
           bash scripts/test-packaging.sh
 

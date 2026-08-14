@@ -122,8 +122,11 @@ Instalações antigas em `/opt/ampcontrol`, baseadas em `.env`, devem usar o mig
 ```bash
 git clone https://github.com/Carlos-Gabryel/ampcontrol.git
 cd ampcontrol
+sudo ./scripts/migration-preflight.sh /opt/ampcontrol
 sudo ./scripts/migrate-legacy.sh /opt/ampcontrol
 ```
+
+O primeiro comando é somente leitura e apresenta um relatório sem exibir valores secretos. Corrija todas as linhas `FALHA` antes de executar a migração.
 
 O migrador:
 
