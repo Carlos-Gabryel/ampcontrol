@@ -204,7 +204,8 @@ prompt_secret() {
 prompt_yes_no() {
     local prompt="$1"
     local default_value="$2"
-    local suffix="$(msg '[s/N]' '[y/N]')"
+    local suffix
+    suffix="$(msg '[s/N]' '[y/N]')"
     [[ "$default_value" == "true" ]] && suffix="$(msg '[S/n]' '[Y/n]')"
     local answer=""
     read -r -p "$prompt $suffix: " answer
