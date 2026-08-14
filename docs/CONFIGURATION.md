@@ -1,6 +1,12 @@
 # Configuração
 
+[English](CONFIGURATION.en.md) · **Português (Brasil)**
+
 A configuração não secreta fica em `/etc/ampcontrol/config.toml`. O modelo completo está em [`config/ampcontrol.example.toml`](../config/ampcontrol.example.toml).
+
+| Chave | Uso |
+| --- | --- |
+| `language` | Idioma global: `pt-BR` ou `en-US`. Controla comandos, painéis, respostas, auditoria, logs e manutenção. |
 
 ## Discord
 

@@ -1,0 +1,27 @@
+language = "en-US"
+
+[discord]
+guild_id = "YOUR_DISCORD_SERVER_ID"
+notification_channel_id = "DASHBOARD_CHANNEL_ID"
+audit_channel_id = "AUDIT_CHANNEL_ID"
+owner_user_id = "YOUR_USER_ID"
+admin_role_ids = []
+restrict_commands_to_channel = true
+allow_discord_administrators = false
+notification_ttl_minutes = 10
+status_refresh_seconds = 60
+command_user_cooldown_seconds = 5
+command_server_cooldown_seconds = 15
+
+[amp]
+username = "ampcontrol"
+ads_url = "http://127.0.0.1:8080"
+public_url = ""
+game_server_address = ""
+system_user = "amp"
+manager_path = "/usr/bin/ampinstmgr"
+wrapper_path = "/usr/local/bin/ampcontrol-amp"
+sudo_path = "/usr/bin/sudo"
+
+[logging]
+level = "info"

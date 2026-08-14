@@ -36,8 +36,19 @@ for architecture in amd64 arm64; do
         CGO_ENABLED=0 GOOS=linux GOARCH="$architecture" \
             go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o "$package_directory/ampcontrol" ./cmd/ampcontrol
     )
-    install -m 0644 "$PROJECT_DIRECTORY/README.md" "$PROJECT_DIRECTORY/LICENSE" "$PROJECT_DIRECTORY/SECURITY.md" "$package_directory/"
-    install -m 0644 "$PROJECT_DIRECTORY/config/ampcontrol.example.toml" "$PROJECT_DIRECTORY/config/idle.json" "$package_directory/config/"
+    install -m 0644 \
+        "$PROJECT_DIRECTORY/README.md" \
+        "$PROJECT_DIRECTORY/README.en.md" \
+        "$PROJECT_DIRECTORY/LICENSE" \
+        "$PROJECT_DIRECTORY/SECURITY.md" \
+        "$PROJECT_DIRECTORY/SECURITY.en.md" \
+        "$PROJECT_DIRECTORY/CONTRIBUTING.md" \
+        "$PROJECT_DIRECTORY/CONTRIBUTING.en.md" \
+        "$PROJECT_DIRECTORY/THIRD_PARTY_NOTICES.md" \
+        "$PROJECT_DIRECTORY/THIRD_PARTY_NOTICES.en.md" \
+        "$package_directory/"
+    cp -a "$PROJECT_DIRECTORY/docs" "$package_directory/docs"
+    install -m 0644 "$PROJECT_DIRECTORY/config/ampcontrol.example.toml" "$PROJECT_DIRECTORY/config/ampcontrol.example.en.toml" "$PROJECT_DIRECTORY/config/idle.json" "$package_directory/config/"
     install -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol.service" "$package_directory/packaging/systemd/"
     install -m 0755 \
         "$PROJECT_DIRECTORY/scripts/install.sh" \

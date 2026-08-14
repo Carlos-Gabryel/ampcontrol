@@ -1,5 +1,7 @@
 # Avisos de terceiros
 
+[English](THIRD_PARTY_NOTICES.en.md) · **Português (Brasil)**
+
 AmpControl é um projeto comunitário independente. Não é afiliado, patrocinado ou endossado por CubeCoders, Discord, Valve/Steam ou pelos estúdios dos jogos compatíveis.
 
 AMP e CubeCoders são marcas de seus respectivos titulares. Discord é marca da Discord Inc. Steam é marca da Valve Corporation. Nomes e logos de jogos pertencem aos respectivos titulares.
