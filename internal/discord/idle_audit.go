@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
 )
 
@@ -21,32 +22,32 @@ func (c *Client) RecordAutomaticIdle(
 
 	record := commandAuditRecord{
 		UserID:    c.bot.ID(),
-		UserName:  "Motor automático de Idle",
+		UserName:  i18n.Choose("Motor automático de Idle", "Automatic Idle engine"),
 		ChannelID: c.notificationChannelID,
-		Command:   "Idle automático",
+		Command:   i18n.Choose("Idle automático", "Automatic Idle"),
 		Server:    server.Instance,
 		Options: []string{
 			fmt.Sprintf(
-				"**Limite de inatividade:** `%s`",
+				i18n.Choose("**Limite de inatividade:** `%s`", "**Inactivity limit:** `%s`"),
 				formatCommandAuditDuration(server.IdleTimeout),
 			),
 		},
 		Accepted:  true,
-		Reason:    "Executado pelo motor automático",
+		Reason:    i18n.Choose("Executado pelo motor automático", "Executed by the automatic engine"),
 		CreatedAt: startedAt,
 	}
 
 	presentation := commandAuditPresentation{
 		Phase:      commandAuditPhaseCompleted,
-		Result:     "O processo do jogo foi encerrado automaticamente por inatividade.",
+		Result:     i18n.Choose("O processo do jogo foi encerrado automaticamente por inatividade.", "The game process was stopped automatically due to inactivity."),
 		FinalState: "Idle",
 		UpdatedAt:  time.Now(),
 	}
 	if operationErr != nil {
 		presentation.Phase = commandAuditPhaseFailed
-		presentation.Result = "Falha ao colocar o servidor em Idle: " +
+		presentation.Result = i18n.Choose("Falha ao colocar o servidor em Idle: ", "Failed to place the server in Idle: ") +
 			sanitizeAuditText(operationErr.Error(), 800)
-		presentation.FinalState = "Não concluído"
+		presentation.FinalState = i18n.Choose("Não concluído", "Not completed")
 	}
 
 	go c.createDetachedCommandAudit(record, presentation)

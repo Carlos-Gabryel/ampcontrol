@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 )
@@ -24,7 +25,7 @@ var gameLogoAssets embed.FS
 func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, defaultAddress string) [][]disgoDiscord.LayoutComponent {
 	if len(statuses) == 0 {
 		return [][]disgoDiscord.LayoutComponent{{
-			disgoDiscord.NewContainer(disgoDiscord.NewTextDisplay("Nenhuma instância controlável foi encontrada.")).WithAccentColor(0x5865F2),
+			disgoDiscord.NewContainer(disgoDiscord.NewTextDisplay(i18n.Choose("Nenhuma instância controlável foi encontrada.", "No controllable instance was found."))).WithAccentColor(0x5865F2),
 		}}
 	}
 
@@ -35,7 +36,7 @@ func buildAMPStatusPages(statuses []ampInstanceStatusView, updatedAt time.Time, 
 		for _, status := range statuses[start:end] {
 			components = append(components, buildAMPServerContainer(status, defaultAddress))
 		}
-		footer := fmt.Sprintf("Atualizado <t:%d:R>", updatedAt.Unix())
+		footer := fmt.Sprintf(i18n.Choose("Atualizado <t:%d:R>", "Updated <t:%d:R>"), updatedAt.Unix())
 		if end == len(statuses) {
 			footer = "🟢 Online  •  🟡 Idle  •  🔴 Offline\n" + footer
 		}
@@ -64,18 +65,15 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 	var header disgoDiscord.ContainerSubComponent = headerText
 	if imageURL := gameIconURL(game); imageURL != "" {
 		header = disgoDiscord.NewSection(headerText).
-			WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription("Logo de " + game))
+			WithAccessory(disgoDiscord.NewThumbnail(imageURL).WithDescription(i18n.Choose("Logo de ", "Logo for ") + game))
 	}
 
 	statusBlock := disgoDiscord.NewTextDisplay(fmt.Sprintf(
-		"### Status do servidor\n**%s**",
+		i18n.Choose("### Status do servidor\n**%s**", "### Server status\n**%s**"),
 		state,
 	))
 	details := disgoDiscord.NewTextDisplay(fmt.Sprintf(
-		"### Endereço do servidor\n`%s`\n\n"+
-			"### Desempenho\n"+
-			"**CPU**　　**Memória**　　**Tempo online**\n`%s`　　`%s`　　`%s`\n\n"+
-			"### Jogadores\n`%s`",
+		i18n.Choose("### Endereço do servidor\n`%s`\n\n### Desempenho\n**CPU**　　**Memória**　　**Tempo online**\n`%s`　　`%s`　　`%s`\n\n### Jogadores\n`%s`", "### Server address\n`%s`\n\n### Performance\n**CPU**　　**Memory**　　**Uptime**\n`%s`　　`%s`　　`%s`\n\n### Players\n`%s`"),
 		address, cpu, memory, uptime, players,
 	))
 
@@ -88,11 +86,11 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 	restartDisabled := stopDisabled
 
 	row := disgoDiscord.NewActionRow(
-		disgoDiscord.NewSuccessButton("Iniciar", dashboardComponentID("start", status.Instance.Name)).WithDisabled(startDisabled),
-		disgoDiscord.NewDangerButton("Parar", dashboardComponentID("stop", status.Instance.Name)).WithDisabled(stopDisabled),
-		disgoDiscord.NewSecondaryButton("Reiniciar", dashboardComponentID("restart", status.Instance.Name)).WithDisabled(restartDisabled),
-		disgoDiscord.NewPrimaryButton("Atualizar", dashboardComponentID("update", status.Instance.Name)),
-		disgoDiscord.NewSecondaryButton("Detalhes", dashboardComponentID("details", status.Instance.Name)),
+		disgoDiscord.NewSuccessButton(i18n.Choose("Iniciar", "Start"), dashboardComponentID("start", status.Instance.Name)).WithDisabled(startDisabled),
+		disgoDiscord.NewDangerButton(i18n.Choose("Parar", "Stop"), dashboardComponentID("stop", status.Instance.Name)).WithDisabled(stopDisabled),
+		disgoDiscord.NewSecondaryButton(i18n.Choose("Reiniciar", "Restart"), dashboardComponentID("restart", status.Instance.Name)).WithDisabled(restartDisabled),
+		disgoDiscord.NewPrimaryButton(i18n.Choose("Atualizar", "Update"), dashboardComponentID("update", status.Instance.Name)),
+		disgoDiscord.NewSecondaryButton(i18n.Choose("Detalhes", "Details"), dashboardComponentID("details", status.Instance.Name)),
 	)
 
 	return disgoDiscord.NewContainer(
@@ -129,7 +127,7 @@ func dashboardPlayerCount(status ampInstanceStatusView) string {
 
 func dashboardResourceUsage(status *amp.ApplicationStatus) (string, string) {
 	if status == nil {
-		return "indisponível", "indisponível"
+		return i18n.Choose("indisponível", "unavailable"), i18n.Choose("indisponível", "unavailable")
 	}
 	return dashboardMetric(status.Metrics, "cpu"), dashboardMetric(status.Metrics, "memory", "memória", "memoria")
 }
@@ -147,7 +145,7 @@ func dashboardMetric(metrics map[string]amp.StatusMetric, names ...string) strin
 			}
 		}
 	}
-	return "indisponível"
+	return i18n.Choose("indisponível", "unavailable")
 }
 
 func dashboardStatusColor(status ampInstanceStatusView) int {
@@ -170,7 +168,7 @@ func dashboardInstanceAddress(setting instancePresentationOverride, fallback str
 	if fallback := strings.TrimSpace(fallback); fallback != "" {
 		return fallback
 	}
-	return "não configurado"
+	return i18n.Choose("não configurado", "not configured")
 }
 
 func (c *Client) handleDashboardComponent(event *events.ComponentInteractionCreate) {
@@ -180,7 +178,7 @@ func (c *Client) handleDashboardComponent(event *events.ComponentInteractionCrea
 		return
 	}
 	if event.Channel().ID() != c.notificationChannelID {
-		_ = event.CreateMessage(disgoDiscord.NewMessageCreate().WithContent("⛔ Este painel só funciona no canal do AmpControl.").WithEphemeral(true))
+		_ = event.CreateMessage(disgoDiscord.NewMessageCreate().WithContent(i18n.Text("⛔ Este painel só funciona no canal do AmpControl.")).WithEphemeral(true))
 		return
 	}
 	if err := event.DeferCreateMessage(true); err != nil {
@@ -256,36 +254,36 @@ func (c *Client) handleDashboardDetails(event *events.ComponentInteractionCreate
 	embed := disgoDiscord.NewEmbed().
 		WithAuthor(ampInstanceDisplayName(instance), "", "").
 		AddField("Status", icon+" "+state, true).
-		AddField("Jogo", instance.Game, true).
-		AddField("Endereço", dashboardInstanceAddress(setting, c.gameServerAddress), false).
+		AddField(i18n.Choose("Jogo", "Game"), instance.Game, true).
+		AddField(i18n.Choose("Endereço", "Address"), dashboardInstanceAddress(setting, c.gameServerAddress), false).
 		AddField("CPU", cpu, true).
-		AddField("Memória", memory, true).
-		AddField("Tempo online", uptime, true).
-		AddField("Jogadores", dashboardPlayerCount(status), true).
+		AddField(i18n.Choose("Memória", "Memory"), memory, true).
+		AddField(i18n.Choose("Tempo online", "Uptime"), uptime, true).
+		AddField(i18n.Choose("Jogadores", "Players"), dashboardPlayerCount(status), true).
 		WithColor(dashboardStatusColor(status)).
-		WithFooter("Instância AMP: "+instance.Name, "")
+		WithFooter(i18n.Choose("Instância AMP: ", "AMP instance: ")+instance.Name, "")
 
 	phase := amp.ApplicationPhaseUnknown
 	if status.ApplicationStatus != nil {
 		phase = status.ApplicationStatus.Phase()
 	}
 	actionRow := disgoDiscord.NewActionRow(
-		disgoDiscord.NewSuccessButton("Iniciar", dashboardComponentID("start", instance.Name)).WithDisabled(instance.Running && phase != amp.ApplicationPhaseIdle),
-		disgoDiscord.NewDangerButton("Parar", dashboardComponentID("stop", instance.Name)).WithDisabled(!instance.Running || phase != amp.ApplicationPhaseOnline),
-		disgoDiscord.NewSecondaryButton("Reiniciar", dashboardComponentID("restart", instance.Name)).WithDisabled(!instance.Running || phase != amp.ApplicationPhaseOnline),
-		disgoDiscord.NewPrimaryButton("Atualizar", dashboardComponentID("update", instance.Name)),
+		disgoDiscord.NewSuccessButton(i18n.Choose("Iniciar", "Start"), dashboardComponentID("start", instance.Name)).WithDisabled(instance.Running && phase != amp.ApplicationPhaseIdle),
+		disgoDiscord.NewDangerButton(i18n.Choose("Parar", "Stop"), dashboardComponentID("stop", instance.Name)).WithDisabled(!instance.Running || phase != amp.ApplicationPhaseOnline),
+		disgoDiscord.NewSecondaryButton(i18n.Choose("Reiniciar", "Restart"), dashboardComponentID("restart", instance.Name)).WithDisabled(!instance.Running || phase != amp.ApplicationPhaseOnline),
+		disgoDiscord.NewPrimaryButton(i18n.Choose("Atualizar", "Update"), dashboardComponentID("update", instance.Name)),
 	)
 	components := []disgoDiscord.LayoutComponent{actionRow}
 	if event.User().ID == c.ownerUserID && c.ampPublicURL != "" && instance.ID != "" {
 		manageURL := strings.TrimRight(c.ampPublicURL, "/") + "/instance/" + url.PathEscape(instance.ID)
-		components = append(components, disgoDiscord.NewActionRow(disgoDiscord.NewLinkButton("Abrir no AMP", manageURL)))
+		components = append(components, disgoDiscord.NewActionRow(disgoDiscord.NewLinkButton(i18n.Choose("Abrir no AMP", "Open in AMP"), manageURL)))
 	}
 	message := disgoDiscord.NewMessageUpdate().WithEmbeds(embed).WithComponents(components...)
 	_, _ = c.interactions.UpdateInteractionResponse(event.ApplicationID(), event.Token(), message)
 	go c.createDetachedCommandAudit(commandAuditRecord{
 		UserID: event.User().ID, UserName: event.User().EffectiveName(), ChannelID: event.Channel().ID(),
-		Command: "/painel detalhes", Server: instance.Name, Accepted: true, Reason: "Consultado pelo painel", CreatedAt: time.Now(),
-	}, commandAuditPresentation{Phase: commandAuditPhaseCompleted, Result: "Detalhes exibidos", FinalState: "Sem alteração", UpdatedAt: time.Now()})
+		Command: i18n.Choose("/painel detalhes", "/dashboard details"), Server: instance.Name, Accepted: true, Reason: i18n.Choose("Consultado pelo painel", "Requested from dashboard"), CreatedAt: time.Now(),
+	}, commandAuditPresentation{Phase: commandAuditPhaseCompleted, Result: i18n.Choose("Detalhes exibidos", "Details displayed"), FinalState: i18n.Choose("Sem alteração", "Unchanged"), UpdatedAt: time.Now()})
 }
 
 func collectSingleAMPStatus(c *Client, instance amp.ManagedInstance) ampInstanceStatusView {
@@ -335,7 +333,7 @@ func gameIconFile(game string) (*disgoDiscord.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("não foi possível carregar a logo %s: %w", filename, err)
 	}
-	return disgoDiscord.NewFile(filename, "Logo de "+game, bytes.NewReader(data)), nil
+	return disgoDiscord.NewFile(filename, i18n.Choose("Logo de ", "Logo for ")+game, bytes.NewReader(data)), nil
 }
 
 func dashboardGameName(instance amp.ManagedInstance) string {
@@ -344,7 +342,7 @@ func dashboardGameName(instance amp.ManagedInstance) string {
 		game = strings.TrimSpace(instance.Module)
 	}
 	if game == "" {
-		return "Desconhecido"
+		return i18n.Choose("Desconhecido", "Unknown")
 	}
 	return game
 }

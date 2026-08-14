@@ -27,11 +27,13 @@ func TestClassifyCommandAuditResponse(t *testing.T) {
 		terminal bool
 	}{
 		{"⏳ Iniciando **Valheim**", commandAuditPhaseRunning, false},
+		{"⏳ Starting **Valheim**", commandAuditPhaseRunning, false},
 		{"✅ O jogo foi iniciado.", commandAuditPhaseCompleted, true},
 		{"❌ Não foi possível iniciar.", commandAuditPhaseFailed, true},
 		{"⛔ Canal não autorizado.", commandAuditPhaseRefused, true},
 		{"⚠️ Confirmação ausente.", commandAuditPhaseFailed, true},
 		{"⏳ O servidor já possui uma operação em andamento.", commandAuditPhaseFailed, true},
+		{"⏳ The server already has an operation in progress.", commandAuditPhaseFailed, true},
 	}
 
 	for _, test := range tests {

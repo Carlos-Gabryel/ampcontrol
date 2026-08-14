@@ -1,5 +1,7 @@
 <div align="center">
 
+[English](README.en.md) · **Português (Brasil)**
+
 # 🎮 AmpControl
 
 ### Gerencie seus servidores AMP pelo Discord — com segurança, automação e economia de recursos.
@@ -107,14 +109,15 @@ sudo ./scripts/install.sh
 
 O assistente de instalação:
 
-1. localiza o AMP, o `ampinstmgr`, o usuário do sistema e as instâncias existentes;
-2. pergunta quais instâncias devem usar Idle automático;
-3. solicita token do bot, servidor Discord, canais, proprietário e cargos administrativos;
-4. permite restringir todos os comandos ao canal escolhido;
-5. configura acesso à API do AMP, endereços e detectores;
-6. mostra um resumo antes de alterar o sistema;
-7. cria o serviço, as permissões mínimas e as credenciais criptografadas;
-8. valida a configuração e inicia o AmpControl.
+1. pergunta se toda a instalação deve usar português ou inglês;
+2. localiza o AMP, o `ampinstmgr`, o usuário do sistema e as instâncias existentes;
+3. pergunta quais instâncias devem usar Idle automático;
+4. solicita token do bot, servidor Discord, canais, proprietário e cargos administrativos;
+5. permite restringir todos os comandos ao canal escolhido;
+6. configura acesso à API do AMP, endereços e detectores;
+7. mostra um resumo antes de alterar o sistema;
+8. cria o serviço, as permissões mínimas e as credenciais criptografadas;
+9. valida a configuração e inicia o AmpControl.
 
 > [!TIP]
 > Antes de instalar, siga o [guia completo de instalação](docs/INSTALLATION.md). Ele explica como criar o bot Discord, a conta dedicada no AMP e copiar cada ID necessário.

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/disgoorg/disgo/events"
 )
 
@@ -59,21 +60,21 @@ func (c *Client) collectDiagnostics(
 	items := make([]diagnosticItem, 0, 5)
 	snapshot := c.dashboardDiagnosticsSnapshot()
 
-	discordDetail := "Gateway conectado"
+	discordDetail := i18n.Choose("Gateway conectado", "Gateway connected")
 	if !snapshot.DiscordConnectedAt.IsZero() {
 		discordDetail += " " + formatDiagnosticRelative(snapshot.DiscordConnectedAt)
 	}
 	if err := c.validateCommandAuditChannel(); err != nil {
 		items = append(items, diagnosticItem{
 			Name:     "Discord",
-			Detail:   discordDetail + "; canal de auditoria indisponível: " + sanitizeAuditText(err.Error(), 260),
+			Detail:   discordDetail + i18n.Choose("; canal de auditoria indisponível: ", "; audit channel unavailable: ") + i18n.Text(sanitizeAuditText(err.Error(), 260)),
 			Severity: diagnosticFailure,
 		})
 	} else {
 		items = append(items, diagnosticItem{
 			Name: "Discord",
 			Detail: fmt.Sprintf(
-				"%s; painel <#%s>; auditoria <#%s>",
+				i18n.Choose("%s; painel <#%s>; auditoria <#%s>", "%s; dashboard <#%s>; audit <#%s>"),
 				discordDetail,
 				c.notificationChannelID,
 				c.auditChannelID,
@@ -88,8 +89,8 @@ func (c *Client) collectDiagnostics(
 	)
 	if ampErr != nil {
 		items = append(items, diagnosticItem{
-			Name:     "API ADS do AMP",
-			Detail:   sanitizeAuditText(ampErr.Error(), 320),
+			Name:     i18n.Choose("API ADS do AMP", "AMP ADS API"),
+			Detail:   i18n.Text(sanitizeAuditText(ampErr.Error(), 320)),
 			Severity: diagnosticFailure,
 		})
 	} else {
@@ -100,9 +101,9 @@ func (c *Client) collectDiagnostics(
 			}
 		}
 		items = append(items, diagnosticItem{
-			Name: "API ADS do AMP",
+			Name: i18n.Choose("API ADS do AMP", "AMP ADS API"),
 			Detail: fmt.Sprintf(
-				"Autenticação e inventário válidos; %d instâncias encontradas, %d ligadas",
+				i18n.Choose("Autenticação e inventário válidos; %d instâncias encontradas, %d ligadas", "Authentication and inventory valid; %d instances found, %d running"),
 				len(instances),
 				running,
 			),
@@ -114,26 +115,26 @@ func (c *Client) collectDiagnostics(
 	if !idleAvailable {
 		items = append(items,
 			diagnosticItem{
-				Name:     "Motor de Idle",
-				Detail:   "Provedor de diagnóstico não está disponível",
+				Name:     i18n.Choose("Motor de Idle", "Idle engine"),
+				Detail:   i18n.Choose("Provedor de diagnóstico não está disponível", "Diagnostics provider is unavailable"),
 				Severity: diagnosticFailure,
 			},
 			diagnosticItem{
 				Name:     "RCON",
-				Detail:   "Não foi possível consultar os detectores configurados",
+				Detail:   i18n.Choose("Não foi possível consultar os detectores configurados", "Could not query configured detectors"),
 				Severity: diagnosticWarning,
 			},
 		)
 	} else {
 		idleSeverity := diagnosticHealthy
-		idleStatus := "Ativo"
+		idleStatus := i18n.Choose("Ativo", "Active")
 		if !idleSnapshot.Running {
 			idleSeverity = diagnosticFailure
-			idleStatus = "Parado"
+			idleStatus = i18n.Choose("Parado", "Stopped")
 		}
 
 		idleDetail := fmt.Sprintf(
-			"%s; %d cadastrados, %d ativos, %d em observação; ciclo de %s",
+			i18n.Choose("%s; %d cadastrados, %d ativos, %d em observação; ciclo de %s", "%s; %d registered, %d active, %d in observe mode; %s cycle"),
 			idleStatus,
 			idleSnapshot.RegisteredServers,
 			idleSnapshot.ActiveServers,
@@ -141,24 +142,24 @@ func (c *Client) collectDiagnostics(
 			formatCommandAuditDuration(idleSnapshot.CheckInterval),
 		)
 		if !idleSnapshot.LastEventAt.IsZero() {
-			idleDetail += "; último ciclo " + formatDiagnosticRelative(idleSnapshot.LastEventAt)
+			idleDetail += i18n.Choose("; último ciclo ", "; last cycle ") + formatDiagnosticRelative(idleSnapshot.LastEventAt)
 		}
 		if !idleSnapshot.LastErrorAt.IsZero() &&
 			time.Since(idleSnapshot.LastErrorAt) <= 5*time.Minute {
 			idleSeverity = maxDiagnosticSeverity(idleSeverity, diagnosticWarning)
-			idleDetail += "; falha recente: " + sanitizeAuditText(idleSnapshot.LastError, 220)
+			idleDetail += i18n.Choose("; falha recente: ", "; recent failure: ") + i18n.Text(sanitizeAuditText(idleSnapshot.LastError, 220))
 		}
 		items = append(items, diagnosticItem{
-			Name:     "Motor de Idle",
+			Name:     i18n.Choose("Motor de Idle", "Idle engine"),
 			Detail:   idleDetail,
 			Severity: idleSeverity,
 		})
 
 		rconSeverity := diagnosticHealthy
-		rconDetail := "Nenhum detector RCON configurado"
+		rconDetail := i18n.Choose("Nenhum detector RCON configurado", "No RCON detector configured")
 		if idleSnapshot.RCONServers > 0 {
 			rconDetail = fmt.Sprintf(
-				"%d detectores configurados; %d com endereço e credencial carregados",
+				i18n.Choose("%d detectores configurados; %d com endereço e credencial carregados", "%d detectors configured; %d with address and credential loaded"),
 				idleSnapshot.RCONServers,
 				idleSnapshot.RCONReadyServers,
 			)
@@ -174,19 +175,19 @@ func (c *Client) collectDiagnostics(
 	}
 
 	dashboardSeverity := diagnosticHealthy
-	dashboardDetail := "Nenhuma atualização bem-sucedida foi registrada nesta execução"
+	dashboardDetail := i18n.Choose("Nenhuma atualização bem-sucedida foi registrada nesta execução", "No successful update was recorded in this run")
 	if snapshot.LastDashboardSuccess.IsZero() {
 		dashboardSeverity = diagnosticWarning
 	} else {
-		dashboardDetail = "Última atualização bem-sucedida " +
+		dashboardDetail = i18n.Choose("Última atualização bem-sucedida ", "Last successful update ") +
 			formatDiagnosticRelative(snapshot.LastDashboardSuccess)
 	}
 	if strings.TrimSpace(snapshot.LastDashboardError) != "" {
 		dashboardSeverity = diagnosticFailure
-		dashboardDetail += "; erro: " + sanitizeAuditText(snapshot.LastDashboardError, 260)
+		dashboardDetail += i18n.Choose("; erro: ", "; error: ") + i18n.Text(sanitizeAuditText(snapshot.LastDashboardError, 260))
 	}
 	items = append(items, diagnosticItem{
-		Name:     "Painel fixo",
+		Name:     i18n.Choose("Painel fixo", "Pinned dashboard"),
 		Detail:   dashboardDetail,
 		Severity: dashboardSeverity,
 	})
@@ -228,11 +229,11 @@ func formatDiagnosticsReport(
 	}
 
 	var builder strings.Builder
-	builder.WriteString("## 🩺 Diagnóstico do AmpControl\n")
-	builder.WriteString("**Resultado geral:** ")
+	builder.WriteString(i18n.Choose("## 🩺 Diagnóstico do AmpControl\n", "## 🩺 AmpControl diagnostics\n"))
+	builder.WriteString(i18n.Choose("**Resultado geral:** ", "**Overall result:** "))
 	builder.WriteString(diagnosticSeverityLabel(overall))
 	builder.WriteString("\n")
-	builder.WriteString(fmt.Sprintf("Verificado <t:%d:R>\n", checkedAt.Unix()))
+	builder.WriteString(fmt.Sprintf(i18n.Choose("Verificado <t:%d:R>\n", "Checked <t:%d:R>\n"), checkedAt.Unix()))
 
 	for _, item := range items {
 		builder.WriteString("\n**")
@@ -261,11 +262,11 @@ func diagnosticSeverityIcon(severity diagnosticSeverity) string {
 func diagnosticSeverityLabel(severity diagnosticSeverity) string {
 	switch severity {
 	case diagnosticFailure:
-		return "🔴 Falha detectada"
+		return i18n.Choose("🔴 Falha detectada", "🔴 Failure detected")
 	case diagnosticWarning:
-		return "🟡 Atenção necessária"
+		return i18n.Choose("🟡 Atenção necessária", "🟡 Attention required")
 	default:
-		return "🟢 Saudável"
+		return i18n.Choose("🟢 Saudável", "🟢 Healthy")
 	}
 }
 
@@ -281,7 +282,7 @@ func maxDiagnosticSeverity(
 
 func formatDiagnosticRelative(value time.Time) string {
 	if value.IsZero() {
-		return "nunca"
+		return i18n.Choose("nunca", "never")
 	}
 	return fmt.Sprintf("<t:%d:R>", value.Unix())
 }

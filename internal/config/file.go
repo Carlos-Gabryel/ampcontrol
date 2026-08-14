@@ -5,15 +5,17 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/pelletier/go-toml/v2"
 )
 
 const defaultConfigPath = "/etc/ampcontrol/config.toml"
 
 type fileConfig struct {
-	Discord fileDiscordConfig `toml:"discord"`
-	AMP     fileAMPConfig     `toml:"amp"`
-	Logging fileLoggingConfig `toml:"logging"`
+	Language string            `toml:"language"`
+	Discord  fileDiscordConfig `toml:"discord"`
+	AMP      fileAMPConfig     `toml:"amp"`
+	Logging  fileLoggingConfig `toml:"logging"`
 }
 
 type fileDiscordConfig struct {
@@ -70,6 +72,9 @@ func loadFileConfig() (fileConfig, error) {
 }
 
 func applyFileDefaults(cfg *Config, source fileConfig) {
+	if cfg.Language == "" {
+		cfg.Language = i18n.Language(strings.TrimSpace(source.Language))
+	}
 	if cfg.DiscordGuildID == "" {
 		cfg.DiscordGuildID = strings.TrimSpace(source.Discord.GuildID)
 	}

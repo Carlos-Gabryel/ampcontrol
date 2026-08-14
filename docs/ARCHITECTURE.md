@@ -1,5 +1,7 @@
 # Arquitetura
 
+[English](ARCHITECTURE.en.md) · **Português (Brasil)**
+
 ```mermaid
 flowchart LR
     U["Usuários no Discord"] --> D["Gateway e comandos Discord"]

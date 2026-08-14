@@ -1,5 +1,7 @@
 # Instalação no Linux
 
+[English](INSTALLATION.en.md) · **Português (Brasil)**
+
 Este guia instala uma cópia nova do AmpControl sem alterar as instâncias de jogos. Faça primeiro em uma janela de manutenção e mantenha backup da configuração atual.
 
 ## 1. Requisitos
@@ -49,6 +51,8 @@ git clone https://github.com/Carlos-Gabryel/ampcontrol.git
 cd ampcontrol
 sudo ./scripts/install.sh
 ```
+
+A primeira pergunta escolhe o idioma de toda a instalação. Também é possível defini-lo diretamente com `--language pt-BR` ou `--language en-US`.
 
 Alternativas:
 

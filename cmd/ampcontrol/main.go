@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/app"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 var version = "dev"
@@ -20,11 +21,11 @@ func main() {
 			return
 		case "--check-config":
 			if _, err := app.New(); err != nil {
-				fmt.Println("Configuração inválida:")
+				fmt.Println(i18n.T(i18n.ConfigInvalid))
 				fmt.Println(err)
 				os.Exit(1)
 			}
-			fmt.Println("Configuração válida.")
+			fmt.Println(i18n.T(i18n.ConfigValid))
 			return
 		}
 	}
@@ -40,7 +41,7 @@ func main() {
 	application, err := app.New()
 
 	if err != nil {
-		fmt.Println("Erro ao iniciar AmpControl:")
+		fmt.Println(i18n.T(i18n.StartupError))
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -48,7 +49,7 @@ func main() {
 	err = application.Start(ctx)
 
 	if err != nil {
-		fmt.Println("Erro Discord:")
+		fmt.Println(i18n.T(i18n.DiscordError))
 		fmt.Println(err)
 		os.Exit(1)
 	}

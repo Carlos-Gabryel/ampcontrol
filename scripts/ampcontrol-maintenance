@@ -13,6 +13,12 @@ readonly STATE_DIRECTORY="/var/lib/ampcontrol/update-state"
 readonly BACKUP_ROOT="/var/backups/ampcontrol"
 
 TEMP_DIRECTORY=""
+LANGUAGE="${AMPCONTROL_LANGUAGE:-}"
+if [[ -z "$LANGUAGE" && -r /etc/ampcontrol/config.toml ]]; then
+    LANGUAGE="$(sed -n 's/^[[:space:]]*language[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' /etc/ampcontrol/config.toml | head -n1)"
+fi
+[[ "$LANGUAGE" == "en-US" ]] || LANGUAGE="pt-BR"
+msg() { if [[ "$LANGUAGE" == "en-US" ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
 
 cleanup() {
     [[ -z "$TEMP_DIRECTORY" || ! -d "$TEMP_DIRECTORY" ]] || rm -rf -- "$TEMP_DIRECTORY"
@@ -20,12 +26,20 @@ cleanup() {
 trap cleanup EXIT
 
 fail() {
-    printf 'Erro: %s\n' "$1" >&2
+    printf '%s: %s\n' "$(msg 'Erro' 'Error')" "$1" >&2
     exit 1
 }
 
 usage() {
-    cat <<'EOF'
+    if [[ "$LANGUAGE" == "en-US" ]]; then cat <<'EOF'
+Usage:
+  sudo ampcontrol-maintenance update [vVERSION]
+  sudo ampcontrol-maintenance rollback [BACKUP_DIRECTORY]
+  sudo ampcontrol-maintenance status
+
+Without a version, update installs the latest stable GitHub release.
+EOF
+    else cat <<'EOF'
 Uso:
   sudo ampcontrol-maintenance update [vVERSÃO]
   sudo ampcontrol-maintenance rollback [DIRETÓRIO_DE_BACKUP]
@@ -33,11 +47,12 @@ Uso:
 
 Sem uma versão, update instala a release estável mais recente do GitHub.
 EOF
+    fi
 }
 
 require_root() {
-    [[ "$(uname -s)" == Linux ]] || fail "somente Linux é suportado"
-    [[ "$EUID" -eq 0 ]] || fail "execute com sudo"
+    [[ "$(uname -s)" == Linux ]] || fail "$(msg 'somente Linux é suportado' 'only Linux is supported')"
+    [[ "$EUID" -eq 0 ]] || fail "$(msg 'execute com sudo' 'run with sudo')"
 }
 
 latest_version() {
@@ -55,7 +70,7 @@ backup_current() {
     [[ ! -e "$WRAPPER_PATH" ]] || cp -a -- "$WRAPPER_PATH" "$backup/ampcontrol-amp"
     [[ ! -e "$MAINTENANCE_PATH" ]] || cp -a -- "$MAINTENANCE_PATH" "$backup/ampcontrol-maintenance"
     [[ ! -e "$SERVICE_PATH" ]] || cp -a -- "$SERVICE_PATH" "$backup/ampcontrol.service"
-    "$BINARY_PATH" --version > "$backup/version" 2>/dev/null || printf 'desconhecida\n' > "$backup/version"
+    "$BINARY_PATH" --version > "$backup/version" 2>/dev/null || printf '%s\n' "$(msg 'desconhecida' 'unknown')" > "$backup/version"
     install -d -o root -g root -m 0700 "$STATE_DIRECTORY"
     printf '%s\n' "$backup" > "$STATE_DIRECTORY/latest-backup"
     printf '%s' "$backup"
@@ -63,8 +78,8 @@ backup_current() {
 
 restore_backup() {
     local backup="$1"
-    [[ "$backup" == "$BACKUP_ROOT"/update-* && -d "$backup" ]] || fail "backup de atualização inválido: $backup"
-    [[ -f "$backup/ampcontrol" ]] || fail "o backup não contém um binário"
+    [[ "$backup" == "$BACKUP_ROOT"/update-* && -d "$backup" ]] || fail "$(msg 'backup de atualização inválido' 'invalid update backup'): $backup"
+    [[ -f "$backup/ampcontrol" ]] || fail "$(msg 'o backup não contém um binário' 'the backup does not contain a binary')"
     systemctl stop ampcontrol.service || true
     install -o root -g root -m 0755 "$backup/ampcontrol" "$BINARY_PATH"
     [[ ! -f "$backup/ampcontrol-amp" ]] || install -o root -g root -m 0755 "$backup/ampcontrol-amp" "$WRAPPER_PATH"
@@ -72,8 +87,8 @@ restore_backup() {
     [[ ! -f "$backup/ampcontrol.service" ]] || install -o root -g root -m 0644 "$backup/ampcontrol.service" "$SERVICE_PATH"
     systemctl daemon-reload
     systemctl restart ampcontrol.service
-    systemctl is-active --quiet ampcontrol.service || fail "o serviço não iniciou após o rollback"
-    printf 'Rollback concluído a partir de %s\n' "$backup"
+    systemctl is-active --quiet ampcontrol.service || fail "$(msg 'o serviço não iniciou após o rollback' 'the service did not start after rollback')"
+    printf '%s %s\n' "$(msg 'Rollback concluído a partir de' 'Rollback completed from')" "$backup"
 }
 
 validate_staged_binary() {
@@ -98,35 +113,35 @@ update_ampcontrol() {
     local requested="${1:-}"
     local version
     version="${requested:-$(latest_version)}"
-    [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || fail "versão inválida: $version"
+    [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || fail "$(msg 'versão inválida' 'invalid version'): $version"
     local architecture
     architecture="$(uname -m)"
     case "$architecture" in
         x86_64) architecture=amd64 ;;
         aarch64|arm64) architecture=arm64 ;;
-        *) fail "arquitetura não suportada: $architecture" ;;
+        *) fail "$(msg 'arquitetura não suportada' 'unsupported architecture'): $architecture" ;;
     esac
 
     TEMP_DIRECTORY="$(mktemp -d)"
     local archive="ampcontrol_${version}_linux_${architecture}.tar.gz"
     local base_url="https://github.com/$REPOSITORY/releases/download/$version"
-    printf 'Baixando AmpControl %s...\n' "$version"
+    printf '%s %s...\n' "$(msg 'Baixando AmpControl' 'Downloading AmpControl')" "$version"
     curl -fL --retry 3 -o "$TEMP_DIRECTORY/$archive" "$base_url/$archive"
     curl -fL --retry 3 -o "$TEMP_DIRECTORY/checksums.txt" "$base_url/checksums.txt"
     (
         cd "$TEMP_DIRECTORY"
         grep -F "$archive" checksums.txt | sha256sum -c -
-    ) || fail "a soma SHA-256 da release não confere"
-    tar -tzf "$TEMP_DIRECTORY/$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))' && fail "a release contém caminhos inseguros"
+    ) || fail "$(msg 'a soma SHA-256 da release não confere' 'the release SHA-256 checksum does not match')"
+    tar -tzf "$TEMP_DIRECTORY/$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))' && fail "$(msg 'a release contém caminhos inseguros' 'the release contains unsafe paths')"
     tar -xzf "$TEMP_DIRECTORY/$archive" -C "$TEMP_DIRECTORY"
     local package="$TEMP_DIRECTORY/ampcontrol_${version}_linux_${architecture}"
-    [[ -x "$package/ampcontrol" ]] || fail "binário ausente na release"
+    [[ -x "$package/ampcontrol" ]] || fail "$(msg 'binário ausente na release' 'binary missing from the release')"
     "$package/ampcontrol" --version
 
     install -o root -g root -m 0755 "$package/ampcontrol" "$LIB_DIRECTORY/ampcontrol.new"
     if ! validate_staged_binary "$LIB_DIRECTORY/ampcontrol.new"; then
         rm -f -- "$LIB_DIRECTORY/ampcontrol.new"
-        fail "a nova versão rejeitou a configuração atual; nada foi substituído"
+        fail "$(msg 'a nova versão rejeitou a configuração atual; nada foi substituído' 'the new version rejected the current configuration; nothing was replaced')"
     fi
 
     local backup
@@ -136,22 +151,22 @@ update_ampcontrol() {
        ! install -o root -g root -m 0755 "$package/scripts/ampcontrol-maintenance" "$MAINTENANCE_PATH" ||
        ! install -o root -g root -m 0644 "$package/packaging/systemd/ampcontrol.service" "$SERVICE_PATH"; then
         restore_backup "$backup"
-        fail "a instalação falhou e o backup foi restaurado"
+        fail "$(msg 'a instalação falhou e o backup foi restaurado' 'installation failed and the backup was restored')"
     fi
     systemctl daemon-reload
     if ! systemctl restart ampcontrol.service || ! systemctl is-active --quiet ampcontrol.service; then
         restore_backup "$backup"
-        fail "a nova versão não iniciou e o rollback automático foi executado"
+        fail "$(msg 'a nova versão não iniciou e o rollback automático foi executado' 'the new version did not start and automatic rollback was performed')"
     fi
-    printf 'AmpControl atualizado para %s. Backup: %s\n' "$version" "$backup"
+    printf '%s %s. %s: %s\n' "$(msg 'AmpControl atualizado para' 'AmpControl updated to')" "$version" "$(msg 'Backup' 'Backup')" "$backup"
 }
 
 show_status() {
-    printf 'Versão instalada: '
+    printf '%s: ' "$(msg 'Versão instalada' 'Installed version')"
     "$BINARY_PATH" --version
     systemctl --no-pager --full status ampcontrol.service
     if [[ -f "$STATE_DIRECTORY/latest-backup" ]]; then
-        printf 'Último backup: %s\n' "$(<"$STATE_DIRECTORY/latest-backup")"
+        printf '%s: %s\n' "$(msg 'Último backup' 'Latest backup')" "$(<"$STATE_DIRECTORY/latest-backup")"
     fi
 }
 
@@ -166,7 +181,7 @@ case "${1:-}" in
         if [[ -z "$backup" && -f "$STATE_DIRECTORY/latest-backup" ]]; then
             backup="$(<"$STATE_DIRECTORY/latest-backup")"
         fi
-        [[ -n "$backup" ]] || fail "nenhum backup foi informado ou registrado"
+        [[ -n "$backup" ]] || fail "$(msg 'nenhum backup foi informado ou registrado' 'no backup was provided or recorded')"
         restore_backup "$backup"
         ;;
     status)

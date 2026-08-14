@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import sys
@@ -18,6 +19,11 @@ from pathlib import Path
 
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 CREDENTIAL_NAME = re.compile(r"[^A-Za-z0-9_.-]+")
+ENGLISH = os.environ.get("AMPCONTROL_LANGUAGE", "").lower() in {"en", "en-us"}
+
+
+def msg(portuguese: str, english: str) -> str:
+    return english if ENGLISH else portuguese
 
 
 def parse_env(path: Path) -> dict[str, str]:
@@ -29,17 +35,17 @@ def parse_env(path: Path) -> dict[str, str]:
         if line.startswith("export "):
             line = line[7:].lstrip()
         if "=" not in line:
-            raise ValueError(f"linha {number} do .env não contém '='")
+            raise ValueError(msg(f"linha {number} do .env não contém '='", f"line {number} of .env does not contain '='"))
         name, raw_value = line.split("=", 1)
         name = name.strip()
         if not ENV_NAME.fullmatch(name):
-            raise ValueError(f"nome inválido na linha {number} do .env: {name!r}")
+            raise ValueError(msg(f"nome inválido na linha {number} do .env: {name!r}", f"invalid name on line {number} of .env: {name!r}"))
         lexer = shlex.shlex(raw_value, posix=True)
         lexer.whitespace_split = True
         lexer.commenters = "#"
         parts = list(lexer)
         if len(parts) > 1:
-            raise ValueError(f"valor inválido na linha {number} do .env")
+            raise ValueError(msg(f"valor inválido na linha {number} do .env", f"invalid value on line {number} of .env"))
         values[name] = parts[0] if parts else ""
     return values
 
@@ -49,10 +55,10 @@ def parse_systemd_environment(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     for item in shlex.split(path.read_text(encoding="utf-8"), posix=True):
         if "=" not in item:
-            raise ValueError("entrada inválida no ambiente do systemd")
+            raise ValueError(msg("entrada inválida no ambiente do systemd", "invalid systemd environment entry"))
         name, value = item.split("=", 1)
         if not ENV_NAME.fullmatch(name):
-            raise ValueError(f"nome inválido no ambiente do systemd: {name!r}")
+            raise ValueError(msg(f"nome inválido no ambiente do systemd: {name!r}", f"invalid name in systemd environment: {name!r}"))
         values[name] = value
     return values
 
@@ -60,7 +66,7 @@ def parse_systemd_environment(path: Path) -> dict[str, str]:
 def credential_name(instance: str) -> str:
     normalized = CREDENTIAL_NAME.sub("_", instance.strip()).strip("_")
     if not normalized:
-        raise ValueError("instância RCON sem nome válido")
+        raise ValueError(msg("instância RCON sem nome válido", "RCON instance has no valid name"))
     return f"rcon_{normalized}"
 
 
@@ -68,23 +74,23 @@ def migrate_idle(source: Path, destination: Path, manifest: Path) -> None:
     document = json.loads(source.read_text(encoding="utf-8"))
     servers = document.get("servers")
     if not isinstance(servers, list):
-        raise ValueError("a configuração de Idle não contém uma lista servers")
+        raise ValueError(msg("a configuração de Idle não contém uma lista servers", "the Idle configuration does not contain a servers list"))
 
     credentials: list[tuple[str, str]] = []
     seen: set[str] = set()
     for server in servers:
         if not isinstance(server, dict):
-            raise ValueError("entrada inválida na lista servers")
+            raise ValueError(msg("entrada inválida na lista servers", "invalid entry in the servers list"))
         rcon = server.get("rcon")
         if rcon is None:
             continue
         if not isinstance(rcon, dict):
-            raise ValueError("configuração RCON inválida")
+            raise ValueError(msg("configuração RCON inválida", "invalid RCON configuration"))
         legacy_name = str(rcon.get("password_env", "")).strip()
         current_name = str(rcon.get("password_credential", "")).strip()
         if legacy_name:
             if not ENV_NAME.fullmatch(legacy_name):
-                raise ValueError(f"variável RCON inválida: {legacy_name!r}")
+                raise ValueError(msg(f"variável RCON inválida: {legacy_name!r}", f"invalid RCON variable: {legacy_name!r}"))
             current_name = credential_name(str(server.get("instance", "")))
             rcon.pop("password_env", None)
             rcon["password_credential"] = current_name
@@ -126,7 +132,7 @@ def main() -> int:
     try:
         if args.command in {"env", "systemd-env"}:
             if not ENV_NAME.fullmatch(args.name):
-                raise ValueError("nome de variável inválido")
+                raise ValueError(msg("nome de variável inválido", "invalid variable name"))
             parser = parse_env if args.command == "env" else parse_systemd_environment
             value = parser(args.file).get(args.name)
             if value is None:
@@ -136,7 +142,7 @@ def main() -> int:
         migrate_idle(args.source, args.destination, args.manifest)
         return 0
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        print(f"Erro: {error}", file=sys.stderr)
+        print(f"{msg('Erro', 'Error')}: {error}", file=sys.stderr)
         return 2
 
 

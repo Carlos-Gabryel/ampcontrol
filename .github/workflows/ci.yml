@@ -45,5 +45,40 @@ jobs:
           bash -n scripts/ampcontrol-maintenance
           shellcheck scripts/*.sh scripts/ampcontrol-maintenance
           python3 -m py_compile scripts/legacy_config.py
+          python3 -m py_compile scripts/check-docs.py
           bash scripts/test-packaging.sh
+
+  localization:
+    name: Localization (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [pt-BR, en-US]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Validate localized runtime
+        env:
+          AMPCONTROL_LANGUAGE: ${{ matrix.language }}
+        run: go test -count=1 ./internal/config ./internal/i18n ./internal/logger ./internal/discord
+
+      - name: Validate localized installation tools
+        env:
+          AMPCONTROL_LANGUAGE: ${{ matrix.language }}
+        run: bash scripts/test-packaging.sh
+
+      - name: Validate bilingual documentation
+        env:
+          AMPCONTROL_LANGUAGE: ${{ matrix.language }}
+        run: python3 scripts/check-docs.py
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
@@ -41,28 +42,28 @@ func (c *Client) handleAMPConfigCommand(
 	}
 
 	switch *data.SubCommandName {
-	case "diagnostico":
+	case "diagnostico", "diagnostics":
 		c.handleAMPDiagnosticsCommand(event)
 
-	case "ocultar":
+	case "ocultar", "hide":
 		c.handleAMPInstanceVisibilityCommand(event, data, true)
 
-	case "exibir":
+	case "exibir", "show":
 		c.handleAMPInstanceVisibilityCommand(event, data, false)
 
-	case "listar":
+	case "listar", "list":
 		c.handleAMPHiddenInstancesCommand(event)
 
-	case "idle-adicionar":
+	case "idle-adicionar", "idle-add":
 		c.handleAMPIdleRegistrationCommand(event, data)
 
-	case "configurar":
+	case "configurar", "configure":
 		c.handleAMPInstanceSettingsCommand(event, data)
 
-	case "detalhes":
+	case "detalhes", "details":
 		c.handleAMPInstanceSettingsDetailsCommand(event, data)
 
-	case "restaurar":
+	case "restaurar", "reset":
 		c.handleAMPInstanceSettingsResetCommand(event, data)
 
 	default:
@@ -81,7 +82,7 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 		return
 	}
 
-	instanceName, exists := data.OptString("servidor")
+	instanceName, exists := optStringAny(data, "servidor", "server")
 	instanceName = strings.TrimSpace(instanceName)
 	if !exists || instanceName == "" {
 		c.updateInteractionMessage(event, "⚠️ A instância AMP não foi informada.")
@@ -93,11 +94,11 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 		return
 	}
 
-	nameValue, hasName := data.OptString("nome")
-	gameValue, hasGame := data.OptString("jogo")
-	maximumValue, hasMaximum := data.OptInt("maximo")
-	addressValue, hasAddress := data.OptString("endereco")
-	detectorValue, hasDetector := data.OptString("detector")
+	nameValue, hasName := optStringAny(data, "nome", "name")
+	gameValue, hasGame := optStringAny(data, "jogo", "game")
+	maximumValue, hasMaximum := optIntAny(data, "maximo", "maximum")
+	addressValue, hasAddress := optStringAny(data, "endereco", "address")
+	detectorValue, hasDetector := optStringAny(data, "detector")
 	nameValue = strings.TrimSpace(nameValue)
 	gameValue = strings.TrimSpace(gameValue)
 	addressValue = strings.TrimSpace(addressValue)
@@ -181,7 +182,7 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 
 	displayName := instance.FriendlyName
 	game := instance.Game
-	maximum := "automático pelo servidor"
+	maximum := i18n.Choose("automático pelo servidor", "automatic from server")
 	if setting.DisplayName != "" {
 		displayName = setting.DisplayName
 	}
@@ -200,8 +201,7 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 		}
 	}
 	message := fmt.Sprintf(
-		"✅ Configuração de **%s** atualizada.\n"+
-			"Nome: **%s**\nJogo: `%s`\nMáximo: `%s`\nEndereço: `%s`\nDetector: `%s`",
+		i18n.Choose("✅ Configuração de **%s** atualizada.\nNome: **%s**\nJogo: `%s`\nMáximo: `%s`\nEndereço: `%s`\nDetector: `%s`", "✅ Configuration for **%s** updated.\nName: **%s**\nGame: `%s`\nMaximum: `%s`\nAddress: `%s`\nDetector: `%s`"),
 		instance.Name, displayName, game, maximum,
 		dashboardInstanceAddress(setting, c.gameServerAddress), detector,
 	)
@@ -219,7 +219,7 @@ func (c *Client) handleAMPInstanceSettingsDetailsCommand(
 	if !c.deferAMPInteraction(event) {
 		return
 	}
-	instanceName, exists := data.OptString("servidor")
+	instanceName, exists := optStringAny(data, "servidor", "server")
 	if !exists {
 		c.updateInteractionMessage(event, "⚠️ A instância AMP não foi informada.")
 		return
@@ -230,23 +230,22 @@ func (c *Client) handleAMPInstanceSettingsDetailsCommand(
 		return
 	}
 	setting, customized := c.instancePresentationSettings(instance.Name)
-	maximum := "automático pelo servidor"
+	maximum := i18n.Choose("automático pelo servidor", "automatic from server")
 	if setting.MaximumPlayers > 0 {
 		maximum = fmt.Sprintf("%d", setting.MaximumPlayers)
 	}
-	detector := "não cadastrada no Idle"
-	rcon := "não configurado"
+	detector := i18n.Choose("não cadastrada no Idle", "not registered in Idle")
+	rcon := i18n.Choose("não configurado", "not configured")
 	if manager := c.idleDetectionConfigurator(); manager != nil {
 		if detection, detectionErr := manager.IdleDetectionSettings(instance.Name); detectionErr == nil {
 			detector = describeIdleDetectionMethod(detection.Method)
 			if detection.RCONConfigured {
-				rcon = "configurado"
+				rcon = i18n.Choose("configurado", "configured")
 			}
 		}
 	}
 	c.updateInteractionMessage(event, fmt.Sprintf(
-		"⚙️ **Configuração de %s**\n"+
-			"Instância: `%s`\nJogo: `%s`\nMáximo: `%s`\nEndereço: `%s`\nDetector: `%s`\nRCON: `%s`\nPersonalização: `%t`",
+		i18n.Choose("⚙️ **Configuração de %s**\nInstância: `%s`\nJogo: `%s`\nMáximo: `%s`\nEndereço: `%s`\nDetector: `%s`\nRCON: `%s`\nPersonalização: `%t`", "⚙️ **Configuration for %s**\nInstance: `%s`\nGame: `%s`\nMaximum: `%s`\nAddress: `%s`\nDetector: `%s`\nRCON: `%s`\nCustomized: `%t`"),
 		ampInstanceDisplayName(instance), instance.Name, instance.Game, maximum,
 		dashboardInstanceAddress(setting, c.gameServerAddress), detector, rcon, customized,
 	))
@@ -264,7 +263,7 @@ func (c *Client) handleAMPInstanceSettingsResetCommand(
 	if !c.deferAMPInteraction(event) {
 		return
 	}
-	instanceName, exists := data.OptString("servidor")
+	instanceName, exists := optStringAny(data, "servidor", "server")
 	if !exists {
 		c.updateInteractionMessage(event, "⚠️ A instância AMP não foi informada.")
 		return
@@ -294,9 +293,9 @@ func (c *Client) handleAMPInstanceSettingsResetCommand(
 	registrationErr := c.registerCommands(ctx)
 	cancel()
 
-	message := fmt.Sprintf("✅ As configurações de **%s** foram restauradas para os valores originais.", instance.Name)
+	message := fmt.Sprintf(i18n.Choose("✅ As configurações de **%s** foram restauradas para os valores originais.", "✅ Settings for **%s** were restored to their original values."), instance.Name)
 	if !removed {
-		message = fmt.Sprintf("✅ O detector de **%s** foi restaurado; não havia apresentação personalizada.", instance.Name)
+		message = fmt.Sprintf(i18n.Choose("✅ O detector de **%s** foi restaurado; não havia apresentação personalizada.", "✅ The detector for **%s** was restored; there was no custom presentation."), instance.Name)
 	}
 	if registrationErr != nil {
 		message += "\n⚠️ A lista dos comandos será atualizada na próxima conexão."
@@ -324,7 +323,7 @@ func (c *Client) handleAMPIdleRegistrationCommand(
 		return
 	}
 
-	instanceName, exists := data.OptString("servidor")
+	instanceName, exists := optStringAny(data, "servidor", "server")
 	instanceName = strings.TrimSpace(instanceName)
 	if !exists || instanceName == "" {
 		c.updateInteractionMessage(
@@ -346,7 +345,7 @@ func (c *Client) handleAMPIdleRegistrationCommand(
 		c.updateInteractionMessage(
 			event,
 			fmt.Sprintf(
-				"ℹ️ **%s** já está cadastrada no motor de Idle.",
+				i18n.Choose("ℹ️ **%s** já está cadastrada no motor de Idle.", "ℹ️ **%s** is already registered in the Idle engine."),
 				ampInstanceDisplayName(instance),
 			),
 		)
@@ -382,8 +381,7 @@ func (c *Client) handleAMPIdleRegistrationCommand(
 	c.requestStatusRefresh()
 
 	message := fmt.Sprintf(
-		"✅ **%s** foi adicionada ao Idle automático.\n"+
-			"Detector: `API AMP` • Limite: `15 min` • Proteção inicial: `5 min`.",
+		i18n.Choose("✅ **%s** foi adicionada ao Idle automático.\nDetector: `API AMP` • Limite: `15 min` • Proteção inicial: `5 min`.", "✅ **%s** was added to automatic Idle.\nDetector: `AMP API` • Limit: `15 min` • Startup protection: `5 min`."),
 		ampInstanceDisplayName(instance),
 	)
 	if registrationErr != nil {
@@ -416,7 +414,7 @@ func (c *Client) handleAMPInstanceVisibilityCommand(
 		return
 	}
 
-	instanceName, exists := data.OptString("servidor")
+	instanceName, exists := optStringAny(data, "servidor", "server")
 	instanceName = strings.TrimSpace(instanceName)
 	if !exists || instanceName == "" {
 		c.updateInteractionMessage(
@@ -463,13 +461,13 @@ func (c *Client) handleAMPInstanceVisibilityCommand(
 	}
 
 	if !changed {
-		state := "visível"
+		state := i18n.Choose("visível", "visible")
 		if hidden {
-			state = "oculta"
+			state = i18n.Choose("oculta", "hidden")
 		}
 		c.updateInteractionMessage(
 			event,
-			fmt.Sprintf("ℹ️ **%s** já está %s no Discord.", instanceName, state),
+			fmt.Sprintf(i18n.Choose("ℹ️ **%s** já está %s no Discord.", "ℹ️ **%s** is already %s in Discord."), instanceName, state),
 		)
 		return
 	}
@@ -479,12 +477,12 @@ func (c *Client) handleAMPInstanceVisibilityCommand(
 	defer cancel()
 	registrationErr := c.registerCommands(ctx)
 
-	action := "voltou a aparecer"
+	action := i18n.Choose("voltou a aparecer", "is visible again")
 	if hidden {
-		action = "foi ocultada"
+		action = i18n.Choose("foi ocultada", "was hidden")
 	}
 	message := fmt.Sprintf(
-		"✅ **%s** %s no painel e nos comandos do Discord.",
+		i18n.Choose("✅ **%s** %s no painel e nos comandos do Discord.", "✅ **%s** %s in the Discord dashboard and commands."),
 		instanceName,
 		action,
 	)
@@ -509,7 +507,7 @@ func (c *Client) handleAMPHiddenInstancesCommand(
 	hiddenNames := c.hiddenInstanceNames()
 	message := "ℹ️ Nenhuma instância está oculta no Discord."
 	if len(hiddenNames) > 0 {
-		message = "**Instâncias ocultas:**\n- `" +
+		message = i18n.Choose("**Instâncias ocultas:**\n- `", "**Hidden instances:**\n- `") +
 			strings.Join(hiddenNames, "`\n- `") + "`"
 	}
 

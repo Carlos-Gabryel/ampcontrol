@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
@@ -91,7 +92,7 @@ func (c *Client) handleAMPInteractionEvent(
 
 		c.sendInteractionMessage(
 			event,
-			"⛔ O AmpControl só aceita comandos no canal <#"+
+			i18n.Choose("⛔ O AmpControl só aceita comandos no canal <#", "⛔ AmpControl only accepts commands in channel <#")+
 				c.notificationChannelID.String()+">.",
 		)
 

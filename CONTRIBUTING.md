@@ -1,5 +1,7 @@
 # Como contribuir
 
+[English](CONTRIBUTING.en.md) · **Português (Brasil)**
+
 Contribuições são bem-vindas. Antes de uma alteração grande, abra uma discussão explicando o problema e a compatibilidade esperada.
 
 ## Ambiente
@@ -8,6 +10,7 @@ Contribuições são bem-vindas. Antes de uma alteração grande, abra uma discu
 2. Crie uma branch a partir da principal.
 3. Não use credenciais ou IDs reais em testes, exemplos ou commits.
 4. Preserve compatibilidade com instalações existentes sempre que possível.
+5. Toda mudança visível ao usuário deve preservar os comportamentos `pt-BR` e `en-US`.
 
 Antes de enviar:
 

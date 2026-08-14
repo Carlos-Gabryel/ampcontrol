@@ -56,7 +56,7 @@ func (c *Client) reserveAMPCommandCooldown(
 		return ampCommandCooldownDecision{Allowed: true}
 	}
 
-	server, _ := data.OptString("servidor")
+	server, _ := optStringAny(data, "servidor", "server")
 	return c.commandCooldowns.reserve(userID, server)
 }
 

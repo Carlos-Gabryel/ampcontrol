@@ -1,5 +1,7 @@
 # Política de segurança
 
+[English](SECURITY.en.md) · **Português (Brasil)**
+
 ## Versões suportadas
 
 Até a primeira versão estável, correções de segurança são aplicadas somente à versão mais recente da branch principal. Instalações antigas devem atualizar antes de solicitar suporte.

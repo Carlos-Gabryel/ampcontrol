@@ -1,10 +1,10 @@
-language = "pt-BR"
+language = "en-US"
 
 [discord]
-guild_id = "SEU_ID_DO_SERVIDOR"
-notification_channel_id = "ID_DO_CANAL_DO_PAINEL"
-audit_channel_id = "ID_DO_CANAL_DE_AUDITORIA"
-owner_user_id = "SEU_ID_DE_USUARIO"
+guild_id = "YOUR_DISCORD_SERVER_ID"
+notification_channel_id = "DASHBOARD_CHANNEL_ID"
+audit_channel_id = "AUDIT_CHANNEL_ID"
+owner_user_id = "YOUR_USER_ID"
 admin_role_ids = []
 restrict_commands_to_channel = true
 allow_discord_administrators = false

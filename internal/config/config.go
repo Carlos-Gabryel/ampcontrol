@@ -7,11 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/secret"
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
+	Language                      i18n.Language
 	DiscordToken                  string
 	DiscordGuildID                string
 	DiscordNotificationChannelID  string
@@ -45,6 +47,7 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
+		Language: i18n.Language(strings.TrimSpace(os.Getenv("AMPCONTROL_LANGUAGE"))),
 		DiscordGuildID: strings.TrimSpace(
 			os.Getenv("DISCORD_GUILD_ID"),
 		),
@@ -74,6 +77,10 @@ func Load() (*Config, error) {
 		),
 	}
 	applyFileDefaults(cfg, fileConfig)
+	cfg.Language, err = i18n.Parse(string(cfg.Language))
+	if err != nil {
+		return nil, err
+	}
 
 	cfg.DiscordToken, err = secret.ReadRequired("discord_token", "DISCORD_TOKEN")
 	if err != nil {

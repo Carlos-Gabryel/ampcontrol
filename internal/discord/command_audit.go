@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
@@ -73,7 +74,7 @@ func (c *Client) commandAuditDecision(
 	channelAllowed bool,
 ) (bool, string) {
 	if !channelAllowed {
-		return false, "Recusado: canal não autorizado"
+		return false, i18n.Choose("Recusado: canal não autorizado", "Rejected: unauthorized channel")
 	}
 
 	if data.CommandName() == "ampconfig" && !ampConfigCommandAuthorized(
@@ -83,10 +84,10 @@ func (c *Client) commandAuditDecision(
 		c.adminRoleIDs,
 		c.allowAdministrators,
 	) {
-		return false, "Recusado: usuário sem permissão"
+		return false, i18n.Choose("Recusado: usuário sem permissão", "Rejected: user lacks permission")
 	}
 
-	return true, "Recebido"
+	return true, i18n.Choose("Recebido", "Received")
 }
 
 func newCommandAuditRecord(
@@ -105,7 +106,7 @@ func newCommandAuditRecord(
 	server := ""
 	for _, name := range optionNames {
 		value := data.Options[name].String()
-		if name == "servidor" {
+		if name == "servidor" || name == "server" {
 			server = value
 			continue
 		}
@@ -370,17 +371,24 @@ func classifyCommandAuditResponse(
 	trimmed := strings.TrimSpace(content)
 	lower := strings.ToLower(trimmed)
 
-	if strings.Contains(lower, "já possui uma operação em andamento") {
+	if strings.Contains(lower, "já possui uma operação em andamento") ||
+		strings.Contains(lower, "already has an operation in progress") {
 		return commandAuditPhaseFailed, true
 	}
 
 	progressPrefixes := []string{
 		"⏳ Iniciando",
+		"⏳ Starting",
 		"⏳ Colocando",
+		"⏳ Placing",
 		"🔄 Reiniciando",
+		"🔄 Restarting",
 		"⚫ Desligando",
+		"⚫ Shutting down",
 		"⬆️ Atualizando",
+		"⬆️ Updating",
 		"⏳ Executando",
+		"⏳ Running",
 	}
 	for _, prefix := range progressPrefixes {
 		if strings.HasPrefix(trimmed, prefix) {
@@ -417,7 +425,8 @@ func inferCommandAuditFinalState(
 		strings.Contains(lower, "em idle") {
 		return "Idle"
 	}
-	if strings.Contains(lower, "transição") {
+	if strings.Contains(lower, "transição") ||
+		strings.Contains(lower, "transition") {
 		return "Em transição"
 	}
 	if strings.Contains(lower, "suspens") {
@@ -425,13 +434,13 @@ func inferCommandAuditFinalState(
 	}
 
 	switch command {
-	case "/amp iniciar", "/amp reiniciar":
+	case "/amp iniciar", "/amp reiniciar", "/amp start", "/amp restart":
 		return "Online"
-	case "/amp parar":
+	case "/amp parar", "/amp stop":
 		return "Idle"
-	case "/amp desligar":
+	case "/amp desligar", "/amp shutdown":
 		return "Offline"
-	case "/amp atualizar":
+	case "/amp atualizar", "/amp update":
 		return "Atualização concluída"
 	case "/amp status":
 		return "Painel atualizado"
@@ -445,39 +454,41 @@ func buildCommandAuditEmbed(
 	presentation commandAuditPresentation,
 ) disgoDiscord.Embed {
 	title, color, status := describeCommandAuditPhase(presentation.Phase)
+	title = i18n.Text(title)
+	status = i18n.Text(status)
 	embed := disgoDiscord.NewEmbed().
 		WithTitle(title).
 		AddField(
-			"Usuário",
+			i18n.Choose("Usuário", "User"),
 			fmt.Sprintf("<@%s> • %s\nID: `%s`", record.UserID, record.UserName, record.UserID),
 			true,
 		).
-		AddField("Comando", fmt.Sprintf("`%s`", record.Command), true).
-		AddField("Canal", fmt.Sprintf("<#%s>", record.ChannelID), true).
-		AddField("Solicitado", fmt.Sprintf("<t:%d:F>", record.CreatedAt.Unix()), true).
-		AddField("Situação", status, true).
+		AddField(i18n.Choose("Comando", "Command"), fmt.Sprintf("`%s`", record.Command), true).
+		AddField(i18n.Choose("Canal", "Channel"), fmt.Sprintf("<#%s>", record.ChannelID), true).
+		AddField(i18n.Choose("Solicitado", "Requested"), fmt.Sprintf("<t:%d:F>", record.CreatedAt.Unix()), true).
+		AddField(i18n.Choose("Situação", "Status"), status, true).
 		WithTimestamp(presentation.UpdatedAt).
 		WithColor(color)
 
 	if strings.TrimSpace(record.Server) != "" {
-		embed = embed.AddField("Servidor", fmt.Sprintf("`%s`", sanitizeAuditText(record.Server, 300)), true)
+		embed = embed.AddField(i18n.Choose("Servidor", "Server"), fmt.Sprintf("`%s`", sanitizeAuditText(record.Server, 300)), true)
 	}
 	if len(record.Options) > 0 {
-		embed = embed.AddField("Opções", strings.Join(record.Options, "\n"), false)
+		embed = embed.AddField(i18n.Choose("Opções", "Options"), strings.Join(record.Options, "\n"), false)
 	}
 	if strings.TrimSpace(presentation.FinalState) != "" {
-		embed = embed.AddField("Estado final", presentation.FinalState, true)
+		embed = embed.AddField(i18n.Choose("Estado final", "Final state"), i18n.Text(presentation.FinalState), true)
 	}
 	if presentation.Phase != commandAuditPhaseReceived &&
 		strings.TrimSpace(presentation.Result) != "" {
-		embed = embed.AddField("Resultado", presentation.Result, false)
+		embed = embed.AddField(i18n.Choose("Resultado", "Result"), i18n.Text(presentation.Result), false)
 	}
 	if presentation.Phase == commandAuditPhaseRunning ||
 		presentation.Phase == commandAuditPhaseCompleted ||
 		presentation.Phase == commandAuditPhaseFailed ||
 		presentation.Phase == commandAuditPhaseRefused {
 		embed = embed.AddField(
-			"Duração",
+			i18n.Choose("Duração", "Duration"),
 			formatCommandAuditDuration(presentation.UpdatedAt.Sub(record.CreatedAt)),
 			true,
 		)
@@ -491,15 +502,15 @@ func describeCommandAuditPhase(
 ) (string, int, string) {
 	switch phase {
 	case commandAuditPhaseRunning:
-		return "🔵 Comando em execução", 0x3498DB, "Em execução"
+		return i18n.Choose("🔵 Comando em execução", "🔵 Command running"), 0x3498DB, i18n.Choose("Em execução", "Running")
 	case commandAuditPhaseCompleted:
-		return "✅ Comando concluído", 0x57F287, "Concluído"
+		return i18n.Choose("✅ Comando concluído", "✅ Command completed"), 0x57F287, i18n.Choose("Concluído", "Completed")
 	case commandAuditPhaseFailed:
-		return "❌ Comando falhou", 0xED4245, "Falhou"
+		return i18n.Choose("❌ Comando falhou", "❌ Command failed"), 0xED4245, i18n.Choose("Falhou", "Failed")
 	case commandAuditPhaseRefused:
-		return "⛔ Comando recusado", 0xED4245, "Recusado"
+		return i18n.Choose("⛔ Comando recusado", "⛔ Command rejected"), 0xED4245, i18n.Choose("Recusado", "Rejected")
 	default:
-		return "🟡 Comando recebido", 0xFEE75C, "Aguardando processamento"
+		return i18n.Choose("🟡 Comando recebido", "🟡 Command received"), 0xFEE75C, i18n.Choose("Aguardando processamento", "Awaiting processing")
 	}
 }
 
@@ -509,7 +520,7 @@ func formatCommandAuditDuration(duration time.Duration) string {
 	}
 	duration = duration.Round(time.Second)
 	if duration < time.Second {
-		return "menos de 1 s"
+		return i18n.Choose("menos de 1 s", "less than 1 s")
 	}
 
 	hours := int(duration / time.Hour)
