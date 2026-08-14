@@ -8,6 +8,7 @@ import (
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/config"
 	discordClient "github.com/Carlos-Gabryel/ampcontrol/internal/discord"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/logger"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
@@ -24,6 +25,7 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	i18n.SetDefault(cfg.Language)
 
 	log := logger.New(
 		cfg.LogLevel,

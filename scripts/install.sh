@@ -23,6 +23,7 @@ START_SERVICE=true
 TEMP_DIRECTORY=""
 LEGACY_DIRECTORY=""
 LEGACY_ENV_FILE=""
+INSTALL_LANGUAGE=""
 
 cleanup() {
     if [[ -n "$TEMP_DIRECTORY" && -d "$TEMP_DIRECTORY" ]]; then
@@ -38,8 +39,9 @@ fail() {
 
 show_usage() {
     cat <<'EOF'
-Uso: sudo ./scripts/install.sh [--binary CAMINHO] [--no-start] [--migrate-legacy DIRETÓRIO]
+Usage / Uso: sudo ./scripts/install.sh [--language pt-BR|en-US] [--binary PATH/CAMINHO] [--no-start] [--migrate-legacy DIRECTORY/DIRETÓRIO]
 
+  --language         selects the installation language / seleciona o idioma da instalação
   --binary CAMINHO  instala um binário já compilado
   --no-start         instala sem habilitar ou iniciar o serviço
   --migrate-legacy   importa uma instalação antiga, normalmente /opt/ampcontrol
@@ -62,6 +64,11 @@ while (($# > 0)); do
             LEGACY_DIRECTORY="${2%/}"
             shift 2
             ;;
+        --language)
+            (($# >= 2)) || fail "--language requires a value / exige um valor"
+            INSTALL_LANGUAGE="$2"
+            shift 2
+            ;;
         -h|--help)
             show_usage
             exit 0
@@ -75,6 +82,35 @@ done
 [[ "$(uname -s)" == "Linux" ]] || fail "o instalador inicial oferece suporte apenas a Linux"
 [[ "$EUID" -eq 0 ]] || fail "execute este instalador com sudo"
 [[ -t 0 ]] || fail "o instalador precisa de um terminal interativo"
+
+if [[ -z "$INSTALL_LANGUAGE" ]]; then
+    printf '\nChoose the installation language / Escolha o idioma da instalação:\n'
+    printf '  1) Português (Brasil)\n'
+    printf '  2) English (United States)\n'
+    while true; do
+        read -r -p 'Option / Opção [1]: ' LANGUAGE_SELECTION
+        case "${LANGUAGE_SELECTION:-1}" in
+            1|pt|pt-BR|pt-br)
+                INSTALL_LANGUAGE="pt-BR"
+                break
+                ;;
+            2|en|en-US|en-us)
+                INSTALL_LANGUAGE="en-US"
+                break
+                ;;
+            *)
+                printf 'Invalid option / Opção inválida.\n' >&2
+                ;;
+        esac
+    done
+else
+    case "${INSTALL_LANGUAGE,,}" in
+        pt|pt-br) INSTALL_LANGUAGE="pt-BR" ;;
+        en|en-us) INSTALL_LANGUAGE="en-US" ;;
+        *) fail "invalid language / idioma inválido: $INSTALL_LANGUAGE" ;;
+    esac
+fi
+readonly INSTALL_LANGUAGE
 
 for command_name in systemctl systemd-creds install getent sudo visudo find sort python3; do
     command -v "$command_name" >/dev/null 2>&1 || fail "dependência ausente: $command_name"
@@ -426,6 +462,8 @@ chown root:root "$CONFIG_DIRECTORY/amp-runtime.conf"
 chmod 0644 "$CONFIG_DIRECTORY/amp-runtime.conf"
 
 cat > "$CONFIG_DIRECTORY/config.toml" <<EOF
+language = "$INSTALL_LANGUAGE"
+
 [discord]
 guild_id = "$(toml_escape "$DISCORD_GUILD_ID")"
 notification_channel_id = "$(toml_escape "$DISCORD_PANEL_CHANNEL_ID")"

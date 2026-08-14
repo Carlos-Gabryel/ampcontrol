@@ -8,7 +8,9 @@ import (
 
 func TestLoadFileConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	content := []byte(`[discord]
+	content := []byte(`language = "en-US"
+
+[discord]
 guild_id = "111111111111111111"
 notification_channel_id = "222222222222222222"
 audit_channel_id = "333333333333333333"
@@ -37,6 +39,9 @@ level = "debug"
 	if result.Discord.GuildID != "111111111111111111" || result.AMP.Username != "amp" {
 		t.Fatalf("configuração inesperada: %#v", result)
 	}
+	if result.Language != "en-US" {
+		t.Fatalf("idioma inesperado: %q", result.Language)
+	}
 	if result.Discord.RestrictCommandsToChannel == nil || *result.Discord.RestrictCommandsToChannel ||
 		len(result.Discord.AdminRoleIDs) != 1 {
 		t.Fatalf("política Discord inesperada: %#v", result.Discord)
@@ -61,7 +66,9 @@ func TestLoadUsesTOMLAndSystemdCredentials(t *testing.T) {
 	if err := os.Mkdir(credentialDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	content := []byte(`[discord]
+	content := []byte(`language = "en-US"
+
+[discord]
 guild_id = "111111111111111111"
 notification_channel_id = "222222222222222222"
 audit_channel_id = "333333333333333333"
@@ -100,5 +107,8 @@ username = "amp-api-user"
 	}
 	if result.DiscordGuildID != "111111111111111111" || result.AMPUsername != "amp-api-user" {
 		t.Fatalf("configuração TOML inesperada: %#v", result)
+	}
+	if result.Language != "en-US" {
+		t.Fatalf("idioma inesperado: %q", result.Language)
 	}
 }

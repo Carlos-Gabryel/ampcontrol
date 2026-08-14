@@ -1,3 +1,5 @@
+language = "pt-BR"
+
 [discord]
 guild_id = "SEU_ID_DO_SERVIDOR"
 notification_channel_id = "ID_DO_CANAL_DO_PAINEL"
