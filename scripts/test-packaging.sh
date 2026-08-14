@@ -6,6 +6,11 @@ readonly SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P
 readonly PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIRECTORY/.." && pwd -P)"
 TEMP_DIRECTORY="$(mktemp -d)"
 trap 'rm -rf -- "$TEMP_DIRECTORY"' EXIT
+PYTHON_COMMAND="$(command -v python3 || command -v python || true)"
+[[ -n "$PYTHON_COMMAND" ]] || {
+    printf 'Falha: Python 3 não encontrado\n' >&2
+    exit 1
+}
 
 fail() {
     printf 'Falha: %s\n' "$1" >&2
@@ -56,5 +61,31 @@ expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Game01 extra
 expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" unknown
 
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--binary CAMINHO'
+"$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'rollback'
+
+cat > "$TEMP_DIRECTORY/legacy.env" <<'EOF'
+DISCORD_TOKEN="token sem execução"
+AMP_PASSWORD='senha # preservada'
+RCON_PASSWORD=segredo-rcon
+EOF
+[[ "$("$PYTHON_COMMAND" "$PROJECT_DIRECTORY/scripts/legacy_config.py" env "$TEMP_DIRECTORY/legacy.env" AMP_PASSWORD)" == 'senha # preservada' ]] || fail "parser seguro de .env alterou o valor"
+
+cat > "$TEMP_DIRECTORY/legacy-idle.json" <<'EOF'
+{
+  "check_interval_seconds": 30,
+  "servers": [{
+    "instance": "Game 01",
+    "enabled": true,
+    "detector": "amp_players",
+    "fallback_detector": "palworld_rcon",
+    "rcon": {"address": "127.0.0.1:25575", "password_env": "RCON_PASSWORD"}
+  }]
+}
+EOF
+"$PYTHON_COMMAND" "$PROJECT_DIRECTORY/scripts/legacy_config.py" migrate-idle \
+    "$TEMP_DIRECTORY/legacy-idle.json" "$TEMP_DIRECTORY/migrated-idle.json" "$TEMP_DIRECTORY/manifest"
+grep -q '"password_credential": "rcon_Game_01"' "$TEMP_DIRECTORY/migrated-idle.json" || fail "credencial RCON não foi convertida"
+! grep -q 'password_env' "$TEMP_DIRECTORY/migrated-idle.json" || fail "referência legada RCON permaneceu no JSON"
+grep -q $'^rcon_Game_01\tRCON_PASSWORD$' "$TEMP_DIRECTORY/manifest" || fail "manifesto RCON inválido"
 printf 'Testes dos scripts de instalação: OK\n'
 

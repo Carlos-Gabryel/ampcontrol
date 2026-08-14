@@ -29,7 +29,7 @@ O projeto foi desenvolvido para uma instalação AMP local, um servidor Discord 
 
 ## Instalação rápida
 
-Pré-requisitos: AMP já instalado, Linux com systemd e `systemd-creds`, acesso `sudo` e Go 1.26.6 ou superior. Um binário pré-compilado também pode ser informado com `--binary`.
+Pré-requisitos: AMP já instalado, Linux com systemd e `systemd-creds`, Python 3, acesso `sudo` e Go 1.26.6 ou superior. Um binário pré-compilado também pode ser informado com `--binary`.
 
 ```bash
 git clone https://github.com/Carlos-Gabryel/ampcontrol.git
@@ -40,6 +40,14 @@ sudo ./scripts/install.sh
 O assistente detecta o usuário e o inventário do AMP, configura Discord e permissões, cria as credenciais criptografadas e instala o serviço. Leia o [guia de instalação](docs/INSTALLATION.md) antes de instalar em produção.
 
 Releases oficiais incluem arquivos para Linux `amd64` e `arm64`, acompanhados de checksums SHA-256. Depois de extrair o pacote, execute `sudo ./scripts/install.sh --binary ./ampcontrol`.
+
+Instalações configuradas podem receber a versão estável mais recente com:
+
+```bash
+sudo ampcontrol-maintenance update
+```
+
+O atualizador verifica o checksum, valida a configuração com o novo binário e cria um backup antes da troca. Se a nova versão não iniciar, o rollback é automático.
 
 ## Comandos
 

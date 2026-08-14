@@ -10,14 +10,19 @@ readonly STATE_DIRECTORY="/var/lib/ampcontrol"
 readonly LIB_DIRECTORY="/usr/lib/ampcontrol"
 readonly CREDENTIAL_DIRECTORY="/etc/credstore.encrypted"
 readonly WRAPPER_PATH="/usr/local/bin/ampcontrol-amp"
+readonly MAINTENANCE_PATH="/usr/local/sbin/ampcontrol-maintenance"
 readonly SERVICE_PATH="/etc/systemd/system/ampcontrol.service"
 readonly SUDOERS_PATH="/etc/sudoers.d/ampcontrol"
+readonly CREDENTIAL_DROPIN_DIRECTORY="/etc/systemd/system/ampcontrol.service.d"
+readonly CREDENTIAL_DROPIN_PATH="$CREDENTIAL_DROPIN_DIRECTORY/credentials.conf"
 
 SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIRECTORY/.." && pwd -P)"
 BINARY_SOURCE=""
 START_SERVICE=true
 TEMP_DIRECTORY=""
+LEGACY_DIRECTORY=""
+LEGACY_ENV_FILE=""
 
 cleanup() {
     if [[ -n "$TEMP_DIRECTORY" && -d "$TEMP_DIRECTORY" ]]; then
@@ -33,10 +38,11 @@ fail() {
 
 show_usage() {
     cat <<'EOF'
-Uso: sudo ./scripts/install.sh [--binary CAMINHO] [--no-start]
+Uso: sudo ./scripts/install.sh [--binary CAMINHO] [--no-start] [--migrate-legacy DIRETÓRIO]
 
   --binary CAMINHO  instala um binário já compilado
   --no-start         instala sem habilitar ou iniciar o serviço
+  --migrate-legacy   importa uma instalação antiga, normalmente /opt/ampcontrol
 EOF
 }
 
@@ -50,6 +56,11 @@ while (($# > 0)); do
         --no-start)
             START_SERVICE=false
             shift
+            ;;
+        --migrate-legacy)
+            (($# >= 2)) || fail "--migrate-legacy exige um diretório"
+            LEGACY_DIRECTORY="${2%/}"
+            shift 2
             ;;
         -h|--help)
             show_usage
@@ -65,9 +76,30 @@ done
 [[ "$EUID" -eq 0 ]] || fail "execute este instalador com sudo"
 [[ -t 0 ]] || fail "o instalador precisa de um terminal interativo"
 
-for command_name in systemctl systemd-creds install getent sudo visudo find sort; do
+for command_name in systemctl systemd-creds install getent sudo visudo find sort python3; do
     command -v "$command_name" >/dev/null 2>&1 || fail "dependência ausente: $command_name"
 done
+
+if [[ -n "$LEGACY_DIRECTORY" ]]; then
+    [[ "${AMPCONTROL_MIGRATION_TRANSACTION:-}" == "1" ]] || fail "use scripts/migrate-legacy.sh para uma migração transacional"
+    [[ "$LEGACY_DIRECTORY" == /* && -d "$LEGACY_DIRECTORY" ]] || fail "instalação legada não encontrada em $LEGACY_DIRECTORY"
+    LEGACY_ENV_FILE="$LEGACY_DIRECTORY/.env"
+    [[ -f "$LEGACY_ENV_FILE" ]] || fail "arquivo legado ausente: $LEGACY_ENV_FILE"
+fi
+
+legacy_env_value() {
+    local name="$1"
+    [[ -n "$LEGACY_ENV_FILE" ]] || return 3
+    python3 "$PROJECT_DIRECTORY/scripts/legacy_config.py" env "$LEGACY_ENV_FILE" "$name"
+}
+
+legacy_or_default() {
+    local name="$1"
+    local fallback="$2"
+    local value=""
+    value="$(legacy_env_value "$name" 2>/dev/null || true)"
+    printf '%s' "${value:-$fallback}"
+}
 
 prompt_required() {
     local prompt="$1"
@@ -195,7 +227,10 @@ printf '%s instância(s) AMP encontrada(s).\n' "$AMP_INSTANCE_COUNT"
 unset AMP_INVENTORY_OUTPUT
 
 PRESERVE_EXISTING_IDLE=false
-if [[ -f "$STATE_DIRECTORY/config/idle.json" ]]; then
+if [[ -n "$LEGACY_DIRECTORY" && -f "$LEGACY_DIRECTORY/config/idle.json" ]]; then
+    PRESERVE_EXISTING_IDLE=true
+    printf 'Configuração de Idle legada detectada e será preservada.\n'
+elif [[ -f "$STATE_DIRECTORY/config/idle.json" ]]; then
     PRESERVE_EXISTING_IDLE="$(prompt_yes_no 'Manter a configuração de Idle da instalação existente?' 'true')"
 fi
 
@@ -238,10 +273,15 @@ if [[ "$PRESERVE_EXISTING_IDLE" == false ]] && ((${#DETECTED_INSTANCES[@]} > 0))
     esac
 fi
 
-DISCORD_GUILD_ID="$(prompt_required 'ID do servidor Discord')"
-DISCORD_PANEL_CHANNEL_ID="$(prompt_required 'ID do canal do painel e comandos')"
-DISCORD_AUDIT_CHANNEL_ID="$(prompt_required 'ID do canal privado de auditoria')"
-DISCORD_OWNER_USER_ID="$(prompt_required 'ID do proprietário do bot')"
+LEGACY_GUILD_ID="$(legacy_env_value DISCORD_GUILD_ID 2>/dev/null || true)"
+if [[ -n "$LEGACY_GUILD_ID" ]]; then
+    DISCORD_GUILD_ID="$(prompt_default 'ID do servidor Discord' "$LEGACY_GUILD_ID")"
+else
+    DISCORD_GUILD_ID="$(prompt_required 'ID do servidor Discord')"
+fi
+DISCORD_PANEL_CHANNEL_ID="$(prompt_default 'ID do canal do painel e comandos' "$(legacy_or_default DISCORD_NOTIFICATION_CHANNEL_ID '')")"
+DISCORD_AUDIT_CHANNEL_ID="$(prompt_default 'ID do canal privado de auditoria' "$(legacy_or_default DISCORD_AUDIT_CHANNEL_ID '')")"
+DISCORD_OWNER_USER_ID="$(prompt_default 'ID do proprietário do bot' "$(legacy_or_default DISCORD_OWNER_USER_ID '')")"
 DISCORD_ADMIN_ROLE_IDS_RAW="$(prompt_optional 'IDs dos cargos administrativos do Discord, separados por vírgula')"
 RESTRICT_COMMAND_CHANNEL="$(prompt_yes_no 'Restringir /amp e /ampconfig ao canal do painel?' 'true')"
 ALLOW_DISCORD_ADMINISTRATORS="$(prompt_yes_no 'Autorizar automaticamente qualquer membro com permissão Administrator?' 'false')"
@@ -263,19 +303,25 @@ if [[ -n "$DISCORD_ADMIN_ROLE_IDS_RAW" ]]; then
     done
 fi
 
-AMP_API_USERNAME="$(prompt_required 'Usuário da API do AMP usado pelo bot')"
-AMP_ADS_URL="$(prompt_default 'URL local do ADS do AMP' 'http://127.0.0.1:8080')"
-AMP_PUBLIC_URL="$(prompt_optional 'URL pública do painel AMP')"
-GAME_SERVER_ADDRESS="$(prompt_optional 'Endereço público padrão dos jogos')"
-DISCORD_TOKEN="$(prompt_secret 'Token do bot Discord')"
-AMP_PASSWORD="$(prompt_secret 'Senha do usuário da API do AMP')"
+AMP_API_USERNAME="$(prompt_default 'Usuário da API do AMP usado pelo bot' "$(legacy_or_default AMP_USERNAME 'ampcontrol')")"
+AMP_ADS_URL="$(prompt_default 'URL local do ADS do AMP' "$(legacy_or_default AMP_ADS_URL 'http://127.0.0.1:8080')")"
+AMP_PUBLIC_URL="$(prompt_default 'URL pública do painel AMP' "$(legacy_or_default AMP_PUBLIC_URL '')")"
+GAME_SERVER_ADDRESS="$(prompt_default 'Endereço público padrão dos jogos' "$(legacy_or_default AMP_GAME_SERVER_ADDRESS '')")"
+DISCORD_TOKEN="$(legacy_env_value DISCORD_TOKEN 2>/dev/null || true)"
+AMP_PASSWORD="$(legacy_env_value AMP_PASSWORD 2>/dev/null || true)"
+if [[ -n "$LEGACY_DIRECTORY" && -n "$DISCORD_TOKEN" && -n "$AMP_PASSWORD" ]]; then
+    printf 'Token Discord e senha AMP serão migrados diretamente para credenciais criptografadas.\n'
+else
+    [[ -n "$DISCORD_TOKEN" ]] || DISCORD_TOKEN="$(prompt_secret 'Token do bot Discord')"
+    [[ -n "$AMP_PASSWORD" ]] || AMP_PASSWORD="$(prompt_secret 'Senha do usuário da API do AMP')"
+fi
 
 printf '\nResumo:\n'
 printf '  AMP: usuário Linux %s, gerenciador %s\n' "$AMP_SYSTEM_USER" "$AMP_MANAGER_PATH"
 printf '  Discord: servidor %s, painel %s, auditoria %s\n' "$DISCORD_GUILD_ID" "$DISCORD_PANEL_CHANNEL_ID" "$DISCORD_AUDIT_CHANNEL_ID"
 printf '  Instalação: %s\n' "$LIB_DIRECTORY"
 read -r -p 'Continuar com a instalação? [s/N]: ' CONFIRMATION
-[[ "$CONFIRMATION" =~ ^[sSyY]$ ]] || { printf 'Instalação cancelada.\n'; exit 0; }
+[[ "$CONFIRMATION" =~ ^[sSyY]$ ]] || { printf 'Instalação cancelada.\n'; exit 10; }
 
 if [[ -z "$BINARY_SOURCE" ]]; then
     command -v go >/dev/null 2>&1 || fail "Go não foi encontrado; instale Go 1.26.6+ ou use --binary"
@@ -287,7 +333,7 @@ fi
 [[ -f "$BINARY_SOURCE" && -x "$BINARY_SOURCE" ]] || fail "binário inválido: $BINARY_SOURCE"
 
 BACKUP_REQUIRED=false
-for existing_path in "$CONFIG_DIRECTORY" "$STATE_DIRECTORY" "$LIB_DIRECTORY/ampcontrol" "$WRAPPER_PATH" "$SERVICE_PATH" "$SUDOERS_PATH"; do
+for existing_path in "$CONFIG_DIRECTORY" "$STATE_DIRECTORY" "$LIB_DIRECTORY/ampcontrol" "$WRAPPER_PATH" "$MAINTENANCE_PATH" "$SERVICE_PATH" "$SUDOERS_PATH" "$CREDENTIAL_DROPIN_PATH"; do
     if [[ -e "$existing_path" ]]; then
         BACKUP_REQUIRED=true
         break
@@ -300,9 +346,16 @@ if [[ "$BACKUP_REQUIRED" == true ]]; then
     [[ ! -e "$STATE_DIRECTORY" ]] || cp -a -- "$STATE_DIRECTORY" "$BACKUP_DIRECTORY/state"
     [[ ! -e "$LIB_DIRECTORY/ampcontrol" ]] || cp -a -- "$LIB_DIRECTORY/ampcontrol" "$BACKUP_DIRECTORY/binary"
     [[ ! -e "$WRAPPER_PATH" ]] || cp -a -- "$WRAPPER_PATH" "$BACKUP_DIRECTORY/wrapper"
+    [[ ! -e "$MAINTENANCE_PATH" ]] || cp -a -- "$MAINTENANCE_PATH" "$BACKUP_DIRECTORY/maintenance"
     [[ ! -e "$SERVICE_PATH" ]] || cp -a -- "$SERVICE_PATH" "$BACKUP_DIRECTORY/service"
     [[ ! -e "$SUDOERS_PATH" ]] || cp -a -- "$SUDOERS_PATH" "$BACKUP_DIRECTORY/sudoers"
+    [[ ! -e "$CREDENTIAL_DROPIN_PATH" ]] || cp -a -- "$CREDENTIAL_DROPIN_PATH" "$BACKUP_DIRECTORY/credentials.conf"
     printf 'Backup da instalação anterior criado em %s\n' "$BACKUP_DIRECTORY"
+fi
+
+if [[ -n "$LEGACY_DIRECTORY" ]]; then
+    printf 'Pausando o serviço para copiar um estado consistente...\n'
+    systemctl stop ampcontrol.service
 fi
 
 if ! getent group "$SERVICE_GROUP" >/dev/null; then
@@ -318,7 +371,16 @@ install -d -o root -g root -m 0755 "$LIB_DIRECTORY"
 install -d -o root -g root -m 0700 "$CREDENTIAL_DIRECTORY"
 install -o root -g root -m 0755 "$BINARY_SOURCE" "$LIB_DIRECTORY/ampcontrol"
 install -o root -g root -m 0755 "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" "$WRAPPER_PATH"
-if [[ "$PRESERVE_EXISTING_IDLE" == false ]]; then
+install -o root -g root -m 0755 "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" "$MAINTENANCE_PATH"
+if [[ -n "$LEGACY_DIRECTORY" && -f "$LEGACY_DIRECTORY/config/idle.json" ]]; then
+    install -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0640 "$LEGACY_DIRECTORY/config/idle.json" "$STATE_DIRECTORY/config/idle.json"
+    if [[ -d "$LEGACY_DIRECTORY/data" ]]; then
+        cp -a -- "$LEGACY_DIRECTORY/data/." "$STATE_DIRECTORY/data/"
+        chown -R "$SERVICE_USER":"$SERVICE_GROUP" "$STATE_DIRECTORY/data"
+        find "$STATE_DIRECTORY/data" -type d -exec chmod 0700 {} +
+        find "$STATE_DIRECTORY/data" -type f -exec chmod 0600 {} +
+    fi
+elif [[ "$PRESERVE_EXISTING_IDLE" == false ]]; then
     install -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0640 "$PROJECT_DIRECTORY/config/idle.json" "$STATE_DIRECTORY/config/idle.json"
 fi
 
@@ -399,6 +461,41 @@ encrypt_credential discord_token "$DISCORD_TOKEN"
 encrypt_credential amp_password "$AMP_PASSWORD"
 unset DISCORD_TOKEN AMP_PASSWORD
 
+RCON_MANIFEST=""
+if [[ -f "$STATE_DIRECTORY/config/idle.json" ]]; then
+    RCON_MANIFEST="$(mktemp)"
+    MIGRATED_IDLE="$(mktemp)"
+    python3 "$PROJECT_DIRECTORY/scripts/legacy_config.py" migrate-idle \
+        "$STATE_DIRECTORY/config/idle.json" "$MIGRATED_IDLE" "$RCON_MANIFEST"
+    install -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0640 "$MIGRATED_IDLE" "$STATE_DIRECTORY/config/idle.json"
+    while IFS=$'\t' read -r credential_name environment_name; do
+        [[ -n "$credential_name" ]] || continue
+        credential_path="$CREDENTIAL_DIRECTORY/ampcontrol.$credential_name"
+        if [[ -n "$environment_name" ]]; then
+            rcon_password="$(legacy_env_value "$environment_name" 2>/dev/null || true)"
+            [[ -n "$rcon_password" ]] || fail "a variável RCON $environment_name não existe no .env legado"
+            encrypt_credential "$credential_name" "$rcon_password"
+            unset rcon_password
+        fi
+        [[ -f "$credential_path" ]] || fail "credencial RCON ausente: $credential_name"
+    done < "$RCON_MANIFEST"
+fi
+
+install -d -o root -g root -m 0755 "$CREDENTIAL_DROPIN_DIRECTORY"
+{
+    printf '[Service]\n'
+    if [[ -n "$RCON_MANIFEST" ]]; then
+        while IFS=$'\t' read -r credential_name _; do
+            [[ -n "$credential_name" ]] || continue
+            printf 'LoadCredentialEncrypted=%s:%s/ampcontrol.%s\n' \
+                "$credential_name" "$CREDENTIAL_DIRECTORY" "$credential_name"
+        done < "$RCON_MANIFEST"
+    fi
+} > "$CREDENTIAL_DROPIN_PATH.new"
+install -o root -g root -m 0644 "$CREDENTIAL_DROPIN_PATH.new" "$CREDENTIAL_DROPIN_PATH"
+rm -f -- "$CREDENTIAL_DROPIN_PATH.new"
+[[ -z "$RCON_MANIFEST" ]] || rm -f -- "$RCON_MANIFEST" "$MIGRATED_IDLE"
+
 TEMP_SUDOERS="$(mktemp)"
 printf '%s ALL=(%s) NOPASSWD: %s *\n' "$SERVICE_USER" "$AMP_SYSTEM_USER" "$WRAPPER_PATH" > "$TEMP_SUDOERS"
 chmod 0440 "$TEMP_SUDOERS"
@@ -409,7 +506,8 @@ rm -f -- "$TEMP_SUDOERS"
 install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol.service" "$SERVICE_PATH"
 systemctl daemon-reload
 if [[ "$START_SERVICE" == true ]]; then
-    systemctl enable --now ampcontrol.service
+    systemctl enable ampcontrol.service >/dev/null
+    systemctl restart ampcontrol.service
     systemctl is-active --quiet ampcontrol.service || fail "o serviço não iniciou; consulte journalctl -u ampcontrol.service"
     printf '\nAmpControl instalado e em execução.\n'
 else

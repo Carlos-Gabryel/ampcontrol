@@ -8,6 +8,8 @@ Este guia instala uma cópia nova do AmpControl sem alterar as instâncias de jo
 - AMP instalado na mesma máquina;
 - usuário com `sudo`;
 - Git;
+- Python 3 (leitura segura da configuração legada);
+- `curl`, `tar` e `sha256sum` para atualizações;
 - Go 1.26.6 ou superior, salvo se usar `--binary`;
 - um servidor Discord e permissão para adicionar aplicações.
 
@@ -90,6 +92,49 @@ No Discord:
 
 ## 7. Atualizar ou recuperar
 
-Reexecute o instalador a partir da versão desejada. Ele valida antes de reiniciar o serviço e mantém backups locais. Se a validação falhar, consulte o journal e restaure o último backup criado pelo instalador.
+Para instalar a release estável mais recente:
+
+```bash
+sudo ampcontrol-maintenance update
+```
+
+Para escolher uma versão ou consultar o estado:
+
+```bash
+sudo ampcontrol-maintenance update v1.2.3
+sudo ampcontrol-maintenance status
+```
+
+O atualizador baixa a release oficial, confere o SHA-256 publicado, valida a configuração atual em uma unidade systemd temporária e só então substitui o binário. Ele preserva TOML, credenciais, cadastro de Idle e demais estados locais. Uma falha de instalação ou inicialização aciona rollback automático.
+
+Para restaurar manualmente a versão anterior:
+
+```bash
+sudo ampcontrol-maintenance rollback
+```
+
+Os backups ficam em `/var/backups/ampcontrol`. Não remova o último backup antes de validar Discord, painel, Idle e RCON.
+
+## 8. Migrar uma instalação antiga
+
+Instalações antigas em `/opt/ampcontrol`, baseadas em `.env`, devem usar o migrador transacional:
+
+```bash
+git clone https://github.com/Carlos-Gabryel/ampcontrol.git
+cd ampcontrol
+sudo ./scripts/migrate-legacy.sh /opt/ampcontrol
+```
+
+O migrador:
+
+1. cria um snapshot dos arquivos gerenciados e registra o estado do serviço;
+2. lê o `.env` sem executá-lo;
+3. converte token Discord, senha AMP e senhas RCON para `systemd-creds`;
+4. preserva `config/idle.json` e todo o conteúdo persistente de `data/`;
+5. solicita apenas os dados ausentes, como o ID do servidor Discord;
+6. reinicia o serviço com o layout compartilhável;
+7. restaura automaticamente a instalação anterior se o novo serviço falhar.
+
+A pasta legada e o snapshot permanecem intactos após uma migração bem-sucedida. Remova-os somente depois da validação funcional e de um backup externo.
 
 O antigo modo baseado em `.env` continua aceito para migração, mas novas instalações devem usar TOML e credenciais systemd.
