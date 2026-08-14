@@ -93,6 +93,7 @@ username = "amp-api-user"
 	t.Setenv("AMPCONTROL_CONFIG", configPath)
 	t.Setenv("CREDENTIALS_DIRECTORY", credentialDirectory)
 	for _, name := range []string{
+		"AMPCONTROL_LANGUAGE",
 		"DISCORD_TOKEN", "DISCORD_GUILD_ID", "DISCORD_NOTIFICATION_CHANNEL_ID",
 		"DISCORD_AUDIT_CHANNEL_ID", "DISCORD_OWNER_USER_ID", "AMP_USERNAME", "AMP_PASSWORD",
 	} {
