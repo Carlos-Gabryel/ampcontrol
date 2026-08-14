@@ -15,6 +15,7 @@ Antes de enviar:
 gofmt -w ./cmd ./internal
 go test ./...
 go vet ./...
+bash scripts/test-packaging.sh
 ```
 
 Testes de integração precisam de uma instalação AMP isolada e nunca devem apontar para produção:

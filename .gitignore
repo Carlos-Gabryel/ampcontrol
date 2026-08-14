@@ -9,4 +9,6 @@ data/
 *.dylib
 
 /ampcontrol
+coverage.out
+dist/
 /.ampcontrol.before-*

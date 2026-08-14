@@ -39,6 +39,8 @@ sudo ./scripts/install.sh
 
 O assistente detecta o usuário e o inventário do AMP, configura Discord e permissões, cria as credenciais criptografadas e instala o serviço. Leia o [guia de instalação](docs/INSTALLATION.md) antes de instalar em produção.
 
+Releases oficiais incluem arquivos para Linux `amd64` e `arm64`, acompanhados de checksums SHA-256. Depois de extrair o pacote, execute `sudo ./scripts/install.sh --binary ./ampcontrol`.
+
 ## Comandos
 
 Comandos públicos:
@@ -78,6 +80,8 @@ go test -tags=integration ./...
 ```
 
 Veja [Como contribuir](CONTRIBUTING.md).
+
+Cada pull request executa testes com detector de corrida, `go vet`, ShellCheck, testes do empacotamento, `govulncheck` e CodeQL. Tags no formato `v*` geram uma release somente após os testes passarem.
 
 ## Licença e marcas
 
