@@ -63,6 +63,7 @@ expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Game01 extra
 expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" unknown
 
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--binary CAMINHO'
+"$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --help | grep -q -- '--binary CAMINHO'
 "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'rollback'
 
 cat > "$TEMP_DIRECTORY/legacy.env" <<'EOF'
