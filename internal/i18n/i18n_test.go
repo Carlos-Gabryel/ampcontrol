@@ -1,6 +1,9 @@
 package i18n
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCatalogsContainTheSameKeys(t *testing.T) {
 	portuguese := catalogs[PortugueseBrazil]
@@ -30,5 +33,23 @@ func TestParseLanguageAliases(t *testing.T) {
 	}
 	if _, err := Parse("fr"); err == nil {
 		t.Fatal("unsupported language should fail")
+	}
+}
+
+func TestRuntimeTextUsesSelectedLanguage(t *testing.T) {
+	previous := Default()
+	t.Cleanup(func() { SetDefault(previous) })
+
+	SetDefault(PortugueseBrazil)
+	if got := Text("⚠️ Nenhum subcomando foi informado."); got != "⚠️ Nenhum subcomando foi informado." {
+		t.Fatalf("Portuguese text changed: %q", got)
+	}
+
+	SetDefault(EnglishUS)
+	if got := Text("⚠️ Nenhum subcomando foi informado."); got != "⚠️ No subcommand was provided." {
+		t.Fatalf("English translation = %q", got)
+	}
+	if got := Text("⏱️ Aguarde **10 s** antes de enviar outro comando para a instância `demo`."); strings.Contains(got, "Aguarde") || strings.Contains(got, "instância") {
+		t.Fatalf("dynamic text was not translated: %q", got)
 	}
 }

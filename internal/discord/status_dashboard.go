@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
@@ -564,14 +565,14 @@ func shouldDeleteChannelMessage(
 func formatAMPUptime(raw string) string {
 	parts := strings.Split(strings.TrimSpace(raw), ":")
 	if len(parts) != 4 {
-		return "indisponível"
+		return i18n.Choose("indisponível", "unavailable")
 	}
 
 	values := make([]int, len(parts))
 	for index, part := range parts {
 		value, err := strconv.Atoi(part)
 		if err != nil || value < 0 {
-			return "indisponível"
+			return i18n.Choose("indisponível", "unavailable")
 		}
 		values[index] = value
 	}

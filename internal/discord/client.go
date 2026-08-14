@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
@@ -247,6 +248,7 @@ func (c *Client) sendInteractionMessage(
 	event *events.ApplicationCommandInteractionCreate,
 	content string,
 ) {
+	content = i18n.Text(content)
 	message := discord.NewMessageCreate().
 		WithContent(content).
 		WithEphemeral(true)
@@ -288,6 +290,7 @@ func (c *Client) updateInteractionMessageByToken(
 	interactionToken string,
 	content string,
 ) {
+	content = i18n.Text(content)
 	message := discord.NewMessageUpdate().
 		WithContent(content)
 
@@ -341,6 +344,7 @@ func (c *Client) deleteInteractionResponseLater(
 func (c *Client) sendChannelMessage(
 	content string,
 ) error {
+	content = i18n.Text(content)
 	message := discord.NewMessageCreate().
 		WithContent(content)
 

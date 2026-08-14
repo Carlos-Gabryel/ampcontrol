@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
@@ -57,28 +58,28 @@ func (c *Client) handleAMPCommand(
 	case "status":
 		c.handleAMPStatusCommand(event)
 
-	case "iniciar":
+	case "iniciar", "start":
 		c.handleAMPControlCommand(
 			event,
 			data,
 			ampCommandOperationStart,
 		)
 
-	case "parar":
+	case "parar", "stop":
 		c.handleAMPControlCommand(
 			event,
 			data,
 			ampCommandOperationStop,
 		)
 
-	case "reiniciar":
+	case "reiniciar", "restart":
 		c.handleAMPControlCommand(
 			event,
 			data,
 			ampCommandOperationRestart,
 		)
 
-	case "desligar":
+	case "desligar", "shutdown":
 		if !ampCommandConfirmed(data) {
 			c.sendInteractionMessage(
 				event,
@@ -94,7 +95,7 @@ func (c *Client) handleAMPCommand(
 			ampCommandOperationShutdown,
 		)
 
-	case "atualizar":
+	case "atualizar", "update":
 		if !ampCommandConfirmed(data) {
 			c.sendInteractionMessage(
 				event,
@@ -151,11 +152,9 @@ func ampCommandPrivileged(
 func ampCommandConfirmed(
 	data disgoDiscord.SlashCommandInteractionData,
 ) bool {
-	confirmation, exists := data.OptString(
-		"confirmar",
-	)
+	confirmation, exists := optStringAny(data, "confirmar", "confirm")
 
-	return exists && confirmation == "sim"
+	return exists && (confirmation == "sim" || confirmation == "yes")
 }
 
 func (c *Client) handleAMPStatusCommand(
@@ -307,9 +306,7 @@ func (c *Client) handleAMPControlCommand(
 		return
 	}
 
-	instanceName, exists := data.OptString(
-		"servidor",
-	)
+	instanceName, exists := optStringAny(data, "servidor", "server")
 	if !exists || strings.TrimSpace(instanceName) == "" {
 		c.updateInteractionMessage(
 			event,
@@ -1079,11 +1076,11 @@ func describeAMPInstanceStatus(
 	}
 
 	if statusView.ApplicationError != nil {
-		return "🔴", "Offline — estado indisponível"
+		return "🔴", i18n.Choose("Offline — estado indisponível", "Offline — state unavailable")
 	}
 
 	if statusView.ApplicationStatus == nil {
-		return "🔴", "Offline — estado indisponível"
+		return "🔴", i18n.Choose("Offline — estado indisponível", "Offline — state unavailable")
 	}
 
 	status := *statusView.ApplicationStatus
@@ -1102,10 +1099,10 @@ func describeAMPInstanceStatus(
 		)
 
 	case amp.ApplicationPhaseFailed:
-		return "🔴", "Offline — falha"
+		return "🔴", i18n.Choose("Offline — falha", "Offline — failure")
 
 	case amp.ApplicationPhaseSuspended:
-		return "🔴", "Offline — suspenso"
+		return "🔴", i18n.Choose("Offline — suspenso", "Offline — suspended")
 
 	default:
 		return "🔴", fmt.Sprintf(
@@ -1134,22 +1131,22 @@ func ampOperationProgressMessage(
 ) string {
 	switch operation {
 	case ampCommandOperationStart:
-		return "⏳ Iniciando"
+		return i18n.Choose("⏳ Iniciando", "⏳ Starting")
 
 	case ampCommandOperationStop:
-		return "⏳ Colocando em modo Idle"
+		return i18n.Choose("⏳ Colocando em modo Idle", "⏳ Placing in Idle mode")
 
 	case ampCommandOperationRestart:
-		return "🔄 Reiniciando o processo do jogo de"
+		return i18n.Choose("🔄 Reiniciando o processo do jogo de", "🔄 Restarting the game process for")
 
 	case ampCommandOperationShutdown:
-		return "⚫ Desligando completamente a instância AMP de"
+		return i18n.Choose("⚫ Desligando completamente a instância AMP de", "⚫ Shutting down the AMP instance for")
 
 	case ampCommandOperationUpdate:
-		return "⬆️ Atualizando a instalação AMP de"
+		return i18n.Choose("⬆️ Atualizando a instalação AMP de", "⬆️ Updating the AMP instance for")
 
 	default:
-		return "⏳ Executando uma operação em"
+		return i18n.Choose("⏳ Executando uma operação em", "⏳ Running an operation on")
 	}
 }
 

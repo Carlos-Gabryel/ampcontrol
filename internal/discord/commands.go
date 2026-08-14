@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/omit"
@@ -161,46 +162,47 @@ func (c *Client) refreshCommandsForInventory(
 func buildAMPCommand(
 	instanceChoices []discord.ApplicationCommandOptionChoiceString,
 ) discord.SlashCommandCreate {
+	l := i18n.Choose
 	return discord.SlashCommandCreate{
 		Name:        "amp",
-		Description: "Controla os jogos e as instâncias do AMP",
+		Description: l("Controla os jogos e as instâncias do AMP", "Controls AMP game servers and instances"),
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionSubCommand{
 				Name:        "status",
-				Description: "Mostra os estados Offline, Idle e Online",
+				Description: l("Mostra os estados Offline, Idle e Online", "Shows Offline, Idle, and Online states"),
 			},
 			buildAMPControlSubCommand(
-				"iniciar",
-				"Inicia a instância e o processo do jogo",
-				"Servidor que será iniciado",
+				l("iniciar", "start"),
+				l("Inicia a instância e o processo do jogo", "Starts the instance and game process"),
+				l("Servidor que será iniciado", "Server to start"),
 				instanceChoices,
 			),
 			buildAMPControlSubCommand(
-				"parar",
-				"Para somente o jogo e mantém a instância em Idle",
-				"Servidor que será colocado em Idle",
+				l("parar", "stop"),
+				l("Para somente o jogo e mantém a instância em Idle", "Stops only the game and keeps the instance Idle"),
+				l("Servidor que será colocado em Idle", "Server to place in Idle"),
 				instanceChoices,
 			),
 			buildAMPControlSubCommand(
-				"reiniciar",
-				"Reinicia somente o processo do jogo",
-				"Jogo que será reiniciado",
+				l("reiniciar", "restart"),
+				l("Reinicia somente o processo do jogo", "Restarts only the game process"),
+				l("Jogo que será reiniciado", "Game server to restart"),
 				instanceChoices,
 			),
 			buildAMPConfirmedControlSubCommand(
-				"desligar",
-				"Desliga completamente uma instância AMP",
-				"Instância AMP que será desligada",
-				"Confirma o desligamento completo da instância",
-				"Sim, desligar completamente",
+				l("desligar", "shutdown"),
+				l("Desliga completamente uma instância AMP", "Shuts down an AMP instance completely"),
+				l("Instância AMP que será desligada", "AMP instance to shut down"),
+				l("Confirma o desligamento completo da instância", "Confirms the complete instance shutdown"),
+				l("Sim, desligar completamente", "Yes, shut down completely"),
 				instanceChoices,
 			),
 			buildAMPConfirmedControlSubCommand(
-				"atualizar",
-				"Atualiza somente a instalação AMP da instância",
-				"Instância AMP que será atualizada",
-				"Confirma a atualização da instalação AMP",
-				"Sim, atualizar a instalação AMP",
+				l("atualizar", "update"),
+				l("Atualiza somente a instalação AMP da instância", "Updates the selected AMP instance"),
+				l("Instância AMP que será atualizada", "AMP instance to update"),
+				l("Confirma a atualização da instalação AMP", "Confirms the AMP instance update"),
+				l("Sim, atualizar a instalação AMP", "Yes, update the AMP instance"),
 				instanceChoices,
 			),
 		},
@@ -212,6 +214,7 @@ func buildAMPConfigCommand(
 	hiddenChoices []discord.ApplicationCommandOptionChoiceString,
 	idleCandidateChoices []discord.ApplicationCommandOptionChoiceString,
 ) discord.SlashCommandCreate {
+	l := i18n.Choose
 	configurationChoices := append(
 		append([]discord.ApplicationCommandOptionChoiceString(nil), visibleChoices...),
 		hiddenChoices...,
@@ -223,58 +226,58 @@ func buildAMPConfigCommand(
 	maximumPlayers := 100000
 	return discord.SlashCommandCreate{
 		Name:        "ampconfig",
-		Description: "Configura a apresentação das instâncias do AmpControl",
+		Description: l("Configura a apresentação das instâncias do AmpControl", "Configures AmpControl instance presentation"),
 		DefaultMemberPermissions: omit.NewPtr(
 			discord.PermissionAdministrator,
 		),
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionSubCommand{
-				Name:        "diagnostico",
-				Description: "Verifica a saúde do AmpControl e das integrações",
+				Name:        l("diagnostico", "diagnostics"),
+				Description: l("Verifica a saúde do AmpControl e das integrações", "Checks AmpControl and integration health"),
 			},
 			buildAMPControlSubCommand(
-				"ocultar",
-				"Oculta uma instância do painel e dos comandos",
-				"Instância que deixará de aparecer no Discord",
+				l("ocultar", "hide"),
+				l("Oculta uma instância do painel e dos comandos", "Hides an instance from the dashboard and commands"),
+				l("Instância que deixará de aparecer no Discord", "Instance to hide from Discord"),
 				visibleChoices,
 			),
 			discord.ApplicationCommandOptionSubCommand{
-				Name:        "configurar",
-				Description: "Altera nome, jogo, endereço, limite ou detector",
+				Name:        l("configurar", "configure"),
+				Description: l("Altera nome, jogo, endereço, limite ou detector", "Changes name, game, address, limit, or detector"),
 				Options: []discord.ApplicationCommandOption{
 					discord.ApplicationCommandOptionString{
-						Name:        "servidor",
-						Description: "Instância que será configurada",
+						Name:        l("servidor", "server"),
+						Description: l("Instância que será configurada", "Instance to configure"),
 						Required:    true,
 						Choices:     configurationChoices,
 					},
 					discord.ApplicationCommandOptionString{
-						Name:        "nome",
-						Description: "Novo nome exibido no Discord",
+						Name:        l("nome", "name"),
+						Description: l("Novo nome exibido no Discord", "New name displayed in Discord"),
 						MinLength:   &minimumTextLength,
 						MaxLength:   &maximumTextLength,
 					},
 					discord.ApplicationCommandOptionString{
-						Name:        "jogo",
-						Description: "Nome correto do jogo",
+						Name:        l("jogo", "game"),
+						Description: l("Nome correto do jogo", "Correct game name"),
 						MinLength:   &minimumTextLength,
 						MaxLength:   &maximumTextLength,
 					},
 					discord.ApplicationCommandOptionInt{
-						Name:        "maximo",
-						Description: "Quantidade máxima de jogadores exibida no painel",
+						Name:        l("maximo", "maximum"),
+						Description: l("Quantidade máxima de jogadores exibida no painel", "Maximum player count displayed on the dashboard"),
 						MinValue:    &minimumPlayers,
 						MaxValue:    &maximumPlayers,
 					},
 					discord.ApplicationCommandOptionString{
-						Name:        "endereco",
-						Description: "IP, domínio e porta usados para entrar no servidor",
+						Name:        l("endereco", "address"),
+						Description: l("IP, domínio e porta usados para entrar no servidor", "IP, domain, and port used to join the server"),
 						MinLength:   &minimumTextLength,
 						MaxLength:   &maximumAddressLength,
 					},
 					discord.ApplicationCommandOptionString{
 						Name:        "detector",
-						Description: "Método usado para confirmar jogadores conectados",
+						Description: l("Método usado para confirmar jogadores conectados", "Method used to confirm connected players"),
 						Choices: []discord.ApplicationCommandOptionChoiceString{
 							{Name: "API do AMP", Value: "amp"},
 							{Name: "API AMP + RCON Palworld", Value: "amp_palworld_rcon"},
@@ -284,34 +287,34 @@ func buildAMPConfigCommand(
 				},
 			},
 			buildAMPControlSubCommand(
-				"detalhes",
-				"Mostra a configuração atual de uma instância",
-				"Instância que será consultada",
+				l("detalhes", "details"),
+				l("Mostra a configuração atual de uma instância", "Shows an instance's current configuration"),
+				l("Instância que será consultada", "Instance to inspect"),
 				configurationChoices,
 			),
 			buildAMPConfirmedControlSubCommand(
-				"restaurar",
-				"Remove personalizações e restaura os valores originais",
-				"Instância que voltará à configuração original",
-				"Confirma a remoção das personalizações",
-				"Sim, restaurar a configuração original",
+				l("restaurar", "reset"),
+				l("Remove personalizações e restaura os valores originais", "Removes customizations and restores original values"),
+				l("Instância que voltará à configuração original", "Instance to restore"),
+				l("Confirma a remoção das personalizações", "Confirms removal of customizations"),
+				l("Sim, restaurar a configuração original", "Yes, restore the original configuration"),
 				configurationChoices,
 			),
 			buildAMPControlSubCommand(
-				"exibir",
-				"Volta a exibir uma instância no painel e nos comandos",
-				"Instância que voltará a aparecer no Discord",
+				l("exibir", "show"),
+				l("Volta a exibir uma instância no painel e nos comandos", "Shows an instance in the dashboard and commands again"),
+				l("Instância que voltará a aparecer no Discord", "Instance to show in Discord"),
 				hiddenChoices,
 			),
 			buildAMPControlSubCommand(
-				"idle-adicionar",
-				"Adiciona uma instância ao Idle automático",
-				"Instância que usará Idle ativo após 15 minutos",
+				l("idle-adicionar", "idle-add"),
+				l("Adiciona uma instância ao Idle automático", "Adds an instance to automatic Idle"),
+				l("Instância que usará Idle ativo após 15 minutos", "Instance to use active Idle after 15 minutes"),
 				idleCandidateChoices,
 			),
 			discord.ApplicationCommandOptionSubCommand{
-				Name:        "listar",
-				Description: "Lista as instâncias ocultas do Discord",
+				Name:        l("listar", "list"),
+				Description: l("Lista as instâncias ocultas do Discord", "Lists instances hidden from Discord"),
 			},
 		},
 	}
@@ -328,7 +331,7 @@ func buildAMPControlSubCommand(
 		Description: description,
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionString{
-				Name:        "servidor",
+				Name:        i18n.Choose("servidor", "server"),
 				Description: optionDescription,
 				Required:    true,
 				Choices:     instanceChoices,
@@ -350,19 +353,19 @@ func buildAMPConfirmedControlSubCommand(
 		Description: description,
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionString{
-				Name:        "servidor",
+				Name:        i18n.Choose("servidor", "server"),
 				Description: optionDescription,
 				Required:    true,
 				Choices:     instanceChoices,
 			},
 			discord.ApplicationCommandOptionString{
-				Name:        "confirmar",
+				Name:        i18n.Choose("confirmar", "confirm"),
 				Description: confirmationDescription,
 				Required:    true,
 				Choices: []discord.ApplicationCommandOptionChoiceString{
 					{
 						Name:  confirmationChoiceName,
-						Value: "sim",
+						Value: i18n.Choose("sim", "yes"),
 					},
 				},
 			},
@@ -428,7 +431,7 @@ func buildAMPChoiceName(
 		game = strings.TrimSpace(instance.Module)
 	}
 	if game == "" {
-		game = "Jogo desconhecido"
+		game = i18n.Choose("Jogo desconhecido", "Unknown game")
 	}
 
 	name := fmt.Sprintf("%s — %s", friendlyName, game)
