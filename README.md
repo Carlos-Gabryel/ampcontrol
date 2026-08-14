@@ -89,7 +89,7 @@ go test -tags=integration ./...
 
 Veja [Como contribuir](CONTRIBUTING.md).
 
-Cada pull request executa testes com detector de corrida, `go vet`, ShellCheck, testes do empacotamento, `govulncheck` e CodeQL. Tags no formato `v*` geram uma release somente após os testes passarem.
+Cada pull request executa testes com detector de corrida, `go vet`, ShellCheck, testes do empacotamento, `govulncheck` e CodeQL. Em repositórios privados sem GitHub Advanced Security, o relatório SARIF do CodeQL fica disponível como artefato da execução; em repositórios públicos, ele é enviado automaticamente ao Code scanning. Tags no formato `v*` geram uma release somente após os testes passarem.
 
 ## Licença e marcas
 
