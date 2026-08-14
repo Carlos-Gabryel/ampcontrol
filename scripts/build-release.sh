@@ -8,19 +8,21 @@ PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIRECTORY/.." && pwd -P)"
 readonly PROJECT_DIRECTORY
 readonly VERSION="${1:-dev}"
 readonly DIST_DIRECTORY="${AMPCONTROL_DIST_DIRECTORY:-$PROJECT_DIRECTORY/dist}"
+readonly LANGUAGE="${AMPCONTROL_LANGUAGE:-pt-BR}"
+msg() { if [[ "$LANGUAGE" == "en-US" ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
 
 [[ "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]] || {
-    printf 'Versão inválida: %s\n' "$VERSION" >&2
+    printf '%s: %s\n' "$(msg 'Versão inválida' 'Invalid version')" "$VERSION" >&2
     exit 2
 }
 command -v go >/dev/null 2>&1 || {
-    printf 'Go não encontrado.\n' >&2
+    printf '%s\n' "$(msg 'Go não encontrado.' 'Go was not found.')" >&2
     exit 1
 }
 
 mkdir -p "$DIST_DIRECTORY"
 if [[ -n "$(find "$DIST_DIRECTORY" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-    printf 'O diretório de saída precisa estar vazio: %s\n' "$DIST_DIRECTORY" >&2
+    printf '%s: %s\n' "$(msg 'O diretório de saída precisa estar vazio' 'The output directory must be empty')" "$DIST_DIRECTORY" >&2
     exit 1
 fi
 
@@ -54,4 +56,4 @@ done
     cd "$DIST_DIRECTORY"
     sha256sum ./*.tar.gz >checksums.txt
 )
-printf 'Artefatos criados em %s\n' "$DIST_DIRECTORY"
+printf '%s %s\n' "$(msg 'Artefatos criados em' 'Artifacts created at')" "$DIST_DIRECTORY"

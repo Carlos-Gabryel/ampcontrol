@@ -25,6 +25,10 @@ LEGACY_DIRECTORY=""
 LEGACY_ENV_FILE=""
 INSTALL_LANGUAGE=""
 
+msg() {
+    if [[ "${INSTALL_LANGUAGE:-pt-BR}" == "en-US" ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi
+}
+
 cleanup() {
     if [[ -n "$TEMP_DIRECTORY" && -d "$TEMP_DIRECTORY" ]]; then
         rm -rf -- "$TEMP_DIRECTORY"
@@ -33,25 +37,34 @@ cleanup() {
 trap cleanup EXIT
 
 fail() {
-    printf 'Erro: %s\n' "$1" >&2
+    printf '%s: %s\n' "$(msg 'Erro' 'Error')" "$1" >&2
     exit 1
 }
 
 show_usage() {
-    cat <<'EOF'
-Usage / Uso: sudo ./scripts/install.sh [--language pt-BR|en-US] [--binary PATH/CAMINHO] [--no-start] [--migrate-legacy DIRECTORY/DIRETÓRIO]
+    if [[ "${INSTALL_LANGUAGE:-}" == "en-US" ]]; then cat <<'EOF'
+Usage: sudo ./scripts/install.sh [--language pt-BR|en-US] [--binary PATH] [--no-start] [--migrate-legacy DIRECTORY]
 
-  --language         selects the installation language / seleciona o idioma da instalação
-  --binary CAMINHO  instala um binário já compilado
+  --language         selects the installation language
+  --binary PATH      installs an already compiled binary
+  --no-start         installs without enabling or starting the service
+  --migrate-legacy   imports a legacy installation, usually /opt/ampcontrol
+EOF
+    else cat <<'EOF'
+Uso: sudo ./scripts/install.sh [--language pt-BR|en-US] [--binary CAMINHO] [--no-start] [--migrate-legacy DIRETÓRIO]
+
+  --language         seleciona o idioma da instalação
+  --binary CAMINHO   instala um binário já compilado
   --no-start         instala sem habilitar ou iniciar o serviço
   --migrate-legacy   importa uma instalação antiga, normalmente /opt/ampcontrol
 EOF
+    fi
 }
 
 while (($# > 0)); do
     case "$1" in
         --binary)
-            (($# >= 2)) || fail "--binary exige um caminho"
+            (($# >= 2)) || fail "$(msg '--binary exige um caminho' '--binary requires a path')"
             BINARY_SOURCE="$2"
             shift 2
             ;;
@@ -60,7 +73,7 @@ while (($# > 0)); do
             shift
             ;;
         --migrate-legacy)
-            (($# >= 2)) || fail "--migrate-legacy exige um diretório"
+            (($# >= 2)) || fail "$(msg '--migrate-legacy exige um diretório' '--migrate-legacy requires a directory')"
             LEGACY_DIRECTORY="${2%/}"
             shift 2
             ;;
@@ -74,14 +87,14 @@ while (($# > 0)); do
             exit 0
             ;;
         *)
-            fail "opção desconhecida: $1"
+            fail "$(msg 'opção desconhecida' 'unknown option'): $1"
             ;;
     esac
 done
 
-[[ "$(uname -s)" == "Linux" ]] || fail "o instalador inicial oferece suporte apenas a Linux"
-[[ "$EUID" -eq 0 ]] || fail "execute este instalador com sudo"
-[[ -t 0 ]] || fail "o instalador precisa de um terminal interativo"
+[[ "$(uname -s)" == "Linux" ]] || fail "$(msg 'o instalador inicial oferece suporte apenas a Linux' 'the initial installer supports Linux only')"
+[[ "$EUID" -eq 0 ]] || fail "$(msg 'execute este instalador com sudo' 'run this installer with sudo')"
+[[ -t 0 ]] || fail "$(msg 'o instalador precisa de um terminal interativo' 'the installer requires an interactive terminal')"
 
 if [[ -z "$INSTALL_LANGUAGE" ]]; then
     printf '\nChoose the installation language / Escolha o idioma da instalação:\n'
@@ -111,16 +124,17 @@ else
     esac
 fi
 readonly INSTALL_LANGUAGE
+export AMPCONTROL_LANGUAGE="$INSTALL_LANGUAGE"
 
 for command_name in systemctl systemd-creds install getent sudo visudo find sort python3; do
-    command -v "$command_name" >/dev/null 2>&1 || fail "dependência ausente: $command_name"
+    command -v "$command_name" >/dev/null 2>&1 || fail "$(msg 'dependência ausente' 'missing dependency'): $command_name"
 done
 
 if [[ -n "$LEGACY_DIRECTORY" ]]; then
-    [[ "${AMPCONTROL_MIGRATION_TRANSACTION:-}" == "1" ]] || fail "use scripts/migrate-legacy.sh para uma migração transacional"
-    [[ "$LEGACY_DIRECTORY" == /* && -d "$LEGACY_DIRECTORY" ]] || fail "instalação legada não encontrada em $LEGACY_DIRECTORY"
+    [[ "${AMPCONTROL_MIGRATION_TRANSACTION:-}" == "1" ]] || fail "$(msg 'use scripts/migrate-legacy.sh para uma migração transacional' 'use scripts/migrate-legacy.sh for a transactional migration')"
+    [[ "$LEGACY_DIRECTORY" == /* && -d "$LEGACY_DIRECTORY" ]] || fail "$(msg 'instalação legada não encontrada em' 'legacy installation not found at') $LEGACY_DIRECTORY"
     LEGACY_ENV_FILE="$LEGACY_DIRECTORY/.env"
-    [[ -f "$LEGACY_ENV_FILE" ]] || fail "arquivo legado ausente: $LEGACY_ENV_FILE"
+    [[ -f "$LEGACY_ENV_FILE" ]] || fail "$(msg 'arquivo legado ausente' 'missing legacy file'): $LEGACY_ENV_FILE"
 fi
 
 legacy_env_value() {
@@ -167,7 +181,7 @@ prompt_default() {
 prompt_optional() {
     local prompt="$1"
     local value=""
-    read -r -p "$prompt (opcional): " value
+    read -r -p "$prompt ($(msg 'opcional' 'optional')): " value
     printf '%s' "$value"
 }
 
@@ -178,10 +192,10 @@ prompt_secret() {
     while true; do
         read -r -s -p "$prompt: " first
         printf '\n'
-        [[ -n "$first" ]] || { printf 'O valor não pode ficar vazio.\n' >&2; continue; }
-        read -r -s -p "Confirme o valor: " second
+        [[ -n "$first" ]] || { printf '%s\n' "$(msg 'O valor não pode ficar vazio.' 'The value cannot be empty.')" >&2; continue; }
+        read -r -s -p "$(msg 'Confirme o valor' 'Confirm the value'): " second
         printf '\n'
-        [[ "$first" == "$second" ]] || { printf 'Os valores não coincidem.\n' >&2; continue; }
+        [[ "$first" == "$second" ]] || { printf '%s\n' "$(msg 'Os valores não coincidem.' 'The values do not match.')" >&2; continue; }
         printf '%s' "$first"
         return
     done
@@ -190,8 +204,8 @@ prompt_secret() {
 prompt_yes_no() {
     local prompt="$1"
     local default_value="$2"
-    local suffix="[s/N]"
-    [[ "$default_value" == "true" ]] && suffix="[S/n]"
+    local suffix="$(msg '[s/N]' '[y/N]')"
+    [[ "$default_value" == "true" ]] && suffix="$(msg '[S/n]' '[Y/n]')"
     local answer=""
     read -r -p "$prompt $suffix: " answer
     if [[ -z "$answer" ]]; then
@@ -204,7 +218,7 @@ prompt_yes_no() {
 }
 
 validate_discord_id() {
-    [[ "$1" =~ ^[0-9]{15,20}$ ]] || fail "$2 não parece ser um ID válido do Discord"
+    [[ "$1" =~ ^[0-9]{15,20}$ ]] || fail "$2 $(msg 'não parece ser um ID válido do Discord' 'does not look like a valid Discord ID')"
 }
 
 toml_escape() {
@@ -240,42 +254,42 @@ detect_amp_users() {
     done < <(getent passwd)
 }
 
-printf '\nAmpControl — instalação Linux\n'
-printf 'A produção existente não é alterada por este script até a confirmação final.\n\n'
+printf '\n%s\n' "$(msg 'AmpControl — instalação Linux' 'AmpControl — Linux installation')"
+printf '%s\n\n' "$(msg 'A produção existente não é alterada por este script até a confirmação final.' 'The existing production installation is not changed until final confirmation.')"
 
 AMP_MANAGER_PATH="$(detect_amp_manager)"
-[[ -n "$AMP_MANAGER_PATH" ]] || AMP_MANAGER_PATH="$(prompt_required 'Caminho absoluto do ampinstmgr')"
-[[ "$AMP_MANAGER_PATH" == /* && -x "$AMP_MANAGER_PATH" ]] || fail "ampinstmgr não encontrado ou não executável em $AMP_MANAGER_PATH"
+[[ -n "$AMP_MANAGER_PATH" ]] || AMP_MANAGER_PATH="$(prompt_required "$(msg 'Caminho absoluto do ampinstmgr' 'Absolute path to ampinstmgr')")"
+[[ "$AMP_MANAGER_PATH" == /* && -x "$AMP_MANAGER_PATH" ]] || fail "$(msg 'ampinstmgr não encontrado ou não executável em' 'ampinstmgr was not found or is not executable at') $AMP_MANAGER_PATH"
 
 mapfile -t DETECTED_AMP_USERS < <(detect_amp_users)
 if ((${#DETECTED_AMP_USERS[@]} == 1)); then
     AMP_SYSTEM_USER="${DETECTED_AMP_USERS[0]}"
-    printf 'Usuário AMP detectado: %s\n' "$AMP_SYSTEM_USER"
+    printf '%s: %s\n' "$(msg 'Usuário AMP detectado' 'Detected AMP user')" "$AMP_SYSTEM_USER"
 else
-    AMP_SYSTEM_USER="$(prompt_default 'Usuário Linux proprietário do AMP' 'amp')"
+    AMP_SYSTEM_USER="$(prompt_default "$(msg 'Usuário Linux proprietário do AMP' 'Linux user that owns AMP')" 'amp')"
 fi
-[[ "$AMP_SYSTEM_USER" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || fail "usuário AMP inválido"
+[[ "$AMP_SYSTEM_USER" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || fail "$(msg 'usuário AMP inválido' 'invalid AMP user')"
 AMP_ACCOUNT="$(getent passwd "$AMP_SYSTEM_USER" || true)"
-[[ -n "$AMP_ACCOUNT" ]] || fail "o usuário $AMP_SYSTEM_USER não existe"
+[[ -n "$AMP_ACCOUNT" ]] || fail "$(msg 'o usuário' 'user') $AMP_SYSTEM_USER $(msg 'não existe' 'does not exist')"
 AMP_HOME="$(cut -d: -f6 <<<"$AMP_ACCOUNT")"
-[[ -n "$AMP_HOME" ]] || fail "o usuário $AMP_SYSTEM_USER não existe"
+[[ -n "$AMP_HOME" ]] || fail "$(msg 'o usuário' 'user') $AMP_SYSTEM_USER $(msg 'não existe' 'does not exist')"
 AMP_INSTANCES_DIRECTORY="$AMP_HOME/.ampdata/instances"
-[[ -d "$AMP_INSTANCES_DIRECTORY" ]] || fail "diretório de instâncias não encontrado em $AMP_INSTANCES_DIRECTORY"
+[[ -d "$AMP_INSTANCES_DIRECTORY" ]] || fail "$(msg 'diretório de instâncias não encontrado em' 'instance directory not found at') $AMP_INSTANCES_DIRECTORY"
 
-printf 'Validando acesso ao inventário AMP...\n'
+printf '%s\n' "$(msg 'Validando acesso ao inventário AMP...' 'Validating access to the AMP inventory...')"
 if ! AMP_INVENTORY_OUTPUT="$(sudo -n -u "$AMP_SYSTEM_USER" "$AMP_MANAGER_PATH" --ShowInstancesList 2>&1)"; then
-    fail "não foi possível consultar o AMP como $AMP_SYSTEM_USER: $AMP_INVENTORY_OUTPUT"
+    fail "$(msg 'não foi possível consultar o AMP como' 'could not query AMP as') $AMP_SYSTEM_USER: $AMP_INVENTORY_OUTPUT"
 fi
 AMP_INSTANCE_COUNT="$(grep -c 'Instance Name' <<<"$AMP_INVENTORY_OUTPUT" || true)"
-printf '%s instância(s) AMP encontrada(s).\n' "$AMP_INSTANCE_COUNT"
+printf '%s %s\n' "$AMP_INSTANCE_COUNT" "$(msg 'instância(s) AMP encontrada(s).' 'AMP instance(s) found.')"
 unset AMP_INVENTORY_OUTPUT
 
 PRESERVE_EXISTING_IDLE=false
 if [[ -n "$LEGACY_DIRECTORY" && -f "$LEGACY_DIRECTORY/config/idle.json" ]]; then
     PRESERVE_EXISTING_IDLE=true
-    printf 'Configuração de Idle legada detectada e será preservada.\n'
+    printf '%s\n' "$(msg 'Configuração de Idle legada detectada e será preservada.' 'Legacy Idle configuration detected and will be preserved.')"
 elif [[ -f "$STATE_DIRECTORY/config/idle.json" ]]; then
-    PRESERVE_EXISTING_IDLE="$(prompt_yes_no 'Manter a configuração de Idle da instalação existente?' 'true')"
+    PRESERVE_EXISTING_IDLE="$(prompt_yes_no "$(msg 'Manter a configuração de Idle da instalação existente?' 'Keep the existing installation Idle configuration?')" 'true')"
 fi
 
 mapfile -t DETECTED_INSTANCES < <(
@@ -288,26 +302,26 @@ mapfile -t DETECTED_INSTANCES < <(
 )
 SELECTED_IDLE_INSTANCES=()
 if [[ "$PRESERVE_EXISTING_IDLE" == false ]] && ((${#DETECTED_INSTANCES[@]} > 0)); then
-    printf '\nInstâncias disponíveis para Idle automático:\n'
+    printf '\n%s\n' "$(msg 'Instâncias disponíveis para Idle automático:' 'Instances available for automatic Idle:')"
     for index in "${!DETECTED_INSTANCES[@]}"; do
         printf '  %d) %s\n' "$((index + 1))" "${DETECTED_INSTANCES[$index]}"
     done
-    read -r -p 'Ativar Idle de 15 minutos em quais instâncias? Use todos, nenhum ou números separados por vírgula [nenhum]: ' IDLE_SELECTION
-    IDLE_SELECTION="${IDLE_SELECTION:-nenhum}"
+    read -r -p "$(msg 'Ativar Idle de 15 minutos em quais instâncias? Use todos, nenhum ou números separados por vírgula [nenhum]: ' 'Enable 15-minute Idle for which instances? Use all, none, or comma-separated numbers [none]: ')" IDLE_SELECTION
+    IDLE_SELECTION="${IDLE_SELECTION:-$(msg 'nenhum' 'none')}"
     case "${IDLE_SELECTION,,}" in
-        todos)
+        todos|all)
             SELECTED_IDLE_INSTANCES=("${DETECTED_INSTANCES[@]}")
             ;;
-        nenhum)
+        nenhum|none)
             ;;
         *)
             IFS=',' read -r -a IDLE_INDEXES <<<"$IDLE_SELECTION"
             declare -A SELECTED_IDLE_INDEXES=()
             for selected_index in "${IDLE_INDEXES[@]}"; do
                 selected_index="${selected_index//[[:space:]]/}"
-                [[ "$selected_index" =~ ^[0-9]+$ ]] || fail "seleção de Idle inválida: $selected_index"
+                [[ "$selected_index" =~ ^[0-9]+$ ]] || fail "$(msg 'seleção de Idle inválida' 'invalid Idle selection'): $selected_index"
                 selected_index="$((10#$selected_index))"
-                ((selected_index >= 1 && selected_index <= ${#DETECTED_INSTANCES[@]})) || fail "índice de Idle fora da lista: $selected_index"
+                ((selected_index >= 1 && selected_index <= ${#DETECTED_INSTANCES[@]})) || fail "$(msg 'índice de Idle fora da lista' 'Idle index is outside the list'): $selected_index"
                 if [[ -z "${SELECTED_IDLE_INDEXES[$selected_index]:-}" ]]; then
                     SELECTED_IDLE_INSTANCES+=("${DETECTED_INSTANCES[$((selected_index - 1))]}")
                     SELECTED_IDLE_INDEXES[$selected_index]=1
@@ -319,62 +333,62 @@ fi
 
 LEGACY_GUILD_ID="$(legacy_env_value DISCORD_GUILD_ID 2>/dev/null || true)"
 if [[ -n "$LEGACY_GUILD_ID" ]]; then
-    DISCORD_GUILD_ID="$(prompt_default 'ID do servidor Discord' "$LEGACY_GUILD_ID")"
+    DISCORD_GUILD_ID="$(prompt_default "$(msg 'ID do servidor Discord' 'Discord server ID')" "$LEGACY_GUILD_ID")"
 else
-    DISCORD_GUILD_ID="$(prompt_required 'ID do servidor Discord')"
+    DISCORD_GUILD_ID="$(prompt_required "$(msg 'ID do servidor Discord' 'Discord server ID')")"
 fi
-DISCORD_PANEL_CHANNEL_ID="$(prompt_default 'ID do canal do painel e comandos' "$(legacy_or_default DISCORD_NOTIFICATION_CHANNEL_ID '')")"
-DISCORD_AUDIT_CHANNEL_ID="$(prompt_default 'ID do canal privado de auditoria' "$(legacy_or_default DISCORD_AUDIT_CHANNEL_ID '')")"
-DISCORD_OWNER_USER_ID="$(prompt_default 'ID do proprietário do bot' "$(legacy_or_default DISCORD_OWNER_USER_ID '')")"
-DISCORD_ADMIN_ROLE_IDS_RAW="$(prompt_optional 'IDs dos cargos administrativos do Discord, separados por vírgula')"
-RESTRICT_COMMAND_CHANNEL="$(prompt_yes_no 'Restringir /amp e /ampconfig ao canal do painel?' 'true')"
-ALLOW_DISCORD_ADMINISTRATORS="$(prompt_yes_no 'Autorizar automaticamente qualquer membro com permissão Administrator?' 'false')"
-printf 'Nota: o proprietário e os cargos escolhidos devem ter permissão Administrator no Discord para visualizar /ampconfig.\n'
-validate_discord_id "$DISCORD_GUILD_ID" "O ID do servidor"
-validate_discord_id "$DISCORD_PANEL_CHANNEL_ID" "O ID do canal do painel"
-validate_discord_id "$DISCORD_AUDIT_CHANNEL_ID" "O ID do canal de auditoria"
-validate_discord_id "$DISCORD_OWNER_USER_ID" "O ID do proprietário"
-[[ "$DISCORD_PANEL_CHANNEL_ID" != "$DISCORD_AUDIT_CHANNEL_ID" ]] || fail "os canais do painel e de auditoria precisam ser diferentes"
+DISCORD_PANEL_CHANNEL_ID="$(prompt_default "$(msg 'ID do canal do painel e comandos' 'Dashboard and command channel ID')" "$(legacy_or_default DISCORD_NOTIFICATION_CHANNEL_ID '')")"
+DISCORD_AUDIT_CHANNEL_ID="$(prompt_default "$(msg 'ID do canal privado de auditoria' 'Private audit channel ID')" "$(legacy_or_default DISCORD_AUDIT_CHANNEL_ID '')")"
+DISCORD_OWNER_USER_ID="$(prompt_default "$(msg 'ID do proprietário do bot' 'Bot owner user ID')" "$(legacy_or_default DISCORD_OWNER_USER_ID '')")"
+DISCORD_ADMIN_ROLE_IDS_RAW="$(prompt_optional "$(msg 'IDs dos cargos administrativos do Discord, separados por vírgula' 'Discord administrator role IDs, separated by commas')")"
+RESTRICT_COMMAND_CHANNEL="$(prompt_yes_no "$(msg 'Restringir /amp e /ampconfig ao canal do painel?' 'Restrict /amp and /ampconfig to the dashboard channel?')" 'true')"
+ALLOW_DISCORD_ADMINISTRATORS="$(prompt_yes_no "$(msg 'Autorizar automaticamente qualquer membro com permissão Administrator?' 'Automatically authorize any member with the Administrator permission?')" 'false')"
+printf '%s\n' "$(msg 'Nota: o proprietário e os cargos escolhidos devem ter permissão Administrator no Discord para visualizar /ampconfig.' 'Note: the owner and selected roles must have the Discord Administrator permission to see /ampconfig.')"
+validate_discord_id "$DISCORD_GUILD_ID" "$(msg 'O ID do servidor' 'The server ID')"
+validate_discord_id "$DISCORD_PANEL_CHANNEL_ID" "$(msg 'O ID do canal do painel' 'The dashboard channel ID')"
+validate_discord_id "$DISCORD_AUDIT_CHANNEL_ID" "$(msg 'O ID do canal de auditoria' 'The audit channel ID')"
+validate_discord_id "$DISCORD_OWNER_USER_ID" "$(msg 'O ID do proprietário' 'The owner ID')"
+[[ "$DISCORD_PANEL_CHANNEL_ID" != "$DISCORD_AUDIT_CHANNEL_ID" ]] || fail "$(msg 'os canais do painel e de auditoria precisam ser diferentes' 'the dashboard and audit channels must be different')"
 
 DISCORD_ADMIN_ROLE_IDS_TOML=""
 if [[ -n "$DISCORD_ADMIN_ROLE_IDS_RAW" ]]; then
     IFS=',' read -r -a DISCORD_ADMIN_ROLE_IDS <<<"$DISCORD_ADMIN_ROLE_IDS_RAW"
     for role_id in "${DISCORD_ADMIN_ROLE_IDS[@]}"; do
         role_id="${role_id//[[:space:]]/}"
-        validate_discord_id "$role_id" "O ID de cargo administrativo"
+        validate_discord_id "$role_id" "$(msg 'O ID de cargo administrativo' 'The administrator role ID')"
         [[ -z "$DISCORD_ADMIN_ROLE_IDS_TOML" ]] || DISCORD_ADMIN_ROLE_IDS_TOML+=", "
         DISCORD_ADMIN_ROLE_IDS_TOML+="\"$role_id\""
     done
 fi
 
-AMP_API_USERNAME="$(prompt_default 'Usuário da API do AMP usado pelo bot' "$(legacy_or_default AMP_USERNAME 'ampcontrol')")"
-AMP_ADS_URL="$(prompt_default 'URL local do ADS do AMP' "$(legacy_or_default AMP_ADS_URL 'http://127.0.0.1:8080')")"
-AMP_PUBLIC_URL="$(prompt_default 'URL pública do painel AMP' "$(legacy_or_default AMP_PUBLIC_URL '')")"
-GAME_SERVER_ADDRESS="$(prompt_default 'Endereço público padrão dos jogos' "$(legacy_or_default AMP_GAME_SERVER_ADDRESS '')")"
+AMP_API_USERNAME="$(prompt_default "$(msg 'Usuário da API do AMP usado pelo bot' 'AMP API user used by the bot')" "$(legacy_or_default AMP_USERNAME 'ampcontrol')")"
+AMP_ADS_URL="$(prompt_default "$(msg 'URL local do ADS do AMP' 'Local AMP ADS URL')" "$(legacy_or_default AMP_ADS_URL 'http://127.0.0.1:8080')")"
+AMP_PUBLIC_URL="$(prompt_default "$(msg 'URL pública do painel AMP' 'Public AMP panel URL')" "$(legacy_or_default AMP_PUBLIC_URL '')")"
+GAME_SERVER_ADDRESS="$(prompt_default "$(msg 'Endereço público padrão dos jogos' 'Default public game-server address')" "$(legacy_or_default AMP_GAME_SERVER_ADDRESS '')")"
 DISCORD_TOKEN="$(legacy_env_value DISCORD_TOKEN 2>/dev/null || true)"
 AMP_PASSWORD="$(legacy_env_value AMP_PASSWORD 2>/dev/null || true)"
 if [[ -n "$LEGACY_DIRECTORY" && -n "$DISCORD_TOKEN" && -n "$AMP_PASSWORD" ]]; then
-    printf 'Token Discord e senha AMP serão migrados diretamente para credenciais criptografadas.\n'
+    printf '%s\n' "$(msg 'Token Discord e senha AMP serão migrados diretamente para credenciais criptografadas.' 'The Discord token and AMP password will be migrated directly into encrypted credentials.')"
 else
-    [[ -n "$DISCORD_TOKEN" ]] || DISCORD_TOKEN="$(prompt_secret 'Token do bot Discord')"
-    [[ -n "$AMP_PASSWORD" ]] || AMP_PASSWORD="$(prompt_secret 'Senha do usuário da API do AMP')"
+    [[ -n "$DISCORD_TOKEN" ]] || DISCORD_TOKEN="$(prompt_secret "$(msg 'Token do bot Discord' 'Discord bot token')")"
+    [[ -n "$AMP_PASSWORD" ]] || AMP_PASSWORD="$(prompt_secret "$(msg 'Senha do usuário da API do AMP' 'AMP API user password')")"
 fi
 
-printf '\nResumo:\n'
-printf '  AMP: usuário Linux %s, gerenciador %s\n' "$AMP_SYSTEM_USER" "$AMP_MANAGER_PATH"
-printf '  Discord: servidor %s, painel %s, auditoria %s\n' "$DISCORD_GUILD_ID" "$DISCORD_PANEL_CHANNEL_ID" "$DISCORD_AUDIT_CHANNEL_ID"
-printf '  Instalação: %s\n' "$LIB_DIRECTORY"
-read -r -p 'Continuar com a instalação? [s/N]: ' CONFIRMATION
-[[ "$CONFIRMATION" =~ ^[sSyY]$ ]] || { printf 'Instalação cancelada.\n'; exit 10; }
+printf '\n%s\n' "$(msg 'Resumo:' 'Summary:')"
+printf '  AMP: %s %s, %s %s\n' "$(msg 'usuário Linux' 'Linux user')" "$AMP_SYSTEM_USER" "$(msg 'gerenciador' 'manager')" "$AMP_MANAGER_PATH"
+printf '  Discord: %s %s, %s %s, %s %s\n' "$(msg 'servidor' 'server')" "$DISCORD_GUILD_ID" "$(msg 'painel' 'dashboard')" "$DISCORD_PANEL_CHANNEL_ID" "$(msg 'auditoria' 'audit')" "$DISCORD_AUDIT_CHANNEL_ID"
+printf '  %s: %s\n' "$(msg 'Instalação' 'Installation')" "$LIB_DIRECTORY"
+read -r -p "$(msg 'Continuar com a instalação? [s/N]: ' 'Continue with the installation? [y/N]: ')" CONFIRMATION
+[[ "$CONFIRMATION" =~ ^[sSyY]$ ]] || { printf '%s\n' "$(msg 'Instalação cancelada.' 'Installation canceled.')"; exit 10; }
 
 if [[ -z "$BINARY_SOURCE" ]]; then
-    command -v go >/dev/null 2>&1 || fail "Go não foi encontrado; instale Go 1.26.6+ ou use --binary"
+    command -v go >/dev/null 2>&1 || fail "$(msg 'Go não foi encontrado; instale Go 1.26.6+ ou use --binary' 'Go was not found; install Go 1.26.6+ or use --binary')"
     TEMP_DIRECTORY="$(mktemp -d)"
-    printf 'Compilando AmpControl...\n'
+    printf '%s\n' "$(msg 'Compilando AmpControl...' 'Building AmpControl...')"
     (cd "$PROJECT_DIRECTORY" && GOTOOLCHAIN=auto go build -trimpath -o "$TEMP_DIRECTORY/ampcontrol" ./cmd/ampcontrol)
     BINARY_SOURCE="$TEMP_DIRECTORY/ampcontrol"
 fi
-[[ -f "$BINARY_SOURCE" && -x "$BINARY_SOURCE" ]] || fail "binário inválido: $BINARY_SOURCE"
+[[ -f "$BINARY_SOURCE" && -x "$BINARY_SOURCE" ]] || fail "$(msg 'binário inválido' 'invalid binary'): $BINARY_SOURCE"
 
 BACKUP_REQUIRED=false
 for existing_path in "$CONFIG_DIRECTORY" "$STATE_DIRECTORY" "$LIB_DIRECTORY/ampcontrol" "$WRAPPER_PATH" "$MAINTENANCE_PATH" "$SERVICE_PATH" "$SUDOERS_PATH" "$CREDENTIAL_DROPIN_PATH"; do
@@ -394,11 +408,11 @@ if [[ "$BACKUP_REQUIRED" == true ]]; then
     [[ ! -e "$SERVICE_PATH" ]] || cp -a -- "$SERVICE_PATH" "$BACKUP_DIRECTORY/service"
     [[ ! -e "$SUDOERS_PATH" ]] || cp -a -- "$SUDOERS_PATH" "$BACKUP_DIRECTORY/sudoers"
     [[ ! -e "$CREDENTIAL_DROPIN_PATH" ]] || cp -a -- "$CREDENTIAL_DROPIN_PATH" "$BACKUP_DIRECTORY/credentials.conf"
-    printf 'Backup da instalação anterior criado em %s\n' "$BACKUP_DIRECTORY"
+    printf '%s %s\n' "$(msg 'Backup da instalação anterior criado em' 'Previous installation backup created at')" "$BACKUP_DIRECTORY"
 fi
 
 if [[ -n "$LEGACY_DIRECTORY" ]]; then
-    printf 'Pausando o serviço para copiar um estado consistente...\n'
+    printf '%s\n' "$(msg 'Pausando o serviço para copiar um estado consistente...' 'Stopping the service to copy a consistent state...')"
     systemctl stop ampcontrol.service
 fi
 
@@ -519,11 +533,11 @@ if [[ -f "$STATE_DIRECTORY/config/idle.json" ]]; then
         credential_path="$CREDENTIAL_DIRECTORY/ampcontrol.$credential_name"
         if [[ -n "$environment_name" ]]; then
             rcon_password="$(legacy_env_value "$environment_name" 2>/dev/null || true)"
-            [[ -n "$rcon_password" ]] || fail "a variável RCON $environment_name não existe no .env legado"
+            [[ -n "$rcon_password" ]] || fail "$(msg 'a variável RCON' 'RCON variable') $environment_name $(msg 'não existe no .env legado' 'does not exist in the legacy .env')"
             encrypt_credential "$credential_name" "$rcon_password"
             unset rcon_password
         fi
-        [[ -f "$credential_path" ]] || fail "credencial RCON ausente: $credential_name"
+        [[ -f "$credential_path" ]] || fail "$(msg 'credencial RCON ausente' 'missing RCON credential'): $credential_name"
     done < "$RCON_MANIFEST"
 fi
 
@@ -545,7 +559,7 @@ rm -f -- "$CREDENTIAL_DROPIN_PATH.new"
 TEMP_SUDOERS="$(mktemp)"
 printf '%s ALL=(%s) NOPASSWD: %s *\n' "$SERVICE_USER" "$AMP_SYSTEM_USER" "$WRAPPER_PATH" > "$TEMP_SUDOERS"
 chmod 0440 "$TEMP_SUDOERS"
-visudo -cf "$TEMP_SUDOERS" >/dev/null || fail "a política sudo gerada é inválida"
+visudo -cf "$TEMP_SUDOERS" >/dev/null || fail "$(msg 'a política sudo gerada é inválida' 'the generated sudo policy is invalid')"
 install -o root -g root -m 0440 "$TEMP_SUDOERS" "$SUDOERS_PATH"
 rm -f -- "$TEMP_SUDOERS"
 
@@ -554,8 +568,8 @@ systemctl daemon-reload
 if [[ "$START_SERVICE" == true ]]; then
     systemctl enable ampcontrol.service >/dev/null
     systemctl restart ampcontrol.service
-    systemctl is-active --quiet ampcontrol.service || fail "o serviço não iniciou; consulte journalctl -u ampcontrol.service"
-    printf '\nAmpControl instalado e em execução.\n'
+systemctl is-active --quiet ampcontrol.service || fail "$(msg 'o serviço não iniciou; consulte journalctl -u ampcontrol.service' 'the service did not start; check journalctl -u ampcontrol.service')"
+printf '\n%s\n' "$(msg 'AmpControl instalado e em execução.' 'AmpControl installed and running.')"
 else
-    printf '\nAmpControl instalado. Inicie com: systemctl enable --now ampcontrol.service\n'
+printf '\n%s\n' "$(msg 'AmpControl instalado. Inicie com: systemctl enable --now ampcontrol.service' 'AmpControl installed. Start it with: systemctl enable --now ampcontrol.service')"
 fi

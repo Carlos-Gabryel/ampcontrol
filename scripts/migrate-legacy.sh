@@ -7,26 +7,43 @@ SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly SCRIPT_DIRECTORY
 LEGACY_DIRECTORY="/opt/ampcontrol"
 BINARY_PATH=""
+INSTALL_LANGUAGE="${AMPCONTROL_LANGUAGE:-pt-BR}"
+
+msg() { if [[ "$INSTALL_LANGUAGE" == "en-US" ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
 
 fail() {
-    printf 'Erro: %s\n' "$1" >&2
+    printf '%s: %s\n' "$(msg 'Erro' 'Error')" "$1" >&2
     exit 1
 }
 
 usage() {
-    cat <<'EOF'
-Uso: sudo ./scripts/migrate-legacy.sh [DIRETÓRIO] [--binary CAMINHO]
+    if [[ "$INSTALL_LANGUAGE" == "en-US" ]]; then cat <<'EOF'
+Usage: sudo ./scripts/migrate-legacy.sh [DIRECTORY] [--binary PATH] [--language pt-BR|en-US]
+
+  DIRECTORY       legacy installation (default: /opt/ampcontrol)
+  --binary PATH   uses an already compiled Linux binary
+  --language      selects the migration and installation language
+EOF
+    else cat <<'EOF'
+Uso: sudo ./scripts/migrate-legacy.sh [DIRETÓRIO] [--binary CAMINHO] [--language pt-BR|en-US]
 
   DIRETÓRIO        instalação legada (padrão: /opt/ampcontrol)
   --binary CAMINHO usa um binário Linux já compilado
+  --language        seleciona o idioma da migração e instalação
 EOF
+    fi
 }
 
 while (($# > 0)); do
     case "$1" in
         --binary)
-            (($# >= 2)) || fail "--binary exige um caminho"
+            (($# >= 2)) || fail "$(msg '--binary exige um caminho' '--binary requires a path')"
             BINARY_PATH="$2"
+            shift 2
+            ;;
+        --language)
+            (($# >= 2)) || fail "--language requires a value / exige um valor"
+            case "${2,,}" in pt|pt-br) INSTALL_LANGUAGE="pt-BR" ;; en|en-us) INSTALL_LANGUAGE="en-US" ;; *) fail "invalid language / idioma inválido: $2" ;; esac
             shift 2
             ;;
         --help|-h)
@@ -34,10 +51,10 @@ while (($# > 0)); do
             exit 0
             ;;
         -* )
-            fail "opção desconhecida: $1"
+            fail "$(msg 'opção desconhecida' 'unknown option'): $1"
             ;;
         *)
-            [[ "$LEGACY_DIRECTORY" == "/opt/ampcontrol" ]] || fail "informe somente um diretório legado"
+            [[ "$LEGACY_DIRECTORY" == "/opt/ampcontrol" ]] || fail "$(msg 'informe somente um diretório legado' 'provide only one legacy directory')"
             LEGACY_DIRECTORY="$1"
             shift
             ;;
@@ -45,6 +62,7 @@ while (($# > 0)); do
 done
 
 readonly LEGACY_DIRECTORY BINARY_PATH
+export AMPCONTROL_LANGUAGE="$INSTALL_LANGUAGE"
 readonly BACKUP_ROOT="/var/backups/ampcontrol"
 BACKUP_DIRECTORY="$BACKUP_ROOT/migration-$(date -u +%Y%m%dT%H%M%SZ)"
 readonly BACKUP_DIRECTORY
@@ -74,7 +92,7 @@ copy_to_snapshot() {
 restore_snapshot() {
     local path=""
     set +e
-    printf '\nFalha detectada. Restaurando o estado anterior...\n' >&2
+    printf '\n%s\n' "$(msg 'Falha detectada. Restaurando o estado anterior...' 'Failure detected. Restoring the previous state...')" >&2
     systemctl stop ampcontrol.service >/dev/null 2>&1 || true
     for path in "${MANAGED_PATHS[@]}"; do
         rm -rf -- "$path"
@@ -96,7 +114,7 @@ restore_snapshot() {
     if [[ "$SERVICE_WAS_ACTIVE" == true ]]; then
         systemctl start ampcontrol.service >/dev/null 2>&1 || true
     fi
-    printf 'Rollback concluído. Backup preservado em %s\n' "$BACKUP_DIRECTORY" >&2
+    printf '%s %s\n' "$(msg 'Rollback concluído. Backup preservado em' 'Rollback completed. Backup preserved at')" "$BACKUP_DIRECTORY" >&2
 }
 
 on_error() {
@@ -108,12 +126,12 @@ on_error() {
 }
 trap on_error ERR
 
-[[ "$(uname -s)" == Linux ]] || fail "a migração oferece suporte apenas a Linux"
-[[ "$EUID" -eq 0 ]] || fail "execute com sudo"
-[[ -t 0 ]] || fail "a migração precisa de um terminal interativo"
-[[ "$LEGACY_DIRECTORY" == /* && -d "$LEGACY_DIRECTORY" ]] || fail "instalação legada não encontrada em $LEGACY_DIRECTORY"
-[[ -f "$LEGACY_DIRECTORY/.env" ]] || fail "arquivo .env legado não encontrado"
-[[ -x "$SCRIPT_DIRECTORY/install.sh" ]] || fail "install.sh não está executável"
+[[ "$(uname -s)" == Linux ]] || fail "$(msg 'a migração oferece suporte apenas a Linux' 'migration supports Linux only')"
+[[ "$EUID" -eq 0 ]] || fail "$(msg 'execute com sudo' 'run with sudo')"
+[[ -t 0 ]] || fail "$(msg 'a migração precisa de um terminal interativo' 'migration requires an interactive terminal')"
+[[ "$LEGACY_DIRECTORY" == /* && -d "$LEGACY_DIRECTORY" ]] || fail "$(msg 'instalação legada não encontrada em' 'legacy installation not found at') $LEGACY_DIRECTORY"
+[[ -f "$LEGACY_DIRECTORY/.env" ]] || fail "$(msg 'arquivo .env legado não encontrado' 'legacy .env file not found')"
+[[ -x "$SCRIPT_DIRECTORY/install.sh" ]] || fail "$(msg 'install.sh não está executável' 'install.sh is not executable')"
 
 if systemctl is-active --quiet ampcontrol.service; then
     SERVICE_WAS_ACTIVE=true
@@ -139,8 +157,8 @@ printf 'active=%s\nenabled=%s\nlegacy=%s\n' \
     "$SERVICE_WAS_ACTIVE" "$SERVICE_WAS_ENABLED" "$LEGACY_DIRECTORY" > "$BACKUP_DIRECTORY/metadata"
 
 ROLLBACK_ARMED=true
-printf 'Backup transacional criado em %s\n' "$BACKUP_DIRECTORY"
-INSTALL_ARGUMENTS=(--no-start --migrate-legacy "$LEGACY_DIRECTORY")
+printf '%s %s\n' "$(msg 'Backup transacional criado em' 'Transactional backup created at')" "$BACKUP_DIRECTORY"
+INSTALL_ARGUMENTS=(--language "$INSTALL_LANGUAGE" --no-start --migrate-legacy "$LEGACY_DIRECTORY")
 if [[ -n "$BINARY_PATH" ]]; then
     INSTALL_ARGUMENTS+=(--binary "$BINARY_PATH")
 fi
@@ -156,11 +174,11 @@ for _ in {1..10}; do
     sleep 1
 done
 if ! systemctl is-active --quiet ampcontrol.service; then
-    printf 'O novo serviço não permaneceu ativo.\n' >&2
+    printf '%s\n' "$(msg 'O novo serviço não permaneceu ativo.' 'The new service did not remain active.')" >&2
     false
 fi
 
 ROLLBACK_ARMED=false
-printf '\nMigração concluída. A instalação legada foi preservada em %s.\n' "$LEGACY_DIRECTORY"
-printf 'Backup para rollback: %s\n' "$BACKUP_DIRECTORY"
-printf 'Valide o Discord e os detectores RCON antes de remover qualquer backup.\n'
+printf '\n%s %s.\n' "$(msg 'Migração concluída. A instalação legada foi preservada em' 'Migration completed. The legacy installation was preserved at')" "$LEGACY_DIRECTORY"
+printf '%s: %s\n' "$(msg 'Backup para rollback' 'Rollback backup')" "$BACKUP_DIRECTORY"
+printf '%s\n' "$(msg 'Valide o Discord e os detectores RCON antes de remover qualquer backup.' 'Validate Discord and RCON detectors before removing any backup.')"

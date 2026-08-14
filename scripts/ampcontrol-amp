@@ -16,9 +16,24 @@ fi
 readonly AMPINSTMGR
 readonly INSTANCES_DIRECTORY
 readonly PROTECTED_INSTANCE="ADS01"
+LANGUAGE="${AMPCONTROL_LANGUAGE:-}"
+if [[ -z "$LANGUAGE" && -r /etc/ampcontrol/config.toml ]]; then
+    LANGUAGE="$(sed -n 's/^[[:space:]]*language[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' /etc/ampcontrol/config.toml | head -n1)"
+fi
+[[ "$LANGUAGE" == "en-US" ]] || LANGUAGE="pt-BR"
+msg() { if [[ "$LANGUAGE" == "en-US" ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
 
 show_usage() {
-    cat <<'EOF'
+    if [[ "$LANGUAGE" == "en-US" ]]; then cat <<'EOF'
+Usage:
+  ampcontrol-amp list
+  ampcontrol-amp status
+  ampcontrol-amp start INSTANCE
+  ampcontrol-amp stop INSTANCE
+  ampcontrol-amp restart INSTANCE
+  ampcontrol-amp update INSTANCE
+EOF
+    else cat <<'EOF'
 Uso:
   ampcontrol-amp list
   ampcontrol-amp status
@@ -27,10 +42,11 @@ Uso:
   ampcontrol-amp restart INSTANCIA
   ampcontrol-amp update INSTANCIA
 EOF
+    fi
 }
 
 fail() {
-    printf 'Erro: %s\n' "$1" >&2
+    printf '%s: %s\n' "$(msg 'Erro' 'Error')" "$1" >&2
     exit 1
 }
 
@@ -38,19 +54,19 @@ validate_instance() {
     local instance_name="$1"
 
     if [[ -z "$instance_name" ]]; then
-        fail "o nome da instância não foi informado"
+        fail "$(msg 'o nome da instância não foi informado' 'the instance name was not provided')"
     fi
 
     if [[ ! "$instance_name" =~ ^[A-Za-z0-9._-]+$ ]]; then
-        fail "o nome da instância contém caracteres inválidos"
+        fail "$(msg 'o nome da instância contém caracteres inválidos' 'the instance name contains invalid characters')"
     fi
 
     if [[ "$instance_name" == "$PROTECTED_INSTANCE" ]]; then
-        fail "a instância ADS01 é protegida e não pode ser controlada pelo bot"
+        fail "$(msg 'a instância ADS01 é protegida e não pode ser controlada pelo bot' 'the ADS01 instance is protected and cannot be controlled by the bot')"
     fi
 
     if [[ ! -d "$INSTANCES_DIRECTORY/$instance_name" ]]; then
-        fail "a instância '$instance_name' não existe"
+        fail "$(msg 'a instância' 'instance') '$instance_name' $(msg 'não existe' 'does not exist')"
     fi
 }
 
@@ -110,7 +126,7 @@ main() {
             ;;
 
         *)
-            fail "operação desconhecida: '$operation'"
+            fail "$(msg 'operação desconhecida' 'unknown operation'): '$operation'"
             ;;
     esac
 }

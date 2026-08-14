@@ -64,8 +64,14 @@ expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" unknown
 
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--binary CAMINHO'
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--language'
+"$PROJECT_DIRECTORY/scripts/install.sh" --language en-US --help | grep -q -- 'installs an already compiled binary'
 "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --help | grep -q -- '--binary CAMINHO'
+"$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --language en-US --help | grep -q -- 'legacy installation'
+"$PROJECT_DIRECTORY/scripts/migration-preflight.sh" --language en-US --help | grep -q -- '^Usage:'
 "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'rollback'
+AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'latest stable GitHub release'
+AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Missing01 >"$TEMP_DIRECTORY/english-error.out" 2>&1 || true
+grep -q "instance 'Missing01' does not exist" "$TEMP_DIRECTORY/english-error.out" || fail "mensagem em inglês do wrapper não foi aplicada"
 
 cat > "$TEMP_DIRECTORY/legacy.env" <<'EOF'
 DISCORD_TOKEN="token sem execução"
@@ -73,6 +79,9 @@ AMP_PASSWORD='senha # preservada'
 RCON_PASSWORD=segredo-rcon
 EOF
 [[ "$("$PYTHON_COMMAND" "$PROJECT_DIRECTORY/scripts/legacy_config.py" env "$TEMP_DIRECTORY/legacy.env" AMP_PASSWORD)" == 'senha # preservada' ]] || fail "parser seguro de .env alterou o valor"
+printf 'INVALID\n' >"$TEMP_DIRECTORY/invalid.env"
+AMPCONTROL_LANGUAGE=en-US "$PYTHON_COMMAND" "$PROJECT_DIRECTORY/scripts/legacy_config.py" env "$TEMP_DIRECTORY/invalid.env" TEST >"$TEMP_DIRECTORY/python-english.out" 2>&1 || true
+grep -q 'Error: line 1 of .env' "$TEMP_DIRECTORY/python-english.out" || fail "erro em inglês do conversor não foi aplicado"
 
 cat > "$TEMP_DIRECTORY/systemd-environment" <<'EOF'
 HOME=/home/ampcontrol "AMP_PUBLIC_URL=http://192.168.1.22:8080" AMP_GAME_SERVER_ADDRESS=192.168.1.22
