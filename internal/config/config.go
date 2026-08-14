@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alabamaamp/ampcontrol/internal/secret"
 	"github.com/joho/godotenv"
 )
 
@@ -31,10 +32,12 @@ type Config struct {
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
+	fileConfig, err := loadFileConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
-		DiscordToken: strings.TrimSpace(
-			os.Getenv("DISCORD_TOKEN"),
-		),
 		DiscordGuildID: strings.TrimSpace(
 			os.Getenv("DISCORD_GUILD_ID"),
 		),
@@ -50,7 +53,6 @@ func Load() (*Config, error) {
 		AMPUsername: strings.TrimSpace(
 			os.Getenv("AMP_USERNAME"),
 		),
-		AMPPassword: os.Getenv("AMP_PASSWORD"),
 		AMPADSURL: strings.TrimSpace(
 			os.Getenv("AMP_ADS_URL"),
 		),
@@ -63,6 +65,16 @@ func Load() (*Config, error) {
 		LogLevel: strings.TrimSpace(
 			os.Getenv("LOG_LEVEL"),
 		),
+	}
+	applyFileDefaults(cfg, fileConfig)
+
+	cfg.DiscordToken, err = secret.ReadRequired("discord_token", "DISCORD_TOKEN")
+	if err != nil {
+		return nil, err
+	}
+	cfg.AMPPassword, err = secret.ReadRequired("amp_password", "AMP_PASSWORD")
+	if err != nil {
+		return nil, err
 	}
 
 	if cfg.DiscordToken == "" {
@@ -107,7 +119,7 @@ func Load() (*Config, error) {
 
 	notificationTTLMinutes, err := positiveEnvironmentInteger(
 		"DISCORD_NOTIFICATION_TTL_MINUTES",
-		10,
+		valueOrDefault(fileConfig.Discord.NotificationTTLMinutes, 10),
 	)
 	if err != nil {
 		return nil, err
@@ -115,7 +127,7 @@ func Load() (*Config, error) {
 
 	statusRefreshSeconds, err := positiveEnvironmentInteger(
 		"DISCORD_STATUS_REFRESH_SECONDS",
-		60,
+		valueOrDefault(fileConfig.Discord.StatusRefreshSeconds, 60),
 	)
 	if err != nil {
 		return nil, err
@@ -123,7 +135,7 @@ func Load() (*Config, error) {
 
 	userCooldownSeconds, err := nonNegativeEnvironmentInteger(
 		"DISCORD_COMMAND_USER_COOLDOWN_SECONDS",
-		5,
+		valueOrDefault(fileConfig.Discord.CommandUserCooldownSeconds, 5),
 	)
 	if err != nil {
 		return nil, err
@@ -131,7 +143,7 @@ func Load() (*Config, error) {
 
 	serverCooldownSeconds, err := nonNegativeEnvironmentInteger(
 		"DISCORD_COMMAND_SERVER_COOLDOWN_SECONDS",
-		15,
+		valueOrDefault(fileConfig.Discord.CommandServerCooldownSeconds, 15),
 	)
 	if err != nil {
 		return nil, err

@@ -1,0 +1,97 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestLoadFileConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	content := []byte(`[discord]
+guild_id = "111111111111111111"
+notification_channel_id = "222222222222222222"
+audit_channel_id = "333333333333333333"
+owner_user_id = "444444444444444444"
+status_refresh_seconds = 30
+
+[amp]
+username = "amp"
+ads_url = "http://127.0.0.1:8080"
+
+[logging]
+level = "debug"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AMPCONTROL_CONFIG", path)
+
+	result, err := loadFileConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Discord.GuildID != "111111111111111111" || result.AMP.Username != "amp" {
+		t.Fatalf("configuração inesperada: %#v", result)
+	}
+}
+
+func TestLoadFileConfigRejectsUnknownField(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("unknown = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AMPCONTROL_CONFIG", path)
+	if _, err := loadFileConfig(); err == nil {
+		t.Fatal("era esperado erro para campo desconhecido")
+	}
+}
+
+func TestLoadUsesTOMLAndSystemdCredentials(t *testing.T) {
+	directory := t.TempDir()
+	configPath := filepath.Join(directory, "config.toml")
+	credentialDirectory := filepath.Join(directory, "credentials")
+	if err := os.Mkdir(credentialDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	content := []byte(`[discord]
+guild_id = "111111111111111111"
+notification_channel_id = "222222222222222222"
+audit_channel_id = "333333333333333333"
+owner_user_id = "444444444444444444"
+
+[amp]
+username = "amp-api-user"
+`)
+	if err := os.WriteFile(configPath, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range map[string]string{
+		"discord_token": "discord-secret",
+		"amp_password":  "amp-secret",
+	} {
+		if err := os.WriteFile(filepath.Join(credentialDirectory, name), []byte(value), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Setenv("AMPCONTROL_CONFIG", configPath)
+	t.Setenv("CREDENTIALS_DIRECTORY", credentialDirectory)
+	for _, name := range []string{
+		"DISCORD_TOKEN", "DISCORD_GUILD_ID", "DISCORD_NOTIFICATION_CHANNEL_ID",
+		"DISCORD_AUDIT_CHANNEL_ID", "DISCORD_OWNER_USER_ID", "AMP_USERNAME", "AMP_PASSWORD",
+	} {
+		t.Setenv(name, "")
+	}
+
+	result, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DiscordToken != "discord-secret" || result.AMPPassword != "amp-secret" {
+		t.Fatal("as credenciais do systemd não foram carregadas")
+	}
+	if result.DiscordGuildID != "111111111111111111" || result.AMPUsername != "amp-api-user" {
+		t.Fatalf("configuração TOML inesperada: %#v", result)
+	}
+}

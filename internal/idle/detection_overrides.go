@@ -224,9 +224,10 @@ func validateDetectionOverrideServer(server Server) error {
 	}
 	if detectorUsesRCON(server.FallbackDetector) &&
 		(strings.TrimSpace(server.RCONAddress) == "" ||
-			strings.TrimSpace(server.RCONPasswordEnv) == "") {
+			(strings.TrimSpace(server.RCONCredential) == "" &&
+				strings.TrimSpace(server.RCONPasswordEnv) == "")) {
 		return fmt.Errorf(
-			"a instância %s não possui endereço e variável de senha RCON configurados",
+			"a instância %s não possui endereço e credencial de senha RCON configurados",
 			server.Instance,
 		)
 	}

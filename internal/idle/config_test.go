@@ -320,6 +320,27 @@ func TestRCONPasswordRejectsMissingEnvironmentVariable(
 	}
 }
 
+func TestRCONPasswordUsesSystemdCredential(t *testing.T) {
+	directory := t.TempDir()
+	t.Setenv("CREDENTIALS_DIRECTORY", directory)
+	if err := os.WriteFile(
+		filepath.Join(directory, "rcon_TestServer01"),
+		[]byte("senha-segura\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	server := Server{
+		Instance:       "TestServer01",
+		RCONCredential: "rcon_TestServer01",
+	}
+	password, err := server.RCONPassword()
+	if err != nil || password != "senha-segura" {
+		t.Fatalf("credencial RCON inesperada: valor=%q erro=%v", password, err)
+	}
+}
+
 func TestFindServer(
 	t *testing.T,
 ) {
