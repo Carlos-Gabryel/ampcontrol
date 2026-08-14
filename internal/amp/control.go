@@ -45,13 +45,14 @@ func ControlInstance(
 		)
 	}
 
+	runtime := currentRuntimeConfig()
 	command := exec.CommandContext(
 		ctx,
-		sudoPath,
+		runtime.SudoPath,
 		"-n",
 		"-u",
-		ampSystemUser,
-		ampcontrolAMPWrapperPath,
+		runtime.SystemUser,
+		runtime.WrapperPath,
 		string(operation),
 		instanceName,
 	)

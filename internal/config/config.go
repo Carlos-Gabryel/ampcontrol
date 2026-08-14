@@ -26,6 +26,10 @@ type Config struct {
 	AMPADSURL                    string
 	AMPPublicURL                 string
 	AMPGameServerAddress         string
+	AMPSystemUser                string
+	AMPManagerPath               string
+	AMPWrapperPath               string
+	SudoPath                     string
 	LogLevel                     string
 }
 

@@ -28,6 +28,14 @@ func New() (*App, error) {
 	log := logger.New(
 		cfg.LogLevel,
 	)
+	if err := amp.ConfigureRuntime(amp.RuntimeConfig{
+		SystemUser:  cfg.AMPSystemUser,
+		ManagerPath: cfg.AMPManagerPath,
+		WrapperPath: cfg.AMPWrapperPath,
+		SudoPath:    cfg.SudoPath,
+	}); err != nil {
+		return nil, fmt.Errorf("configuração de execução do AMP inválida: %w", err)
+	}
 
 	ampAPIClient := amp.NewAPIClient(
 		cfg.AMPUsername,

@@ -32,6 +32,10 @@ type fileAMPConfig struct {
 	ADSURL            string `toml:"ads_url"`
 	PublicURL         string `toml:"public_url"`
 	GameServerAddress string `toml:"game_server_address"`
+	SystemUser        string `toml:"system_user"`
+	ManagerPath       string `toml:"manager_path"`
+	WrapperPath       string `toml:"wrapper_path"`
+	SudoPath          string `toml:"sudo_path"`
 }
 
 type fileLoggingConfig struct {
@@ -87,9 +91,21 @@ func applyFileDefaults(cfg *Config, source fileConfig) {
 	if cfg.AMPGameServerAddress == "" {
 		cfg.AMPGameServerAddress = strings.TrimSpace(source.AMP.GameServerAddress)
 	}
+	cfg.AMPSystemUser = valueOrStringDefault(source.AMP.SystemUser, "amp")
+	cfg.AMPManagerPath = valueOrStringDefault(source.AMP.ManagerPath, "/usr/bin/ampinstmgr")
+	cfg.AMPWrapperPath = valueOrStringDefault(source.AMP.WrapperPath, "/usr/local/bin/ampcontrol-amp")
+	cfg.SudoPath = valueOrStringDefault(source.AMP.SudoPath, "/usr/bin/sudo")
 	if cfg.LogLevel == "" {
 		cfg.LogLevel = strings.TrimSpace(source.Logging.Level)
 	}
+}
+
+func valueOrStringDefault(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func valueOrDefault(value *int, fallback int) int {

@@ -13,6 +13,10 @@ username = "ampcontrol"
 ads_url = "http://127.0.0.1:8080"
 public_url = ""
 game_server_address = ""
+system_user = "amp"
+manager_path = "/usr/bin/ampinstmgr"
+wrapper_path = "/usr/local/bin/ampcontrol-amp"
+sudo_path = "/usr/bin/sudo"
 
 [logging]
 level = "info"
