@@ -74,7 +74,7 @@ func (c *Client) commandAuditDecision(
 	channelAllowed bool,
 ) (bool, string) {
 	if !channelAllowed {
-		return false, "Recusado: canal não autorizado"
+		return false, i18n.Choose("Recusado: canal não autorizado", "Rejected: unauthorized channel")
 	}
 
 	if data.CommandName() == "ampconfig" && !ampConfigCommandAuthorized(
@@ -84,10 +84,10 @@ func (c *Client) commandAuditDecision(
 		c.adminRoleIDs,
 		c.allowAdministrators,
 	) {
-		return false, "Recusado: usuário sem permissão"
+		return false, i18n.Choose("Recusado: usuário sem permissão", "Rejected: user lacks permission")
 	}
 
-	return true, "Recebido"
+	return true, i18n.Choose("Recebido", "Received")
 }
 
 func newCommandAuditRecord(
@@ -371,17 +371,24 @@ func classifyCommandAuditResponse(
 	trimmed := strings.TrimSpace(content)
 	lower := strings.ToLower(trimmed)
 
-	if strings.Contains(lower, "já possui uma operação em andamento") {
+	if strings.Contains(lower, "já possui uma operação em andamento") ||
+		strings.Contains(lower, "already has an operation in progress") {
 		return commandAuditPhaseFailed, true
 	}
 
 	progressPrefixes := []string{
 		"⏳ Iniciando",
+		"⏳ Starting",
 		"⏳ Colocando",
+		"⏳ Placing",
 		"🔄 Reiniciando",
+		"🔄 Restarting",
 		"⚫ Desligando",
+		"⚫ Shutting down",
 		"⬆️ Atualizando",
+		"⬆️ Updating",
 		"⏳ Executando",
+		"⏳ Running",
 	}
 	for _, prefix := range progressPrefixes {
 		if strings.HasPrefix(trimmed, prefix) {
@@ -418,7 +425,8 @@ func inferCommandAuditFinalState(
 		strings.Contains(lower, "em idle") {
 		return "Idle"
 	}
-	if strings.Contains(lower, "transição") {
+	if strings.Contains(lower, "transição") ||
+		strings.Contains(lower, "transition") {
 		return "Em transição"
 	}
 	if strings.Contains(lower, "suspens") {

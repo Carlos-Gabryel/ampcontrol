@@ -3,6 +3,7 @@ package discord
 import (
 	"fmt"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 )
 
@@ -58,23 +59,23 @@ func ampCommandOperationDescription(
 ) string {
 	switch commandOperation {
 	case ampCommandOperationStart:
-		return "comando /amp iniciar"
+		return i18n.Choose("comando /amp iniciar", "command /amp start")
 
 	case ampCommandOperationStop:
-		return "comando /amp parar"
+		return i18n.Choose("comando /amp parar", "command /amp stop")
 
 	case ampCommandOperationRestart:
-		return "comando /amp reiniciar"
+		return i18n.Choose("comando /amp reiniciar", "command /amp restart")
 
 	case ampCommandOperationShutdown:
-		return "comando /amp desligar"
+		return i18n.Choose("comando /amp desligar", "command /amp shutdown")
 
 	case ampCommandOperationUpdate:
-		return "comando /amp atualizar"
+		return i18n.Choose("comando /amp atualizar", "command /amp update")
 
 	default:
 		return fmt.Sprintf(
-			"comando /amp desconhecido (%s)",
+			i18n.Choose("comando /amp desconhecido (%s)", "unknown /amp command (%s)"),
 			commandOperation,
 		)
 	}

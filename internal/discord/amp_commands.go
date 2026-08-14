@@ -977,7 +977,7 @@ func buildAMPStatusEmbeds(
 		return []disgoDiscord.Embed{
 			disgoDiscord.NewEmbed().
 				WithDescription(
-					"Nenhuma instância controlável foi encontrada.",
+					i18n.Choose("Nenhuma instância controlável foi encontrada.", "No controllable instance was found."),
 				).
 				WithColor(0x5865F2),
 		}
@@ -993,7 +993,7 @@ func buildAMPStatusEmbeds(
 		row := disgoDiscord.NewEmbed().WithColor(0x5865F2)
 		if rowStart == 0 {
 			row = row.WithDescription(
-				fmt.Sprintf("Atualizado <t:%d:R>", updatedAt.Unix()),
+				fmt.Sprintf(i18n.Choose("Atualizado <t:%d:R>", "Updated <t:%d:R>"), updatedAt.Unix()),
 			)
 		}
 
@@ -1006,7 +1006,7 @@ func buildAMPStatusEmbeds(
 				game = strings.TrimSpace(statusView.Instance.Module)
 			}
 			if game == "" {
-				game = "Desconhecido"
+				game = i18n.Choose("Desconhecido", "Unknown")
 			}
 
 			uptime := "0 min"
@@ -1040,7 +1040,7 @@ func buildAMPStatusEmbeds(
 					ampInstanceDisplayName(statusView.Instance),
 				),
 				fmt.Sprintf(
-					"**Jogo:** `%s`\n**Tempo online:** `%s`\n**Jogadores:** `%s`\n──────────────",
+					i18n.Choose("**Jogo:** `%s`\n**Tempo online:** `%s`\n**Jogadores:** `%s`\n──────────────", "**Game:** `%s`\n**Uptime:** `%s`\n**Players:** `%s`\n──────────────"),
 					game,
 					uptime,
 					players,
@@ -1060,7 +1060,7 @@ func buildAMPStatusEmbeds(
 		embeds,
 		disgoDiscord.NewEmbed().
 			WithDescription(
-				"**Legenda:**  🟢 Online   •   🟡 Idle   •   🔴 Offline",
+				i18n.Choose("**Legenda:**  🟢 Online   •   🟡 Idle   •   🔴 Offline", "**Legend:**  🟢 Online   •   🟡 Idle   •   🔴 Offline"),
 			).
 			WithColor(0x5865F2),
 	)
