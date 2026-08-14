@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -516,9 +515,7 @@ func (o *idleObserver) IdleDiagnostics() discordClient.IdleDiagnosticsSnapshot {
 			continue
 		}
 		rconServers++
-		if strings.TrimSpace(server.RCONAddress) != "" &&
-			strings.TrimSpace(server.RCONPasswordEnv) != "" &&
-			strings.TrimSpace(os.Getenv(server.RCONPasswordEnv)) != "" {
+		if rconServerReady(server) {
 			rconReady++
 		}
 	}
@@ -546,6 +543,14 @@ func (o *idleObserver) IdleDiagnostics() discordClient.IdleDiagnosticsSnapshot {
 func idleServerUsesRCON(server idle.Server) bool {
 	return strings.HasSuffix(string(server.Detector), "_rcon") ||
 		strings.HasSuffix(string(server.FallbackDetector), "_rcon")
+}
+
+func rconServerReady(server idle.Server) bool {
+	if strings.TrimSpace(server.RCONAddress) == "" {
+		return false
+	}
+	password, err := server.RCONPassword()
+	return err == nil && strings.TrimSpace(password) != ""
 }
 
 func (o *idleObserver) configSnapshot() idle.Config {
