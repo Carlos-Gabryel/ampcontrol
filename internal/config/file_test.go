@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -110,5 +111,28 @@ username = "amp-api-user"
 	}
 	if result.Language != "en-US" {
 		t.Fatalf("idioma inesperado: %q", result.Language)
+	}
+}
+
+func TestBilingualExampleConfigsParse(t *testing.T) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("could not locate test file")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
+	for filename, expectedLanguage := range map[string]string{
+		"ampcontrol.example.toml":    "pt-BR",
+		"ampcontrol.example.en.toml": "en-US",
+	} {
+		t.Run(filename, func(t *testing.T) {
+			t.Setenv("AMPCONTROL_CONFIG", filepath.Join(root, "config", filename))
+			result, err := loadFileConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Language != expectedLanguage {
+				t.Fatalf("language = %q, want %q", result.Language, expectedLanguage)
+			}
+		})
 	}
 }
