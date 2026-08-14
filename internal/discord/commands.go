@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	discordGuildID        = "787371679541755935"
 	maximumDiscordChoices = 25
 	maximumChoiceNameSize = 100
 )
@@ -24,6 +23,7 @@ func RegisterCommands(
 	ctx context.Context,
 	restClient rest.Rest,
 	applicationID snowflake.ID,
+	guildID snowflake.ID,
 	gameOverrides map[string]string,
 	presentationOverrides []instancePresentationOverride,
 	hiddenInstanceNames []string,
@@ -79,10 +79,6 @@ func RegisterCommands(
 		),
 	}
 
-	guildID := snowflake.MustParse(
-		discordGuildID,
-	)
-
 	_, err = applications.SetGuildCommands(
 		applicationID,
 		guildID,
@@ -106,6 +102,7 @@ func (c *Client) registerCommands(ctx context.Context) error {
 		ctx,
 		c.bot.Rest,
 		c.bot.ApplicationID,
+		c.guildID,
 		c.gameOverridesSnapshot(),
 		c.instancePresentationSettingsSnapshot(),
 		c.hiddenInstanceNames(),

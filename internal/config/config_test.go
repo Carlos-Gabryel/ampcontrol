@@ -27,3 +27,25 @@ func TestNonNegativeEnvironmentInteger(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDiscordID(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name  string
+		value string
+		valid bool
+	}{
+		{name: "snowflake válido", value: "111111111111111111", valid: true},
+		{name: "ausente", value: "", valid: false},
+		{name: "texto", value: "servidor", valid: false},
+		{name: "zero", value: "0", valid: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateDiscordID("DISCORD_GUILD_ID", test.value)
+			if (err == nil) != test.valid {
+				t.Fatalf("validade inesperada para %q: %v", test.value, err)
+			}
+		})
+	}
+}

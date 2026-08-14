@@ -34,6 +34,10 @@ func ControlInstance(
 		)
 	}
 
+	if strings.EqualFold(instanceName, "ADS01") {
+		return fmt.Errorf("a instância ADS01 é protegida")
+	}
+
 	if !isValidInstanceOperation(operation) {
 		return fmt.Errorf(
 			"operação AMP inválida: %q",

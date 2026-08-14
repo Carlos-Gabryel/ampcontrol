@@ -67,6 +67,7 @@ func New() (*App, error) {
 		cfg.DiscordToken,
 		ampAPIClient,
 		discordClient.ClientConfig{
+			GuildID:               cfg.DiscordGuildID,
 			NotificationChannelID: cfg.DiscordNotificationChannelID,
 			AuditChannelID:        cfg.DiscordAuditChannelID,
 			OwnerUserID:           cfg.DiscordOwnerUserID,

@@ -141,7 +141,7 @@ func TestClientInstancePresentationSettingsPersistAndApply(t *testing.T) {
 }
 
 func TestAMPConfigAuthorizationRequiresExactOwnerAndAdministrator(t *testing.T) {
-	ownerID := snowflake.ID(228297467865595904)
+	ownerID := snowflake.ID(111111111111111111)
 	administrator := &disgoDiscord.ResolvedMember{
 		Permissions: disgoDiscord.PermissionAdministrator,
 	}

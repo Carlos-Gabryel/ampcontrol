@@ -1,6 +1,6 @@
 module github.com/alabamaamp/ampcontrol
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/disgoorg/disgo v0.19.6

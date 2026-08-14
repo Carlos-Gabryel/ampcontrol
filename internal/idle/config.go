@@ -184,12 +184,6 @@ func buildConfig(
 		)
 	}
 
-	if len(raw.Servers) == 0 {
-		return Config{}, fmt.Errorf(
-			"nenhum servidor foi cadastrado na configuração de Idle",
-		)
-	}
-
 	config := Config{
 		CheckInterval: time.Duration(
 			checkIntervalSeconds,

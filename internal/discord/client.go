@@ -23,6 +23,7 @@ type Client struct {
 	ampClient               *amp.APIClient
 	interactions            rest.Interactions
 	channels                rest.Channels
+	guildID                 snowflake.ID
 	notificationChannelID   snowflake.ID
 	auditChannelID          snowflake.ID
 	ownerUserID             snowflake.ID
@@ -72,6 +73,7 @@ type PlayerCountResolver interface {
 }
 
 type ClientConfig struct {
+	GuildID                 string
 	NotificationChannelID   string
 	AuditChannelID          string
 	OwnerUserID             string
@@ -127,6 +129,7 @@ func New(
 		ampClient:             ampClient,
 		interactions:          interactions,
 		channels:              channels,
+		guildID:               snowflake.MustParse(config.GuildID),
 		notificationChannelID: snowflake.MustParse(config.NotificationChannelID),
 		auditChannelID:        snowflake.MustParse(config.AuditChannelID),
 		ownerUserID:           snowflake.MustParse(config.OwnerUserID),
