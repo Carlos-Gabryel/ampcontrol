@@ -97,12 +97,17 @@ if compgen -G '/etc/credstore.encrypted/ampcontrol.*' >/dev/null; then
     cp -a -- /etc/credstore.encrypted/ampcontrol.* "$SNAPSHOT_DIRECTORY/etc/credstore.encrypted/"
 fi
 cp -a -- "$LEGACY_DIRECTORY" "$BACKUP_DIRECTORY/legacy-installation"
+SYSTEMD_ENVIRONMENT_FILE="$BACKUP_DIRECTORY/legacy-systemd-environment"
+readonly SYSTEMD_ENVIRONMENT_FILE
+systemctl show ampcontrol.service --property=Environment --value > "$SYSTEMD_ENVIRONMENT_FILE"
+chmod 0600 "$SYSTEMD_ENVIRONMENT_FILE"
 printf 'active=%s\nenabled=%s\nlegacy=%s\n' \
     "$SERVICE_WAS_ACTIVE" "$SERVICE_WAS_ENABLED" "$LEGACY_DIRECTORY" > "$BACKUP_DIRECTORY/metadata"
 
 ROLLBACK_ARMED=true
 printf 'Backup transacional criado em %s\n' "$BACKUP_DIRECTORY"
 AMPCONTROL_MIGRATION_TRANSACTION=1 \
+AMPCONTROL_LEGACY_SYSTEMD_ENV_FILE="$SYSTEMD_ENVIRONMENT_FILE" \
     "$SCRIPT_DIRECTORY/install.sh" --no-start --migrate-legacy "$LEGACY_DIRECTORY"
 
 systemctl daemon-reload

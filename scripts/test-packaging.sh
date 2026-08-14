@@ -72,6 +72,11 @@ RCON_PASSWORD=segredo-rcon
 EOF
 [[ "$("$PYTHON_COMMAND" "$PROJECT_DIRECTORY/scripts/legacy_config.py" env "$TEMP_DIRECTORY/legacy.env" AMP_PASSWORD)" == 'senha # preservada' ]] || fail "parser seguro de .env alterou o valor"
 
+cat > "$TEMP_DIRECTORY/systemd-environment" <<'EOF'
+HOME=/home/ampcontrol "AMP_PUBLIC_URL=http://192.168.1.22:8080" AMP_GAME_SERVER_ADDRESS=192.168.1.22
+EOF
+[[ "$("$PYTHON_COMMAND" "$PROJECT_DIRECTORY/scripts/legacy_config.py" systemd-env "$TEMP_DIRECTORY/systemd-environment" AMP_PUBLIC_URL)" == 'http://192.168.1.22:8080' ]] || fail "ambiente legado do systemd não foi interpretado"
+
 cat > "$TEMP_DIRECTORY/legacy-idle.json" <<'EOF'
 {
   "check_interval_seconds": 30,

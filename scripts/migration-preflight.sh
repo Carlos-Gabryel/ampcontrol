@@ -31,7 +31,12 @@ check_command() {
 }
 
 env_present() {
-    python3 "$SCRIPT_DIRECTORY/legacy_config.py" env "$ENV_FILE" "$1" >/dev/null 2>&1
+    if python3 "$SCRIPT_DIRECTORY/legacy_config.py" env "$ENV_FILE" "$1" >/dev/null 2>&1; then
+        return 0
+    fi
+    [[ -n "$TEMP_DIRECTORY" && -f "$TEMP_DIRECTORY/systemd-environment" ]] &&
+        python3 "$SCRIPT_DIRECTORY/legacy_config.py" systemd-env \
+            "$TEMP_DIRECTORY/systemd-environment" "$1" >/dev/null 2>&1
 }
 
 printf 'AmpControl — pré-validação da migração (somente leitura)\n'
@@ -49,6 +54,11 @@ if [[ -x "$LEGACY_DIRECTORY/ampcontrol" ]]; then ok 'binário legado encontrado'
 if [[ -f "$IDLE_FILE" ]]; then ok 'configuração de Idle encontrada'; else fail 'configuração de Idle ausente'; fi
 if [[ -d "$LEGACY_DIRECTORY/data" ]]; then ok 'diretório de estado encontrado'; else warn 'diretório data não existe'; fi
 
+TEMP_DIRECTORY="$(mktemp -d)"
+if systemctl cat ampcontrol.service >/dev/null 2>&1; then
+    systemctl show ampcontrol.service --property=Environment --value > "$TEMP_DIRECTORY/systemd-environment"
+fi
+
 if [[ -f "$ENV_FILE" ]]; then
     for required in DISCORD_TOKEN DISCORD_NOTIFICATION_CHANNEL_ID DISCORD_AUDIT_CHANNEL_ID DISCORD_OWNER_USER_ID AMP_USERNAME AMP_PASSWORD; do
         if env_present "$required"; then ok "variável legada presente: $required"; else fail "variável legada ausente: $required"; fi
@@ -59,7 +69,6 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 if [[ -f "$IDLE_FILE" && -f "$ENV_FILE" ]]; then
-    TEMP_DIRECTORY="$(mktemp -d)"
     if python3 "$SCRIPT_DIRECTORY/legacy_config.py" migrate-idle \
         "$IDLE_FILE" "$TEMP_DIRECTORY/idle.json" "$TEMP_DIRECTORY/rcon.tsv"; then
         ok 'JSON de Idle aceito pelo conversor'

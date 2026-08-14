@@ -44,6 +44,19 @@ def parse_env(path: Path) -> dict[str, str]:
     return values
 
 
+def parse_systemd_environment(path: Path) -> dict[str, str]:
+    """Parse the escaped output of `systemctl show -p Environment --value`."""
+    values: dict[str, str] = {}
+    for item in shlex.split(path.read_text(encoding="utf-8"), posix=True):
+        if "=" not in item:
+            raise ValueError("entrada inválida no ambiente do systemd")
+        name, value = item.split("=", 1)
+        if not ENV_NAME.fullmatch(name):
+            raise ValueError(f"nome inválido no ambiente do systemd: {name!r}")
+        values[name] = value
+    return values
+
+
 def credential_name(instance: str) -> str:
     normalized = CREDENTIAL_NAME.sub("_", instance.strip()).strip("_")
     if not normalized:
@@ -100,6 +113,10 @@ def main() -> int:
     env_parser.add_argument("file", type=Path)
     env_parser.add_argument("name")
 
+    systemd_env_parser = subparsers.add_parser("systemd-env")
+    systemd_env_parser.add_argument("file", type=Path)
+    systemd_env_parser.add_argument("name")
+
     idle_parser = subparsers.add_parser("migrate-idle")
     idle_parser.add_argument("source", type=Path)
     idle_parser.add_argument("destination", type=Path)
@@ -107,10 +124,11 @@ def main() -> int:
 
     args = parser.parse_args()
     try:
-        if args.command == "env":
+        if args.command in {"env", "systemd-env"}:
             if not ENV_NAME.fullmatch(args.name):
                 raise ValueError("nome de variável inválido")
-            value = parse_env(args.file).get(args.name)
+            parser = parse_env if args.command == "env" else parse_systemd_environment
+            value = parser(args.file).get(args.name)
             if value is None:
                 return 3
             sys.stdout.write(value)

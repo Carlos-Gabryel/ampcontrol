@@ -90,7 +90,15 @@ fi
 legacy_env_value() {
     local name="$1"
     [[ -n "$LEGACY_ENV_FILE" ]] || return 3
-    python3 "$PROJECT_DIRECTORY/scripts/legacy_config.py" env "$LEGACY_ENV_FILE" "$name"
+    if python3 "$PROJECT_DIRECTORY/scripts/legacy_config.py" env "$LEGACY_ENV_FILE" "$name"; then
+        return 0
+    fi
+    if [[ -n "${AMPCONTROL_LEGACY_SYSTEMD_ENV_FILE:-}" && -f "$AMPCONTROL_LEGACY_SYSTEMD_ENV_FILE" ]]; then
+        python3 "$PROJECT_DIRECTORY/scripts/legacy_config.py" systemd-env \
+            "$AMPCONTROL_LEGACY_SYSTEMD_ENV_FILE" "$name"
+        return $?
+    fi
+    return 3
 }
 
 legacy_or_default() {
