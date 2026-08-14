@@ -111,6 +111,22 @@ prompt_secret() {
     done
 }
 
+prompt_yes_no() {
+    local prompt="$1"
+    local default_value="$2"
+    local suffix="[s/N]"
+    [[ "$default_value" == "true" ]] && suffix="[S/n]"
+    local answer=""
+    read -r -p "$prompt $suffix: " answer
+    if [[ -z "$answer" ]]; then
+        printf '%s' "$default_value"
+    elif [[ "$answer" =~ ^[sSyY]$ ]]; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
 validate_discord_id() {
     [[ "$1" =~ ^[0-9]{15,20}$ ]] || fail "$2 não parece ser um ID válido do Discord"
 }
@@ -182,11 +198,26 @@ DISCORD_GUILD_ID="$(prompt_required 'ID do servidor Discord')"
 DISCORD_PANEL_CHANNEL_ID="$(prompt_required 'ID do canal do painel e comandos')"
 DISCORD_AUDIT_CHANNEL_ID="$(prompt_required 'ID do canal privado de auditoria')"
 DISCORD_OWNER_USER_ID="$(prompt_required 'ID do proprietário do bot')"
+DISCORD_ADMIN_ROLE_IDS_RAW="$(prompt_optional 'IDs dos cargos administrativos do Discord, separados por vírgula')"
+RESTRICT_COMMAND_CHANNEL="$(prompt_yes_no 'Restringir /amp e /ampconfig ao canal do painel?' 'true')"
+ALLOW_DISCORD_ADMINISTRATORS="$(prompt_yes_no 'Autorizar automaticamente qualquer membro com permissão Administrator?' 'false')"
+printf 'Nota: o proprietário e os cargos escolhidos devem ter permissão Administrator no Discord para visualizar /ampconfig.\n'
 validate_discord_id "$DISCORD_GUILD_ID" "O ID do servidor"
 validate_discord_id "$DISCORD_PANEL_CHANNEL_ID" "O ID do canal do painel"
 validate_discord_id "$DISCORD_AUDIT_CHANNEL_ID" "O ID do canal de auditoria"
 validate_discord_id "$DISCORD_OWNER_USER_ID" "O ID do proprietário"
 [[ "$DISCORD_PANEL_CHANNEL_ID" != "$DISCORD_AUDIT_CHANNEL_ID" ]] || fail "os canais do painel e de auditoria precisam ser diferentes"
+
+DISCORD_ADMIN_ROLE_IDS_TOML=""
+if [[ -n "$DISCORD_ADMIN_ROLE_IDS_RAW" ]]; then
+    IFS=',' read -r -a DISCORD_ADMIN_ROLE_IDS <<<"$DISCORD_ADMIN_ROLE_IDS_RAW"
+    for role_id in "${DISCORD_ADMIN_ROLE_IDS[@]}"; do
+        role_id="${role_id//[[:space:]]/}"
+        validate_discord_id "$role_id" "O ID de cargo administrativo"
+        [[ -z "$DISCORD_ADMIN_ROLE_IDS_TOML" ]] || DISCORD_ADMIN_ROLE_IDS_TOML+=", "
+        DISCORD_ADMIN_ROLE_IDS_TOML+="\"$role_id\""
+    done
+fi
 
 AMP_API_USERNAME="$(prompt_required 'Usuário da API do AMP usado pelo bot')"
 AMP_ADS_URL="$(prompt_default 'URL local do ADS do AMP' 'http://127.0.0.1:8080')"
@@ -255,6 +286,9 @@ guild_id = "$(toml_escape "$DISCORD_GUILD_ID")"
 notification_channel_id = "$(toml_escape "$DISCORD_PANEL_CHANNEL_ID")"
 audit_channel_id = "$(toml_escape "$DISCORD_AUDIT_CHANNEL_ID")"
 owner_user_id = "$(toml_escape "$DISCORD_OWNER_USER_ID")"
+admin_role_ids = [$DISCORD_ADMIN_ROLE_IDS_TOML]
+restrict_commands_to_channel = $RESTRICT_COMMAND_CHANNEL
+allow_discord_administrators = $ALLOW_DISCORD_ADMINISTRATORS
 notification_ttl_minutes = 10
 status_refresh_seconds = 60
 command_user_cooldown_seconds = 5

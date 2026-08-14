@@ -12,25 +12,28 @@ import (
 )
 
 type Config struct {
-	DiscordToken                 string
-	DiscordGuildID               string
-	DiscordNotificationChannelID string
-	DiscordAuditChannelID        string
-	DiscordOwnerUserID           string
-	DiscordNotificationTTL       time.Duration
-	DiscordStatusRefreshInterval time.Duration
-	DiscordCommandUserCooldown   time.Duration
-	DiscordCommandServerCooldown time.Duration
-	AMPUsername                  string
-	AMPPassword                  string
-	AMPADSURL                    string
-	AMPPublicURL                 string
-	AMPGameServerAddress         string
-	AMPSystemUser                string
-	AMPManagerPath               string
-	AMPWrapperPath               string
-	SudoPath                     string
-	LogLevel                     string
+	DiscordToken                  string
+	DiscordGuildID                string
+	DiscordNotificationChannelID  string
+	DiscordAuditChannelID         string
+	DiscordOwnerUserID            string
+	DiscordAdminRoleIDs           []string
+	DiscordRestrictCommandChannel bool
+	DiscordAllowAdministrators    bool
+	DiscordNotificationTTL        time.Duration
+	DiscordStatusRefreshInterval  time.Duration
+	DiscordCommandUserCooldown    time.Duration
+	DiscordCommandServerCooldown  time.Duration
+	AMPUsername                   string
+	AMPPassword                   string
+	AMPADSURL                     string
+	AMPPublicURL                  string
+	AMPGameServerAddress          string
+	AMPSystemUser                 string
+	AMPManagerPath                string
+	AMPWrapperPath                string
+	SudoPath                      string
+	LogLevel                      string
 }
 
 func Load() (*Config, error) {
@@ -97,6 +100,11 @@ func Load() (*Config, error) {
 		"DISCORD_OWNER_USER_ID":           cfg.DiscordOwnerUserID,
 	} {
 		if err := validateDiscordID(name, value); err != nil {
+			return nil, err
+		}
+	}
+	for _, roleID := range cfg.DiscordAdminRoleIDs {
+		if err := validateDiscordID("discord.admin_role_ids", roleID); err != nil {
 			return nil, err
 		}
 	}

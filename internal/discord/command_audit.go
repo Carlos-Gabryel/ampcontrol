@@ -80,6 +80,8 @@ func (c *Client) commandAuditDecision(
 		event.User().ID,
 		event.Member(),
 		c.ownerUserID,
+		c.adminRoleIDs,
+		c.allowAdministrators,
 	) {
 		return false, "Recusado: usuário sem permissão"
 	}

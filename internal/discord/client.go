@@ -27,6 +27,9 @@ type Client struct {
 	notificationChannelID   snowflake.ID
 	auditChannelID          snowflake.ID
 	ownerUserID             snowflake.ID
+	adminRoleIDs            map[snowflake.ID]struct{}
+	restrictCommandChannel  bool
+	allowAdministrators     bool
 	notificationTTL         time.Duration
 	statusRefreshInterval   time.Duration
 	adsURL                  string
@@ -77,6 +80,9 @@ type ClientConfig struct {
 	NotificationChannelID   string
 	AuditChannelID          string
 	OwnerUserID             string
+	AdminRoleIDs            []string
+	RestrictCommandChannel  bool
+	AllowAdministrators     bool
 	NotificationTTL         time.Duration
 	StatusRefreshInterval   time.Duration
 	ADSURL                  string
@@ -100,6 +106,10 @@ func New(
 	preferences, err := loadDiscordPreferences(config.PreferencesPath)
 	if err != nil {
 		return nil, err
+	}
+	adminRoleIDs, err := parseSnowflakeSet(config.AdminRoleIDs)
+	if err != nil {
+		return nil, fmt.Errorf("cargos administrativos inválidos: %w", err)
 	}
 
 	disgoClient, err := disgo.New(
@@ -125,24 +135,27 @@ func New(
 	)
 
 	client := &Client{
-		bot:                   disgoClient,
-		ampClient:             ampClient,
-		interactions:          interactions,
-		channels:              channels,
-		guildID:               snowflake.MustParse(config.GuildID),
-		notificationChannelID: snowflake.MustParse(config.NotificationChannelID),
-		auditChannelID:        snowflake.MustParse(config.AuditChannelID),
-		ownerUserID:           snowflake.MustParse(config.OwnerUserID),
-		notificationTTL:       config.NotificationTTL,
-		statusRefreshInterval: config.StatusRefreshInterval,
-		adsURL:                config.ADSURL,
-		ampPublicURL:          strings.TrimRight(strings.TrimSpace(config.AMPPublicURL), "/"),
-		gameServerAddress:     strings.TrimSpace(config.GameServerAddress),
-		statusStatePath:       config.StatusStatePath,
-		preferencesPath:       config.PreferencesPath,
-		preferences:           preferences,
-		idleRegistered:        instanceNameMap(config.IdleRegisteredInstances),
-		statusRefreshRequests: make(chan struct{}, 1),
+		bot:                    disgoClient,
+		ampClient:              ampClient,
+		interactions:           interactions,
+		channels:               channels,
+		guildID:                snowflake.MustParse(config.GuildID),
+		notificationChannelID:  snowflake.MustParse(config.NotificationChannelID),
+		auditChannelID:         snowflake.MustParse(config.AuditChannelID),
+		ownerUserID:            snowflake.MustParse(config.OwnerUserID),
+		adminRoleIDs:           adminRoleIDs,
+		restrictCommandChannel: config.RestrictCommandChannel,
+		allowAdministrators:    config.AllowAdministrators,
+		notificationTTL:        config.NotificationTTL,
+		statusRefreshInterval:  config.StatusRefreshInterval,
+		adsURL:                 config.ADSURL,
+		ampPublicURL:           strings.TrimRight(strings.TrimSpace(config.AMPPublicURL), "/"),
+		gameServerAddress:      strings.TrimSpace(config.GameServerAddress),
+		statusStatePath:        config.StatusStatePath,
+		preferencesPath:        config.PreferencesPath,
+		preferences:            preferences,
+		idleRegistered:         instanceNameMap(config.IdleRegisteredInstances),
+		statusRefreshRequests:  make(chan struct{}, 1),
 		commandCooldowns: newAMPCommandCooldowns(
 			config.CommandUserCooldown,
 			config.CommandServerCooldown,
@@ -161,6 +174,18 @@ func New(
 	)
 
 	return client, nil
+}
+
+func parseSnowflakeSet(values []string) (map[snowflake.ID]struct{}, error) {
+	result := make(map[snowflake.ID]struct{}, len(values))
+	for _, value := range values {
+		id, err := snowflake.Parse(strings.TrimSpace(value))
+		if err != nil || id == 0 {
+			return nil, fmt.Errorf("ID inválido: %q", value)
+		}
+		result[id] = struct{}{}
+	}
+	return result, nil
 }
 
 func copyStringMap(source map[string]string) map[string]string {

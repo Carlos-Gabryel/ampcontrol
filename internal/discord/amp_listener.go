@@ -55,6 +55,7 @@ func (c *Client) handleAMPInteractionEvent(
 	channelAllowed := ampCommandChannelAllowed(
 		channelID,
 		c.notificationChannelID,
+		c.restrictCommandChannel,
 	)
 
 	auditAccepted, auditReason := c.commandAuditDecision(
@@ -137,6 +138,10 @@ func (c *Client) handleAMPInteractionEvent(
 func ampCommandChannelAllowed(
 	channelID snowflake.ID,
 	allowedChannelID snowflake.ID,
+	restricted bool,
 ) bool {
+	if !restricted {
+		return channelID != 0
+	}
 	return channelID != 0 && channelID == allowedChannelID
 }

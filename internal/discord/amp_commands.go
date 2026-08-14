@@ -127,6 +127,27 @@ func ampCommandAuthorized(
 		)
 }
 
+func ampCommandPrivileged(
+	userID snowflake.ID,
+	member *disgoDiscord.ResolvedMember,
+	ownerUserID snowflake.ID,
+	adminRoleIDs map[snowflake.ID]struct{},
+	allowAdministrators bool,
+) bool {
+	if ownerUserID != 0 && userID == ownerUserID {
+		return true
+	}
+	if member == nil {
+		return false
+	}
+	for _, roleID := range member.RoleIDs {
+		if _, allowed := adminRoleIDs[roleID]; allowed {
+			return true
+		}
+	}
+	return allowAdministrators && ampCommandAuthorized(member)
+}
+
 func ampCommandConfirmed(
 	data disgoDiscord.SlashCommandInteractionData,
 ) bool {
@@ -342,6 +363,8 @@ func (c *Client) handleAMPControlCommand(
 			event.User().ID,
 			event.Member(),
 			c.ownerUserID,
+			c.adminRoleIDs,
+			c.allowAdministrators,
 		),
 	)
 }

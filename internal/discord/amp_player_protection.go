@@ -20,9 +20,10 @@ func ampCommandBypassesPlayerProtection(
 	userID snowflake.ID,
 	member *disgoDiscord.ResolvedMember,
 	ownerUserID snowflake.ID,
+	adminRoleIDs map[snowflake.ID]struct{},
+	allowAdministrators bool,
 ) bool {
-	return (ownerUserID != 0 && userID == ownerUserID) ||
-		ampCommandAuthorized(member)
+	return ampCommandPrivileged(userID, member, ownerUserID, adminRoleIDs, allowAdministrators)
 }
 
 func ampOperationProtectedFromPlayers(

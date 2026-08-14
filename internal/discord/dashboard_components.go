@@ -219,7 +219,13 @@ func (c *Client) handleDashboardComponent(event *events.ComponentInteractionCrea
 	))
 	go c.executeAMPControlOperation(
 		event.ApplicationID(), event.Token(), instance, operation,
-		ampCommandBypassesPlayerProtection(event.User().ID, event.Member(), c.ownerUserID),
+		ampCommandBypassesPlayerProtection(
+			event.User().ID,
+			event.Member(),
+			c.ownerUserID,
+			c.adminRoleIDs,
+			c.allowAdministrators,
+		),
 	)
 }
 

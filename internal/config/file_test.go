@@ -13,6 +13,9 @@ guild_id = "111111111111111111"
 notification_channel_id = "222222222222222222"
 audit_channel_id = "333333333333333333"
 owner_user_id = "444444444444444444"
+admin_role_ids = ["555555555555555555"]
+restrict_commands_to_channel = false
+allow_discord_administrators = false
 status_refresh_seconds = 30
 
 [amp]
@@ -33,6 +36,10 @@ level = "debug"
 	}
 	if result.Discord.GuildID != "111111111111111111" || result.AMP.Username != "amp" {
 		t.Fatalf("configuração inesperada: %#v", result)
+	}
+	if result.Discord.RestrictCommandsToChannel == nil || *result.Discord.RestrictCommandsToChannel ||
+		len(result.Discord.AdminRoleIDs) != 1 {
+		t.Fatalf("política Discord inesperada: %#v", result.Discord)
 	}
 }
 
