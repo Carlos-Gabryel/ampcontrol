@@ -30,6 +30,19 @@ func TestReadRequiredFallsBackToEnvironment(t *testing.T) {
 	}
 }
 
+func TestReadCredentialTrimsSurroundingLineBreaks(t *testing.T) {
+	directory := t.TempDir()
+	t.Setenv("CREDENTIALS_DIRECTORY", directory)
+	if err := os.WriteFile(filepath.Join(directory, "test_secret"), []byte("\n\r\nsenha com espaço \r\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	value, err := ReadCredential("test_secret")
+	if err != nil || value != "senha com espaço " {
+		t.Fatalf("credencial inesperada: valor=%q erro=%v", value, err)
+	}
+}
+
 func TestReadCredentialRejectsTraversal(t *testing.T) {
 	if _, err := ReadCredential("../secret"); err == nil {
 		t.Fatal("era esperado erro para travessia de diretório")

@@ -41,7 +41,9 @@ func ReadCredential(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	value := strings.TrimRight(string(content), "\r\n")
+	// Quebras de linha nunca fazem parte de um token ou senha; removê-las nas
+	// duas pontas evita cabeçalhos inválidos quando o arquivo vem com sobras.
+	value := strings.Trim(string(content), "\r\n")
 	if value == "" {
 		return "", fmt.Errorf("a credencial %s está vazia", name)
 	}

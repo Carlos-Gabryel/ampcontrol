@@ -68,6 +68,12 @@ expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" unknown
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--binary CAMINHO'
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--language'
 "$PROJECT_DIRECTORY/scripts/install.sh" --language en-US --help | grep -q -- 'installs an already compiled binary'
+
+# prompt_secret é capturado com $(...): nada além do segredo pode sair no
+# stdout, senão token e senha são gravados corrompidos.
+eval "$(sed -n '/^prompt_secret() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/install.sh")"
+captured_secret="$(printf 'segredo com espaço\nsegredo com espaço\n' | prompt_secret 'Token' 2>/dev/null)"
+[[ "$captured_secret" == 'segredo com espaço' ]] || fail "$(msg 'prompt_secret alterou o segredo' 'prompt_secret changed the secret'): $(printf '%q' "$captured_secret")"
 AMPCONTROL_LANGUAGE=pt-BR "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --help | grep -q -- '--binary CAMINHO'
 "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --language en-US --help | grep -q -- 'legacy installation'
 "$PROJECT_DIRECTORY/scripts/migration-preflight.sh" --language en-US --help | grep -q -- '^Usage:'
