@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Ensaio de ponta a ponta do instalador, como um usuário novo faria. Roda como
+# root dentro de um container descartável com systemd (packaging/test/
+# installer.Dockerfile); nunca execute em uma máquina real.
+#
+# Uso: scripts/test-installer.sh CAMINHO_DO_BINÁRIO
+
+set -Eeuo pipefail
+
+readonly LANGUAGE="${AMPCONTROL_LANGUAGE:-pt-BR}"
+msg() { if [[ "$LANGUAGE" == "en-US" ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
+
+SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly SCRIPT_DIRECTORY
+readonly BINARY="${1:?$(msg 'informe o caminho do binário' 'provide the binary path')}"
+
+fail() {
+    printf '%s: %s\n' "$(msg 'Falha' 'Failure')" "$1" >&2
+    exit 1
+}
+
+[[ "$EUID" -eq 0 ]] || fail "$(msg 'execute como root dentro do container de teste' 'run as root inside the test container')"
+[[ -f /.dockerenv || "${AMPCONTROL_INSTALLER_TEST:-}" == 1 ]] ||
+    fail "$(msg 'este ensaio altera o sistema; use somente no container de teste' 'this rehearsal changes the system; use it only in the test container')"
+
+[[ ! -e /etc/ampcontrol ]] ||
+    fail "$(msg 'o ensaio precisa de um container novo, sem instalação anterior' 'the rehearsal needs a fresh container without a previous installation')"
+
+# Formato de token real: base64 do ID da aplicação, como o disgo exige.
+readonly TOKEN_FIRST='MTIzNDU2Nzg5MDEyMzQ1Njc4.fake-first.token_1234'
+readonly TOKEN_SECOND='MTIzNDU2Nzg5MDEyMzQ1Njc4.fake-second.token_5678'
+readonly AMP_PASSWORD='senha com espaço #1'
+readonly GUILD_ID='111111111111111111'
+readonly PANEL_ID='222222222222222222'
+readonly AUDIT_ID='333333333333333333'
+readonly OWNER_ID='444444444444444444'
+
+# AMP falso: usuário, instâncias e um ampinstmgr que só lista.
+id amp >/dev/null 2>&1 || useradd --create-home --shell /bin/bash amp
+install -d -o amp -g amp /home/amp/.ampdata/instances/ADS01 \
+    /home/amp/.ampdata/instances/Palworld01 /home/amp/.ampdata/instances/Valheim01
+cat >/usr/bin/ampinstmgr <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--ShowInstancesList" ]]; then
+    for directory in "$HOME"/.ampdata/instances/*/; do
+        name="$(basename "$directory")"
+        printf 'Instance Name │ %s\nModule        │ GenericModule\nRunning       │ Yes\n\n' "$name"
+    done
+    exit 0
+fi
+printf 'ampinstmgr falso: %s\n' "$*" >&2
+exit 1
+EOF
+chmod 0755 /usr/bin/ampinstmgr
+
+run_installer() {
+    local answers="$1"
+    printf '%s
+' "$answers" | script -qec "'$SCRIPT_DIRECTORY/install.sh' --language pt-BR --binary '$BINARY' --no-start" /dev/null
+}
+
+discord_and_amp_answers() {
+    local token="$1"
+    printf '%s\n' "$GUILD_ID" "$PANEL_ID" "$AUDIT_ID" "$OWNER_ID" '' '' '' \
+        '' '' 'http://amp.example.invalid:8080' 'jogos.example.invalid' \
+        "$token" "$token" "$AMP_PASSWORD" "$AMP_PASSWORD" 's'
+}
+
+decrypted() {
+    systemd-creds decrypt --name="$1" "/etc/credstore.encrypted/ampcontrol.$1" -
+}
+
+assert_secret() {
+    local name="$1"
+    local expected="$2"
+    local actual
+    actual="$(decrypted "$name" | od -An -c | tr -s ' ')"
+    [[ "$actual" == "$(printf '%s' "$expected" | od -An -c | tr -s ' ')" ]] ||
+        fail "$(msg 'credencial gravada com conteúdo diferente do digitado' 'credential stored with content different from the input'): $name:$actual"
+}
+
+check_installation() {
+    local token="$1"
+    assert_secret discord_token "$token"
+    assert_secret amp_password "$AMP_PASSWORD"
+
+    grep -qx "guild_id = \"$GUILD_ID\"" /etc/ampcontrol/config.toml || fail "guild_id"
+    grep -qx 'allow_discord_administrators = false' /etc/ampcontrol/config.toml || fail "allow_discord_administrators"
+    grep -q '"instance": "Palworld01"' /var/lib/ampcontrol/data/idle_servers.json || fail "idle_servers.json"
+    ! grep -q 'Valheim01' /var/lib/ampcontrol/data/idle_servers.json || fail "$(msg 'instância não escolhida no Idle' 'instance not chosen for Idle')"
+
+    systemd-analyze verify /etc/systemd/system/ampcontrol.service || fail "systemd-analyze verify"
+    visudo -cf /etc/sudoers.d/ampcontrol >/dev/null || fail "sudoers"
+    local inventory
+    inventory="$(sudo -u ampcontrol sudo -n -u amp /usr/local/bin/ampcontrol-amp list)"
+    [[ "$inventory" == *'Palworld01'* ]] ||
+        fail "$(msg 'o usuário do serviço não consegue usar o wrapper' 'the service user cannot use the wrapper')"
+    ! sudo -u ampcontrol sudo -n -u amp /bin/true 2>/dev/null ||
+        fail "$(msg 'o sudoers permite mais que o wrapper' 'sudoers allows more than the wrapper')"
+
+    # --check-config fora do systemd: segredos pelas variáveis legadas.
+    (cd /var/lib/ampcontrol && sudo -u ampcontrol env -i PATH=/usr/bin:/bin \
+        AMPCONTROL_CONFIG=/etc/ampcontrol/config.toml DISCORD_TOKEN="$token" AMP_PASSWORD="$AMP_PASSWORD" \
+        /usr/lib/ampcontrol/ampcontrol --check-config) ||
+        fail "$(msg 'o binário recusou a configuração gerada pelo instalador' 'the binary rejected the configuration generated by the installer')"
+}
+
+printf '== %s\n' "$(msg 'Instalação nova' 'Fresh installation')"
+run_installer "$(printf '1\n'; discord_and_amp_answers "$TOKEN_FIRST")"
+check_installation "$TOKEN_FIRST"
+
+printf '== %s\n' "$(msg 'Reexecução para trocar o token, mantendo o Idle' 'Re-run to rotate the token, keeping Idle')"
+run_installer "$(printf '\n'; discord_and_amp_answers "$TOKEN_SECOND")"
+check_installation "$TOKEN_SECOND"
+
+printf '%s\n' "$(msg 'Ensaio do instalador: OK' 'Installer rehearsal: OK')"
