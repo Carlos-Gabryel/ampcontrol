@@ -54,17 +54,42 @@ O fallback por RCON usa nomes `rcon_<instância>`. Em `config/idle.json`, refere
 
 ## Idle e detectores
 
-`/var/lib/ampcontrol/config/idle.json` contém o cadastro por instância. Exemplo:
+O cadastro do Idle fica em dois arquivos, ambos lidos na inicialização (uma instância não pode aparecer nos dois):
+
+| Arquivo | Quem escreve |
+| --- | --- |
+| `/var/lib/ampcontrol/data/idle_servers.json` | o instalador (instâncias escolhidas no assistente) e `/ampconfig idle-adicionar` |
+| `/var/lib/ampcontrol/config/idle.json` | você, à mão, para ajustes finos como RCON e tempos por instância |
+
+O caminho normal não exige editar JSON: o instalador e `/ampconfig idle-adicionar` cadastram a instância já em modo `active`, com o detector da API do AMP e 15 minutos de espera. `/ampconfig configurar` troca o método de detecção:
+
+| Método no Discord | Detector | Fallback |
+| --- | --- | --- |
+| `amp` | `amp_players` | — |
+| `amp_palworld_rcon` | `amp_players` | `palworld_rcon` |
+| `amp_project_zomboid_rcon` | `amp_players` | `project_zomboid_rcon` |
+
+Os métodos com RCON só são aceitos para instâncias que já tenham endereço e credencial RCON configurados (veja [RCON](#rcon)).
+
+### Formato do `idle.json`
+
+Exemplo completo (também em [`config/idle.example.json`](../config/idle.example.json)):
 
 ```json
 {
   "check_interval_seconds": 30,
+  "default_idle_timeout_minutes": 15,
   "servers": [
     {
       "instance": "Palworld01",
+      "display_name": "Meu servidor",
+      "game": "Palworld",
       "enabled": true,
-      "idle_after_minutes": 15,
-      "player_source": "amp_palworld_rcon",
+      "mode": "active",
+      "detector": "amp_players",
+      "fallback_detector": "palworld_rcon",
+      "idle_timeout_minutes": 15,
+      "startup_grace_minutes": 5,
       "rcon": {
         "address": "127.0.0.1:25575",
         "password_credential": "rcon_Palworld01"
@@ -74,11 +99,43 @@ O fallback por RCON usa nomes `rcon_<instância>`. Em `config/idle.json`, refere
 }
 ```
 
-Detectores disponíveis:
+| Chave | Padrão | Descrição |
+| --- | --- | --- |
+| `check_interval_seconds` | `30` | Intervalo entre verificações |
+| `default_idle_timeout_minutes` | `15` | Espera sem jogadores quando a instância não define `idle_timeout_minutes` |
+| `instance` | — | Nome da instância no AMP (obrigatório) |
+| `display_name` | nome da instância | Nome exibido no Discord |
+| `game` | — | Nome do jogo exibido no Discord |
+| `enabled` | `false` | Liga o Idle para a instância |
+| `mode` | `observe` | `active` para o processo do jogo; `observe` apenas registra no log o que faria |
+| `detector` | — | Obrigatório com `enabled: true`: `amp_players`, `palworld_rcon` ou `project_zomboid_rcon` |
+| `fallback_detector` | — | Detector consultado quando o primário não consegue contar os jogadores |
+| `idle_timeout_minutes` | `default_idle_timeout_minutes` | Espera sem jogadores até parar |
+| `startup_grace_minutes` | `5` | Tolerância depois que o jogo inicia |
+| `rcon.address` | — | `host:porta` do RCON, obrigatório com detector RCON |
+| `rcon.password_credential` | — | Nome da credencial systemd com a senha RCON |
 
-- `amp`: usa a telemetria da API AMP;
-- `amp_palworld_rcon`: prioriza a detecção RCON de Palworld;
-- `amp_project_zomboid_rcon`: prioriza a detecção RCON de Project Zomboid.
+> **Atenção ao `mode`:** sem `"mode": "active"`, a instância fica em `observe` e o Idle **nunca para o servidor**, só registra no log. Chaves desconhecidas ou valores inválidos fazem o serviço recusar o arquivo e **não iniciar**. Guarde uma cópia antes de editar e, depois de reiniciar, confira `systemctl status ampcontrol.service` e `journalctl -u ampcontrol.service -n 20`.
+
+### RCON
+
+O RCON dá uma contagem de jogadores mais confiável para Palworld e Project Zomboid. A senha nunca vai no JSON: ela é uma credencial criptografada do systemd, com nome no formato `rcon_<instância>`. Para configurar numa instalação nova (exemplo com `Palworld01`):
+
+```bash
+# 1. Criptografar a senha (lida sem eco e sem ir para o histórico do shell)
+read -rsp 'Senha RCON: ' RCON_PASSWORD; echo
+printf '%s' "$RCON_PASSWORD" | sudo systemd-creds encrypt --with-key=host --name=rcon_Palworld01 - /etc/credstore.encrypted/ampcontrol.rcon_Palworld01
+unset RCON_PASSWORD
+sudo chmod 0600 /etc/credstore.encrypted/ampcontrol.rcon_Palworld01
+
+# 2. Entregar a credencial ao serviço
+echo 'LoadCredentialEncrypted=rcon_Palworld01:/etc/credstore.encrypted/ampcontrol.rcon_Palworld01' | sudo tee -a /etc/systemd/system/ampcontrol.service.d/credentials.conf
+```
+
+3. Em `/var/lib/ampcontrol/config/idle.json`, adicione a instância com o bloco `rcon` do exemplo acima. Se ela já estiver em `data/idle_servers.json` (cadastrada pelo instalador ou pelo Discord), remova-a de lá, porque a mesma instância não pode estar nos dois arquivos.
+4. Aplique: `sudo systemctl daemon-reload && sudo systemctl restart ampcontrol.service`, e confira com `/ampconfig diagnostico`.
+
+Ao reexecutar o instalador, responda **sim** quando ele perguntar se deve manter a configuração de Idle existente: ele recria o `credentials.conf` a partir das referências `password_credential` do `idle.json`, e assim as credenciais RCON continuam carregadas.
 
 Falhas ou contagens ambíguas são tratadas de forma conservadora: comandos destrutivos de usuários comuns são bloqueados quando não é possível confirmar com segurança que o servidor está vazio.
 
