@@ -86,8 +86,9 @@ func TestAMPCommandCooldownExpiresAndCanBeDisabled(t *testing.T) {
 
 	disabled := newAMPCommandCooldowns(0, 0)
 	disabled.now = func() time.Time { return now }
-	if !disabled.reserve(snowflake.ID(30), "Valheim01").Allowed ||
-		!disabled.reserve(snowflake.ID(30), "Valheim01").Allowed {
+	first := disabled.reserve(snowflake.ID(30), "Valheim01")
+	repeated := disabled.reserve(snowflake.ID(30), "Valheim01")
+	if !first.Allowed || !repeated.Allowed {
 		t.Fatal("cooldowns em zero deveriam ficar desativados")
 	}
 }

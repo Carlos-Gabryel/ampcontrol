@@ -1,0 +1,7 @@
+# Scripts, unidades systemd e código precisam de LF mesmo em clones no
+# Windows; CRLF quebra o bash e faz o gofmt acusar todos os arquivos.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
