@@ -20,6 +20,9 @@ const (
 	ConfigValid   Key = "config.valid"
 	StartupError  Key = "startup.error"
 	DiscordError  Key = "discord.error"
+
+	ShutdownWaiting Key = "shutdown.waiting"
+	ShutdownTimeout Key = "shutdown.timeout"
 )
 
 var catalogs = map[Language]map[Key]string{
@@ -28,12 +31,18 @@ var catalogs = map[Language]map[Key]string{
 		ConfigValid:   "Configuração válida.",
 		StartupError:  "Erro ao iniciar AmpControl:",
 		DiscordError:  "Erro Discord:",
+
+		ShutdownWaiting: "Encerrando: aguardando operações em andamento terminarem.",
+		ShutdownTimeout: "Prazo de encerramento esgotado com operações em andamento:",
 	},
 	EnglishUS: {
 		ConfigInvalid: "Invalid configuration:",
 		ConfigValid:   "Configuration is valid.",
 		StartupError:  "Could not start AmpControl:",
 		DiscordError:  "Discord error:",
+
+		ShutdownWaiting: "Shutting down: waiting for running operations to finish.",
+		ShutdownTimeout: "Shutdown deadline reached with operations still running:",
 	},
 }
 

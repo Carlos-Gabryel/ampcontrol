@@ -6,12 +6,17 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/app"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 var version = "dev"
+
+// shutdownTimeout cobre a operação manual mais longa (14 minutos) com folga;
+// a unidade systemd usa TimeoutStopSec maior que este valor.
+const shutdownTimeout = 15 * time.Minute
 
 func main() {
 	if len(os.Args) == 2 {
@@ -55,4 +60,21 @@ func main() {
 	}
 
 	<-ctx.Done()
+	// Devolve o comportamento padrão dos sinais: um segundo Ctrl+C encerra
+	// na hora, sem esperar as operações.
+	cancel()
+
+	fmt.Println(i18n.T(i18n.ShutdownWaiting))
+	shutdownCtx, shutdownCancel := context.WithTimeout(
+		context.Background(),
+		shutdownTimeout,
+	)
+	defer shutdownCancel()
+
+	if remaining, err := application.Shutdown(shutdownCtx); err != nil {
+		fmt.Println(i18n.T(i18n.ShutdownTimeout))
+		for _, info := range remaining {
+			fmt.Printf("- %s: %s\n", info.Instance, info.Operation)
+		}
+	}
 }
