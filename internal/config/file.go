@@ -16,6 +16,10 @@ type fileConfig struct {
 	Discord  fileDiscordConfig `toml:"discord"`
 	AMP      fileAMPConfig     `toml:"amp"`
 	Logging  fileLoggingConfig `toml:"logging"`
+
+	// present indica que um arquivo TOML foi lido; sem ele o serviço está no
+	// modo legado configurado só por variáveis de ambiente.
+	present bool
 }
 
 type fileDiscordConfig struct {
@@ -68,6 +72,7 @@ func loadFileConfig() (fileConfig, error) {
 	if err := decoder.Decode(&result); err != nil {
 		return fileConfig{}, fmt.Errorf("não foi possível interpretar a configuração em %s: %w", path, err)
 	}
+	result.present = true
 	return result, nil
 }
 
@@ -89,7 +94,10 @@ func applyFileDefaults(cfg *Config, source fileConfig) {
 	}
 	cfg.DiscordAdminRoleIDs = normalizeStringList(source.Discord.AdminRoleIDs)
 	cfg.DiscordRestrictCommandChannel = boolOrDefault(source.Discord.RestrictCommandsToChannel, true)
-	cfg.DiscordAllowAdministrators = boolOrDefault(source.Discord.AllowDiscordAdministrators, true)
+	// Com TOML, a chave omitida segue a recomendação da documentação (false).
+	// No modo legado não existe lista de cargos, e o Administrator do Discord
+	// continua sendo a única forma de delegar /ampconfig além do proprietário.
+	cfg.DiscordAllowAdministrators = boolOrDefault(source.Discord.AllowDiscordAdministrators, !source.present)
 	if cfg.AMPUsername == "" {
 		cfg.AMPUsername = strings.TrimSpace(source.AMP.Username)
 	}

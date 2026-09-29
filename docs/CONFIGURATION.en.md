@@ -18,7 +18,7 @@ Non-secret configuration is stored in `/etc/ampcontrol/config.toml`. See the com
 | `owner_user_id` | Owner allowed to use `/ampconfig` |
 | `admin_role_ids` | Additional roles allowed to use `/ampconfig` |
 | `restrict_commands_to_channel` | Rejects commands outside the dashboard channel |
-| `allow_discord_administrators` | Allows any Discord Administrator in addition to explicit IDs |
+| `allow_discord_administrators` | Allows any Discord Administrator in addition to explicit IDs. Defaults to `false` when omitted |
 | `notification_ttl_minutes` | Lifetime of temporary messages |
 | `status_refresh_seconds` | Card refresh interval |
 | `command_user_cooldown_seconds` | Minimum interval per user |
