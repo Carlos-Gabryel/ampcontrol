@@ -2,10 +2,13 @@ package rcon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 var projectZomboidPlayersPattern = regexp.MustCompile(
@@ -37,22 +40,18 @@ func parseProjectZomboidPlayerCount(
 ) (int, error) {
 	output = strings.TrimSpace(output)
 	if output == "" {
-		return 0, fmt.Errorf(
-			"o comando players retornou uma resposta vazia",
-		)
+		return 0, errors.New(i18n.Choose("o comando players retornou uma resposta vazia", "the players command returned an empty response"))
 	}
 
 	match := projectZomboidPlayersPattern.FindStringSubmatch(output)
 	if len(match) != 2 {
-		return 0, fmt.Errorf(
-			"não foi possível interpretar a quantidade retornada pelo comando players",
-		)
+		return 0, errors.New(i18n.Choose("não foi possível interpretar a quantidade retornada pelo comando players", "could not parse the count returned by the players command"))
 	}
 
 	count, err := strconv.Atoi(match[1])
 	if err != nil {
 		return 0, fmt.Errorf(
-			"a quantidade retornada pelo comando players é inválida: %w",
+			i18n.Choose("a quantidade retornada pelo comando players é inválida: %w", "the count returned by the players command is invalid: %w"),
 			err,
 		)
 	}

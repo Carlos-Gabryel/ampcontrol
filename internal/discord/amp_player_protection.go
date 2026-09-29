@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
+
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
@@ -113,13 +115,13 @@ func (c *Client) resolveAMPPlayerCountFromStatus(
 		if applies {
 			if resolverErr != nil {
 				return 0, fmt.Errorf(
-					"não foi possível confirmar os jogadores pelo detector alternativo: %w",
+					i18n.Choose("não foi possível confirmar os jogadores pelo detector alternativo: %w", "could not confirm players with the fallback detector: %w"),
 					resolverErr,
 				)
 			}
 			if resolvedCount < 0 {
 				return 0, fmt.Errorf(
-					"o detector alternativo retornou uma quantidade negativa de jogadores: %d",
+					i18n.Choose("o detector alternativo retornou uma quantidade negativa de jogadores: %d", "the fallback detector returned a negative player count: %d"),
 					resolvedCount,
 				)
 			}
@@ -135,7 +137,7 @@ func (c *Client) resolveAMPPlayerCountFromStatus(
 			return 0, nil
 		default:
 			return 0, fmt.Errorf(
-				"não foi possível confirmar a quantidade de jogadores: %w",
+				i18n.Choose("não foi possível confirmar a quantidade de jogadores: %w", "could not confirm the player count: %w"),
 				countsErr,
 			)
 		}
@@ -181,11 +183,11 @@ func (d ampPlayerProtectionDecision) BypassMessage(
 	if d.Err != nil {
 		return message +
 			"\n⚠️ Não foi possível confirmar a quantidade de jogadores; " +
-			"seu privilégio de proprietário/administrador permitiu continuar."
+			i18n.Choose("seu privilégio de proprietário/administrador permitiu continuar.", "your owner/administrator privilege allowed it to continue.")
 	}
 
 	return fmt.Sprintf(
-		"%s\n⚠️ Proteção ignorada por privilégio de proprietário/administrador: **%s**.",
+		i18n.Choose("%s\n⚠️ Proteção ignorada por privilégio de proprietário/administrador: **%s**.", "%s\n⚠️ Protection bypassed by owner/administrator privilege: **%s**."),
 		message,
 		formatConnectedPlayers(d.PlayerCount),
 	)

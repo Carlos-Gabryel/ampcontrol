@@ -2,9 +2,12 @@ package amp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 const (
@@ -43,9 +46,7 @@ func (c *APIClient) StartApplicationUntilReady(
 	baseURL = strings.TrimSpace(baseURL)
 
 	if baseURL == "" {
-		return fmt.Errorf(
-			"a URL da instância AMP não foi informada",
-		)
+		return errors.New(i18n.Choose("a URL da instância AMP não foi informada", "the AMP instance URL was not provided"))
 	}
 
 	if retryInterval <= 0 {
@@ -80,7 +81,7 @@ func (c *APIClient) StartApplicationUntilReady(
 
 			if err != nil {
 				lastErr = fmt.Errorf(
-					"Core.Start ainda não foi aceito: %w",
+					i18n.Choose("Core.Start ainda não foi aceito: %w", "Core.Start has not been accepted yet: %w"),
 					err,
 				)
 
@@ -116,7 +117,7 @@ func (c *APIClient) StartApplicationUntilReady(
 
 		if err != nil {
 			lastErr = fmt.Errorf(
-				"Core.GetStatus ainda não pôde ser consultado: %w",
+				i18n.Choose("Core.GetStatus ainda não pôde ser consultado: %w", "Core.GetStatus could not be queried yet: %w"),
 				err,
 			)
 		} else {
@@ -126,21 +127,21 @@ func (c *APIClient) StartApplicationUntilReady(
 
 			case ApplicationPhaseFailed:
 				return fmt.Errorf(
-					"a aplicação em %s entrou em estado de falha antes de ficar pronta: %s",
+					i18n.Choose("a aplicação em %s entrou em estado de falha antes de ficar pronta: %s", "the application at %s entered a failed state before becoming ready: %s"),
 					baseURL,
 					status.State.String(),
 				)
 
 			case ApplicationPhaseSuspended:
 				return fmt.Errorf(
-					"a aplicação em %s ficou suspensa antes de ficar pronta: %s",
+					i18n.Choose("a aplicação em %s ficou suspensa antes de ficar pronta: %s", "the application at %s was suspended before becoming ready: %s"),
 					baseURL,
 					status.State.String(),
 				)
 
 			default:
 				lastErr = fmt.Errorf(
-					"a aplicação ainda não está pronta; estado atual: %s",
+					i18n.Choose("a aplicação ainda não está pronta; estado atual: %s", "the application is not ready yet; current state: %s"),
 					status.State.String(),
 				)
 			}
@@ -176,9 +177,7 @@ func (c *APIClient) RestartApplication(
 	baseURL = strings.TrimSpace(baseURL)
 
 	if baseURL == "" {
-		return fmt.Errorf(
-			"a URL da instância AMP não foi informada",
-		)
+		return errors.New(i18n.Choose("a URL da instância AMP não foi informada", "the AMP instance URL was not provided"))
 	}
 
 	if err := c.StopApplication(
@@ -186,7 +185,7 @@ func (c *APIClient) RestartApplication(
 		baseURL,
 	); err != nil {
 		return fmt.Errorf(
-			"não foi possível parar a aplicação antes do reinício: %w",
+			i18n.Choose("não foi possível parar a aplicação antes do reinício: %w", "could not stop the application before restarting it: %w"),
 			err,
 		)
 	}
@@ -197,7 +196,7 @@ func (c *APIClient) RestartApplication(
 		defaultApplicationRetryInterval,
 	); err != nil {
 		return fmt.Errorf(
-			"a aplicação foi parada, mas não pôde ser iniciada novamente: %w",
+			i18n.Choose("a aplicação foi parada, mas não pôde ser iniciada novamente: %w", "the application was stopped but could not be started again: %w"),
 			err,
 		)
 	}
@@ -230,15 +229,15 @@ func buildApplicationRetryError(
 ) error {
 	if lastErr == nil {
 		return fmt.Errorf(
-			"a aplicação em %s não ficou pronta: %w",
+			i18n.Choose("a aplicação em %s não ficou pronta: %w", "the application at %s did not become ready: %w"),
 			baseURL,
 			contextErr,
 		)
 	}
 
 	return fmt.Errorf(
-		"a aplicação em %s não ficou pronta antes do prazo; "+
-			"último erro: %v: %w",
+		i18n.Choose("a aplicação em %s não ficou pronta antes do prazo; ", "the application at %s did not become ready before the deadline; ")+
+			i18n.Choose("último erro: %v: %w", "last error: %v: %w"),
 		baseURL,
 		lastErr,
 		contextErr,

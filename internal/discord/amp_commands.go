@@ -2,6 +2,7 @@ package discord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -394,7 +395,7 @@ func (c *Client) executeAMPControlOperation(
 			applicationID,
 			interactionToken,
 			fmt.Sprintf(
-				"❌ Não foi possível reservar **%s** para a operação.\n"+
+				i18n.Choose("❌ Não foi possível reservar **%s** para a operação.\n", "❌ Could not reserve **%s** for the operation.\n")+
 					"Erro: `%s`",
 				ampInstanceDisplayName(instance),
 				sanitizeAMPError(err),
@@ -428,8 +429,8 @@ func (c *Client) executeAMPControlOperation(
 			applicationID,
 			interactionToken,
 			fmt.Sprintf(
-				"⏳ **%s** já possui uma operação em andamento.\n"+
-					"Operação atual: `%s`\n"+
+				i18n.Choose("⏳ **%s** já possui uma operação em andamento.\n", "⏳ **%s** already has an operation in progress.\n")+
+					i18n.Choose("Operação atual: `%s`\n", "Current operation: `%s`\n")+
 					"Aguarde a conclusão antes de enviar outro comando para esta instância.",
 				ampInstanceDisplayName(instance),
 				activeDescription,
@@ -629,7 +630,7 @@ func (c *Client) startAMPApplication(
 			ampApplicationRetryPeriod,
 		); err != nil {
 			return "", fmt.Errorf(
-				"a instância foi iniciada, mas o jogo não pôde ser iniciado: %w",
+				i18n.Choose("a instância foi iniciada, mas o jogo não pôde ser iniciado: %w", "the instance was started, but the game could not be started: %w"),
 				err,
 			)
 		}
@@ -657,7 +658,7 @@ func (c *Client) startAMPApplication(
 
 	case amp.ApplicationPhaseBusy:
 		return fmt.Sprintf(
-			"🔵 O jogo de **%s** já está em transição.\n"+
+			i18n.Choose("🔵 O jogo de **%s** já está em transição.\n", "🔵 The game for **%s** is already in transition.\n")+
 				"Estado atual: `%s`",
 			displayName,
 			status.State.String(),
@@ -665,7 +666,7 @@ func (c *Client) startAMPApplication(
 
 	case amp.ApplicationPhaseSuspended:
 		return fmt.Sprintf(
-			"🟠 O jogo de **%s** está suspenso e não foi iniciado.",
+			i18n.Choose("🟠 O jogo de **%s** está suspenso e não foi iniciado.", "🟠 The game for **%s** is suspended and was not started."),
 			displayName,
 		), nil
 	}
@@ -676,7 +677,7 @@ func (c *Client) startAMPApplication(
 		ampApplicationRetryPeriod,
 	); err != nil {
 		return "", fmt.Errorf(
-			"não foi possível iniciar o processo do jogo: %w",
+			i18n.Choose("não foi possível iniciar o processo do jogo: %w", "could not start the game process: %w"),
 			err,
 		)
 	}
@@ -727,18 +728,16 @@ func (c *Client) stopAMPApplication(
 
 	case amp.ApplicationPhaseFailed:
 		return "", fmt.Errorf(
-			"a aplicação está no estado de falha %s",
+			i18n.Choose("a aplicação está no estado de falha %s", "the application is in failed state %s"),
 			status.State.String(),
 		)
 
 	case amp.ApplicationPhaseSuspended:
-		return "", fmt.Errorf(
-			"a aplicação está suspensa",
-		)
+		return "", errors.New(i18n.Choose("a aplicação está suspensa", "the application is suspended"))
 
 	case amp.ApplicationPhaseUnknown:
 		return "", fmt.Errorf(
-			"o estado da aplicação não é reconhecido: %s",
+			i18n.Choose("o estado da aplicação não é reconhecido: %s", "the application state is not recognized: %s"),
 			status.State.String(),
 		)
 	}
@@ -748,13 +747,13 @@ func (c *Client) stopAMPApplication(
 		instance.APIURL,
 	); err != nil {
 		return "", fmt.Errorf(
-			"não foi possível parar o processo do jogo: %w",
+			i18n.Choose("não foi possível parar o processo do jogo: %w", "could not stop the game process: %w"),
 			err,
 		)
 	}
 
 	return fmt.Sprintf(
-		"💤 O processo do jogo de **%s** foi parado.\n"+
+		i18n.Choose("💤 O processo do jogo de **%s** foi parado.\n", "💤 The game process for **%s** was stopped.\n")+
 			"A instância AMP permanece ligada em modo Idle.",
 		displayName,
 	), nil
@@ -770,7 +769,7 @@ func (c *Client) restartAMPApplication(
 
 	if !instance.Running {
 		return fmt.Sprintf(
-			"⚫ A instância AMP de **%s** está Offline.\n"+
+			i18n.Choose("⚫ A instância AMP de **%s** está Offline.\n", "⚫ The AMP instance for **%s** is Offline.\n")+
 				"Use `/amp iniciar` para ligar o servidor.",
 			displayName,
 		), nil
@@ -802,18 +801,16 @@ func (c *Client) restartAMPApplication(
 
 	case amp.ApplicationPhaseFailed:
 		return "", fmt.Errorf(
-			"a aplicação está no estado de falha %s",
+			i18n.Choose("a aplicação está no estado de falha %s", "the application is in failed state %s"),
 			status.State.String(),
 		)
 
 	case amp.ApplicationPhaseSuspended:
-		return "", fmt.Errorf(
-			"a aplicação está suspensa",
-		)
+		return "", errors.New(i18n.Choose("a aplicação está suspensa", "the application is suspended"))
 
 	case amp.ApplicationPhaseUnknown:
 		return "", fmt.Errorf(
-			"o estado da aplicação não é reconhecido: %s",
+			i18n.Choose("o estado da aplicação não é reconhecido: %s", "the application state is not recognized: %s"),
 			status.State.String(),
 		)
 	}
@@ -823,13 +820,13 @@ func (c *Client) restartAMPApplication(
 		instance.APIURL,
 	); err != nil {
 		return "", fmt.Errorf(
-			"não foi possível reiniciar o processo do jogo: %w",
+			i18n.Choose("não foi possível reiniciar o processo do jogo: %w", "could not restart the game process: %w"),
 			err,
 		)
 	}
 
 	return fmt.Sprintf(
-		"✅ O processo do jogo de **%s** foi reiniciado.",
+		i18n.Choose("✅ O processo do jogo de **%s** foi reiniciado.", "✅ The game process for **%s** was restarted."),
 		displayName,
 	), nil
 }
@@ -878,13 +875,13 @@ func (c *Client) updateAMPInstance(
 		instance.Name,
 	); err != nil {
 		return "", fmt.Errorf(
-			"não foi possível atualizar a instalação AMP: %w",
+			i18n.Choose("não foi possível atualizar a instalação AMP: %w", "could not update the AMP installation: %w"),
 			err,
 		)
 	}
 
 	return fmt.Sprintf(
-		"✅ A instalação AMP de **%s** foi atualizada.",
+		i18n.Choose("✅ A instalação AMP de **%s** foi atualizada.", "✅ The AMP installation for **%s** was updated."),
 		displayName,
 	), nil
 }
@@ -905,7 +902,7 @@ func (c *Client) getAMPApplicationStatus(
 	)
 	if err != nil {
 		return amp.ApplicationStatus{}, fmt.Errorf(
-			"não foi possível consultar o estado do jogo: %w",
+			i18n.Choose("não foi possível consultar o estado do jogo: %w", "could not query the game state: %w"),
 			err,
 		)
 	}
@@ -925,7 +922,7 @@ func (c *Client) resolveAMPInstance(
 	instances, err := c.discoverAMPInstances(ctx)
 	if err != nil {
 		return amp.ManagedInstance{}, fmt.Errorf(
-			"não foi possível atualizar a lista de instâncias: %w",
+			i18n.Choose("não foi possível atualizar a lista de instâncias: %w", "could not refresh the instance list: %w"),
 			err,
 		)
 	}
@@ -941,7 +938,7 @@ func (c *Client) resolveAMPInstance(
 	}
 
 	return amp.ManagedInstance{}, fmt.Errorf(
-		"a instância %q não foi encontrada",
+		i18n.Choose("a instância %q não foi encontrada", "instance %q was not found"),
 		instanceName,
 	)
 }
@@ -957,7 +954,7 @@ func (c *Client) deferAMPInteraction(
 		c.finishCommandAudit(
 			event.Token(),
 			commandAuditPhaseFailed,
-			"Não foi possível iniciar a resposta do comando no Discord.",
+			i18n.Choose("Não foi possível iniciar a resposta do comando no Discord.", "Could not start the command response in Discord."),
 			"",
 		)
 

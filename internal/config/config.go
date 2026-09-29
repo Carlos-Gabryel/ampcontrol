@@ -183,7 +183,7 @@ func validateDiscordID(name string, value string) error {
 
 	id, err := strconv.ParseUint(value, 10, 64)
 	if err != nil || id == 0 {
-		return fmt.Errorf("%s é inválido", name)
+		return fmt.Errorf(i18n.Choose("%s é inválido", "%s is invalid"), name)
 	}
 
 	return nil
@@ -201,7 +201,7 @@ func nonNegativeEnvironmentInteger(
 	value, err := strconv.Atoi(raw)
 	if err != nil || value < 0 {
 		return 0, fmt.Errorf(
-			"%s precisa ser um número inteiro maior ou igual a zero",
+			i18n.Choose("%s precisa ser um número inteiro maior ou igual a zero", "%s must be an integer greater than or equal to zero"),
 			name,
 		)
 	}
@@ -221,7 +221,7 @@ func positiveEnvironmentInteger(
 	value, err := strconv.Atoi(raw)
 	if err != nil || value <= 0 {
 		return 0, fmt.Errorf(
-			"%s precisa ser um número inteiro maior que zero",
+			i18n.Choose("%s precisa ser um número inteiro maior que zero", "%s must be an integer greater than zero"),
 			name,
 		)
 	}

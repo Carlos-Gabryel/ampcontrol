@@ -2,8 +2,11 @@ package amp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 type InstanceDiscoverer interface {
@@ -22,18 +25,18 @@ type Inventory struct {
 
 func NewInventory(client adsInstanceDiscoverer, adsURL string) (*Inventory, error) {
 	if client == nil {
-		return nil, fmt.Errorf("o cliente ADS do inventário não foi informado")
+		return nil, errors.New(i18n.Choose("o cliente ADS do inventário não foi informado", "the inventory ADS client was not provided"))
 	}
 	adsURL = strings.TrimRight(strings.TrimSpace(adsURL), "/")
 	if adsURL == "" {
-		return nil, fmt.Errorf("a URL ADS do inventário não foi informada")
+		return nil, errors.New(i18n.Choose("a URL ADS do inventário não foi informada", "the inventory ADS URL was not provided"))
 	}
 	return &Inventory{ads: client, adsURL: adsURL, fallback: DiscoverInstances}, nil
 }
 
 func (i *Inventory) DiscoverInstances(ctx context.Context) ([]ManagedInstance, error) {
 	if i == nil || i.ads == nil {
-		return nil, fmt.Errorf("o inventário AMP não foi inicializado")
+		return nil, errors.New(i18n.Choose("o inventário AMP não foi inicializado", "the AMP inventory was not initialized"))
 	}
 	instances, adsErr := i.ads.DiscoverManagedInstances(ctx, i.adsURL)
 	if adsErr == nil {
@@ -43,7 +46,7 @@ func (i *Inventory) DiscoverInstances(ctx context.Context) ([]ManagedInstance, e
 	fallback, fallbackErr := i.fallback(ctx)
 	if fallbackErr != nil {
 		return nil, fmt.Errorf(
-			"inventário ADS falhou (%v) e o fallback ampinstmgr também falhou: %w",
+			i18n.Choose("inventário ADS falhou (%v) e o fallback ampinstmgr também falhou: %w", "the ADS inventory failed (%v) and the ampinstmgr fallback also failed: %w"),
 			adsErr,
 			fallbackErr,
 		)

@@ -3,11 +3,12 @@ package operation
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 // ErrShuttingDown é retornado por TryAcquire depois que o encerramento do
@@ -106,9 +107,7 @@ func (m *Manager) TryAcquire(
 	operation string,
 ) (AcquireResult, error) {
 	if m == nil {
-		return AcquireResult{}, fmt.Errorf(
-			"o gerenciador de operações não foi inicializado",
-		)
+		return AcquireResult{}, errors.New(i18n.Choose("o gerenciador de operações não foi inicializado", "the operation manager was not initialized"))
 	}
 
 	instance = strings.TrimSpace(
@@ -116,9 +115,7 @@ func (m *Manager) TryAcquire(
 	)
 
 	if instance == "" {
-		return AcquireResult{}, fmt.Errorf(
-			"o nome da instância não foi informado",
-		)
+		return AcquireResult{}, errors.New(i18n.Choose("o nome da instância não foi informado", "the instance name was not provided"))
 	}
 
 	operation = strings.TrimSpace(
@@ -126,9 +123,7 @@ func (m *Manager) TryAcquire(
 	)
 
 	if operation == "" {
-		return AcquireResult{}, fmt.Errorf(
-			"o nome da operação não foi informado",
-		)
+		return AcquireResult{}, errors.New(i18n.Choose("o nome da operação não foi informado", "the operation name was not provided"))
 	}
 
 	key := normalizeInstance(

@@ -2,10 +2,13 @@ package idle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 // RuntimeState representa o estado simplificado da aplicação
@@ -131,21 +134,15 @@ func NewEngine(
 	options ...EngineOption,
 ) (*Engine, error) {
 	if detectors == nil {
-		return nil, fmt.Errorf(
-			"o registro de detectores do motor de Idle não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o registro de detectores do motor de Idle não foi informado", "the Idle engine detector registry was not provided"))
 	}
 
 	if statusProvider == nil {
-		return nil, fmt.Errorf(
-			"o provedor de estado das aplicações não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o provedor de estado das aplicações não foi informado", "the application state provider was not provided"))
 	}
 
 	if stopper == nil {
-		return nil, fmt.Errorf(
-			"o controlador de parada das aplicações não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o controlador de parada das aplicações não foi informado", "the application stop controller was not provided"))
 	}
 
 	if err := validateEngineConfig(config, detectors); err != nil {
@@ -184,33 +181,31 @@ func validateEngineConfig(
 	detectors *DetectorRegistry,
 ) error {
 	if config.CheckInterval <= 0 {
-		return fmt.Errorf(
-			"o intervalo de verificação do motor de Idle precisa ser maior que zero",
-		)
+		return errors.New(i18n.Choose("o intervalo de verificação do motor de Idle precisa ser maior que zero", "the Idle engine check interval must be greater than zero"))
 	}
 	if detectors == nil {
-		return fmt.Errorf("o registro de detectores não foi informado")
+		return errors.New(i18n.Choose("o registro de detectores não foi informado", "the detector registry was not provided"))
 	}
 
 	for _, server := range config.EnabledServers() {
 		if strings.TrimSpace(server.Instance) == "" {
-			return fmt.Errorf("há um servidor habilitado sem nome de instância")
+			return errors.New(i18n.Choose("há um servidor habilitado sem nome de instância", "there is an enabled server without an instance name"))
 		}
 		if server.IdleTimeout <= 0 {
 			return fmt.Errorf(
-				"o tempo de Idle da instância %s precisa ser maior que zero",
+				i18n.Choose("o tempo de Idle da instância %s precisa ser maior que zero", "the Idle time of instance %s must be greater than zero"),
 				server.Instance,
 			)
 		}
 		if server.StartupGrace <= 0 {
 			return fmt.Errorf(
-				"a proteção inicial da instância %s precisa ser maior que zero",
+				i18n.Choose("a proteção inicial da instância %s precisa ser maior que zero", "the startup grace period of instance %s must be greater than zero"),
 				server.Instance,
 			)
 		}
 		if !detectors.Supports(server.Detector) {
 			return fmt.Errorf(
-				"o detector %q da instância %s não está registrado",
+				i18n.Choose("o detector %q da instância %s não está registrado", "detector %q of instance %s is not registered"),
 				server.Detector,
 				server.Instance,
 			)
@@ -224,7 +219,7 @@ func validateEngineConfig(
 // O intervalo global não pode mudar enquanto o ticker atual está ativo.
 func (e *Engine) ReplaceConfig(config Config) error {
 	if e == nil {
-		return fmt.Errorf("o motor de Idle não está disponível")
+		return errors.New(i18n.Choose("o motor de Idle não está disponível", "the Idle engine is not available"))
 	}
 	if err := validateEngineConfig(config, e.detectors); err != nil {
 		return err
@@ -234,9 +229,7 @@ func (e *Engine) ReplaceConfig(config Config) error {
 	defer e.mu.Unlock()
 
 	if config.CheckInterval != e.config.CheckInterval {
-		return fmt.Errorf(
-			"o intervalo do motor de Idle não pode ser alterado sem reinicialização",
-		)
+		return errors.New(i18n.Choose("o intervalo do motor de Idle não pode ser alterado sem reinicialização", "the Idle engine interval cannot be changed without a restart"))
 	}
 
 	enabled := make(map[string]struct{}, len(config.EnabledServers()))

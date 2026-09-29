@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
+
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	discordClient "github.com/Carlos-Gabryel/ampcontrol/internal/discord"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
@@ -58,9 +60,7 @@ func newModeAwareStopper(
 	activeStopper idle.ApplicationStopper,
 ) (*modeAwareStopper, error) {
 	if activeStopper == nil {
-		return nil, fmt.Errorf(
-			"o mecanismo de parada do modo active não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o mecanismo de parada do modo active não foi informado", "the active-mode stop mechanism was not provided"))
 	}
 
 	return &modeAwareStopper{
@@ -74,9 +74,7 @@ func (s *modeAwareStopper) StopApplication(
 ) error {
 	if s == nil ||
 		s.activeStopper == nil {
-		return fmt.Errorf(
-			"o mecanismo de parada do modo active não está disponível",
-		)
+		return errors.New(i18n.Choose("o mecanismo de parada do modo active não está disponível", "the active-mode stop mechanism is not available"))
 	}
 
 	switch server.Mode {
@@ -92,7 +90,7 @@ func (s *modeAwareStopper) StopApplication(
 
 	default:
 		return fmt.Errorf(
-			"o servidor %s possui modo de Idle não reconhecido: %q",
+			i18n.Choose("o servidor %s possui modo de Idle não reconhecido: %q", "server %s has an unrecognized Idle mode: %q"),
 			server.Instance,
 			server.Mode,
 		)
@@ -108,21 +106,15 @@ func newIdleObserver(
 	log zerolog.Logger,
 ) (*idleObserver, error) {
 	if ampClient == nil {
-		return nil, fmt.Errorf(
-			"o cliente AMP do observador genérico de Idle não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o cliente AMP do observador genérico de Idle não foi informado", "the AMP client of the generic Idle observer was not provided"))
 	}
 
 	if operationManager == nil {
-		return nil, fmt.Errorf(
-			"o gerenciador de operações do observador genérico de Idle não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o gerenciador de operações do observador genérico de Idle não foi informado", "the operation manager of the generic Idle observer was not provided"))
 	}
 
 	if notifier == nil {
-		return nil, fmt.Errorf(
-			"o notificante do observador genérico de Idle não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o notificante do observador genérico de Idle não foi informado", "the notifier of the generic Idle observer was not provided"))
 	}
 
 	ampAdapter, err := idle.NewAMPAdapterWithInventory(
@@ -131,7 +123,7 @@ func newIdleObserver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar o adaptador AMP do observador de Idle: %w",
+			i18n.Choose("não foi possível criar o adaptador AMP do observador de Idle: %w", "could not create the Idle observer AMP adapter: %w"),
 			err,
 		)
 	}
@@ -141,7 +133,7 @@ func newIdleObserver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar o detector de jogadores da API AMP: %w",
+			i18n.Choose("não foi possível criar o detector de jogadores da API AMP: %w", "could not create the AMP API player detector: %w"),
 			err,
 		)
 	}
@@ -151,7 +143,7 @@ func newIdleObserver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar o registro de detectores do observador de Idle: %w",
+			i18n.Choose("não foi possível criar o registro de detectores do observador de Idle: %w", "could not create the Idle observer detector registry: %w"),
 			err,
 		)
 	}
@@ -163,7 +155,7 @@ func newIdleObserver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível configurar as notificações das paradas automáticas: %w",
+			i18n.Choose("não foi possível configurar as notificações das paradas automáticas: %w", "could not set up automatic stop notifications: %w"),
 			err,
 		)
 	}
@@ -174,7 +166,7 @@ func newIdleObserver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível proteger as paradas automáticas do modo active: %w",
+			i18n.Choose("não foi possível proteger as paradas automáticas do modo active: %w", "could not protect active-mode automatic stops: %w"),
 			err,
 		)
 	}
@@ -184,7 +176,7 @@ func newIdleObserver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível configurar a autoridade do motor genérico de Idle: %w",
+			i18n.Choose("não foi possível configurar a autoridade do motor genérico de Idle: %w", "could not set up the generic Idle engine authority: %w"),
 			err,
 		)
 	}
@@ -208,7 +200,7 @@ func newIdleObserver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar o motor genérico de Idle: %w",
+			i18n.Choose("não foi possível criar o motor genérico de Idle: %w", "could not create the generic Idle engine: %w"),
 			err,
 		)
 	}
@@ -409,7 +401,7 @@ func buildIdleEventHandler(
 				)
 
 				if activeOperation == "" {
-					activeOperation = "operação não identificada"
+					activeOperation = i18n.Choose("operação não identificada", "unidentified operation")
 				}
 
 				eventLog.Info().
@@ -595,7 +587,7 @@ func (o *idleObserver) RegisterIdleServer(
 	instance amp.ManagedInstance,
 ) error {
 	if o == nil || o.engine == nil {
-		return fmt.Errorf("o motor de Idle não está disponível")
+		return errors.New(i18n.Choose("o motor de Idle não está disponível", "the Idle engine is not available"))
 	}
 
 	o.registrationMu.Lock()
@@ -619,11 +611,11 @@ func (o *idleObserver) RegisterIdleServer(
 		idleDetectionOverridesPath,
 	)
 	if err != nil {
-		return fmt.Errorf("o cadastro foi salvo, mas a configuração combinada falhou: %w", err)
+		return fmt.Errorf(i18n.Choose("o cadastro foi salvo, mas a configuração combinada falhou: %w", "the registration was saved, but the combined configuration failed: %w"), err)
 	}
 	if err := o.engine.ReplaceConfig(next); err != nil {
 		return fmt.Errorf(
-			"o cadastro foi salvo, mas não pôde ser aplicado ao motor: %w",
+			i18n.Choose("o cadastro foi salvo, mas não pôde ser aplicado ao motor: %w", "the registration was saved, but it could not be applied to the engine: %w"),
 			err,
 		)
 	}
@@ -644,7 +636,7 @@ func (o *idleObserver) IdleDetectionSettings(
 ) (discordClient.IdleDetectionSettings, error) {
 	server, exists := o.configSnapshot().FindServer(instance)
 	if !exists {
-		return discordClient.IdleDetectionSettings{}, fmt.Errorf("a instância %s não está cadastrada no Idle", instance)
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf(i18n.Choose("a instância %s não está cadastrada no Idle", "instance %s is not registered in Idle"), instance)
 	}
 	return discordClient.IdleDetectionSettings{
 		Method:           idleDetectionMethod(server),
@@ -662,7 +654,7 @@ func (o *idleObserver) SetIdleDetectionMethod(
 	method string,
 ) (discordClient.IdleDetectionSettings, error) {
 	if o == nil || o.engine == nil {
-		return discordClient.IdleDetectionSettings{}, fmt.Errorf("o motor de Idle não está disponível")
+		return discordClient.IdleDetectionSettings{}, errors.New(i18n.Choose("o motor de Idle não está disponível", "the Idle engine is not available"))
 	}
 
 	o.registrationMu.Lock()
@@ -682,7 +674,7 @@ func (o *idleObserver) SetIdleDetectionMethod(
 		return discordClient.IdleDetectionSettings{}, err
 	}
 	if err := o.engine.ReplaceConfig(next); err != nil {
-		return discordClient.IdleDetectionSettings{}, fmt.Errorf("não foi possível aplicar o detector ao motor: %w", err)
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf(i18n.Choose("não foi possível aplicar o detector ao motor: %w", "could not apply the detector to the engine: %w"), err)
 	}
 	if err := idle.SetDetectionOverride(
 		idleDetectionOverridesPath,
@@ -711,7 +703,7 @@ func (o *idleObserver) ResetIdleDetectionMethod(
 	instance string,
 ) (discordClient.IdleDetectionSettings, error) {
 	if o == nil || o.engine == nil {
-		return discordClient.IdleDetectionSettings{}, fmt.Errorf("o motor de Idle não está disponível")
+		return discordClient.IdleDetectionSettings{}, errors.New(i18n.Choose("o motor de Idle não está disponível", "the Idle engine is not available"))
 	}
 
 	o.registrationMu.Lock()
@@ -722,7 +714,7 @@ func (o *idleObserver) ResetIdleDetectionMethod(
 		return discordClient.IdleDetectionSettings{}, err
 	}
 	if _, exists := base.FindServer(instance); !exists {
-		return discordClient.IdleDetectionSettings{}, fmt.Errorf("a instância %s não está cadastrada no Idle", instance)
+		return discordClient.IdleDetectionSettings{}, fmt.Errorf(i18n.Choose("a instância %s não está cadastrada no Idle", "instance %s is not registered in Idle"), instance)
 	}
 	overrides, err := idle.LoadDetectionOverrides(idleDetectionOverridesPath)
 	if err != nil {
@@ -761,7 +753,7 @@ func parseIdleDetectionMethod(method string) (idle.Detector, idle.Detector, erro
 	case "amp_project_zomboid_rcon":
 		return idle.DetectorAMPPlayers, idle.DetectorProjectZomboidRCON, nil
 	default:
-		return "", "", fmt.Errorf("o método de detecção %q não é reconhecido", method)
+		return "", "", fmt.Errorf(i18n.Choose("o método de detecção %q não é reconhecido", "detection method %q is not recognized"), method)
 	}
 }
 

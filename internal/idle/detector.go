@@ -2,8 +2,11 @@ package idle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 // PlayerDetector consulta quantos jogadores estão atualmente
@@ -45,7 +48,7 @@ func NewDetectorRegistry(
 	for index, detector := range detectors {
 		if detector == nil {
 			return nil, fmt.Errorf(
-				"o detector de índice %d é nulo",
+				i18n.Choose("o detector de índice %d é nulo", "the detector at index %d is nil"),
 				index,
 			)
 		}
@@ -60,21 +63,21 @@ func NewDetectorRegistry(
 
 		if detectorType == "" {
 			return nil, fmt.Errorf(
-				"o detector de índice %d não informou seu tipo",
+				i18n.Choose("o detector de índice %d não informou seu tipo", "the detector at index %d did not report its type"),
 				index,
 			)
 		}
 
 		if !isKnownDetector(detectorType) {
 			return nil, fmt.Errorf(
-				"o detector %q não é reconhecido",
+				i18n.Choose("o detector %q não é reconhecido", "detector %q is not recognized"),
 				detectorType,
 			)
 		}
 
 		if _, exists := registry.detectors[detectorType]; exists {
 			return nil, fmt.Errorf(
-				"o detector %q foi registrado mais de uma vez",
+				i18n.Choose("o detector %q foi registrado mais de uma vez", "detector %q was registered more than once"),
 				detectorType,
 			)
 		}
@@ -135,15 +138,11 @@ func (r *DetectorRegistry) PlayerCount(
 	server Server,
 ) (int, error) {
 	if r == nil {
-		return 0, fmt.Errorf(
-			"o registro de detectores não foi inicializado",
-		)
+		return 0, errors.New(i18n.Choose("o registro de detectores não foi inicializado", "the detector registry was not initialized"))
 	}
 
 	if ctx == nil {
-		return 0, fmt.Errorf(
-			"o contexto da consulta de jogadores é nulo",
-		)
+		return 0, errors.New(i18n.Choose("o contexto da consulta de jogadores é nulo", "the player query context is nil"))
 	}
 
 	instance := strings.TrimSpace(
@@ -151,14 +150,12 @@ func (r *DetectorRegistry) PlayerCount(
 	)
 
 	if instance == "" {
-		return 0, fmt.Errorf(
-			"o nome da instância AMP não foi informado",
-		)
+		return 0, errors.New(i18n.Choose("o nome da instância AMP não foi informado", "the AMP instance name was not provided"))
 	}
 
 	if !server.Enabled {
 		return 0, fmt.Errorf(
-			"o monitor de Idle da instância %s está desabilitado",
+			i18n.Choose("o monitor de Idle da instância %s está desabilitado", "the Idle monitor for instance %s is disabled"),
 			instance,
 		)
 	}
@@ -171,7 +168,7 @@ func (r *DetectorRegistry) PlayerCount(
 
 	if detectorType == "" {
 		return 0, fmt.Errorf(
-			"a instância %s não possui detector configurado",
+			i18n.Choose("a instância %s não possui detector configurado", "instance %s has no detector configured"),
 			instance,
 		)
 	}
@@ -198,7 +195,7 @@ func (r *DetectorRegistry) PlayerCount(
 		if fallbackErr != nil {
 			if err != nil {
 				return 0, fmt.Errorf(
-					"detector primário %q falhou (%v) e o fallback %q também falhou: %w",
+					i18n.Choose("detector primário %q falhou (%v) e o fallback %q também falhou: %w", "primary detector %q failed (%v) and fallback %q also failed: %w"),
 					detectorType,
 					err,
 					fallbackType,
@@ -212,7 +209,7 @@ func (r *DetectorRegistry) PlayerCount(
 			}
 
 			return 0, fmt.Errorf(
-				"o detector %q informou zero, mas o fallback %q não pôde confirmar: %w",
+				i18n.Choose("o detector %q informou zero, mas o fallback %q não pôde confirmar: %w", "detector %q reported zero, but fallback %q could not confirm it: %w"),
 				detectorType,
 				fallbackType,
 				fallbackErr,
@@ -239,7 +236,7 @@ func (r *DetectorRegistry) playerCountForDetector(
 	detector, exists := r.detectors[detectorType]
 	if !exists {
 		return 0, fmt.Errorf(
-			"o detector %q da instância %s não está registrado",
+			i18n.Choose("o detector %q da instância %s não está registrado", "detector %q of instance %s is not registered"),
 			detectorType,
 			instance,
 		)
@@ -260,7 +257,7 @@ func (r *DetectorRegistry) playerCountForDetector(
 
 	if playerCount < 0 {
 		return 0, fmt.Errorf(
-			"o detector %q retornou uma quantidade negativa de jogadores para a instância %s: %d",
+			i18n.Choose("o detector %q retornou uma quantidade negativa de jogadores para a instância %s: %d", "detector %q returned a negative player count for instance %s: %d"),
 			detectorType,
 			instance,
 			playerCount,

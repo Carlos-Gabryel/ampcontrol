@@ -2,9 +2,11 @@ package discord
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 )
@@ -52,9 +54,7 @@ func (c *Client) SetIdleServerRegistrar(
 	registrar IdleServerRegistrar,
 ) error {
 	if registrar == nil {
-		return fmt.Errorf(
-			"o gerenciador de cadastros do Idle não foi informado",
-		)
+		return errors.New(i18n.Choose("o gerenciador de cadastros do Idle não foi informado", "the Idle registration manager was not provided"))
 	}
 
 	c.idleRegistrationMu.Lock()

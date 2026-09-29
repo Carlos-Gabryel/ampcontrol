@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
+
 	disgoDiscord "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )
@@ -134,7 +136,7 @@ func (d ampCommandCooldownDecision) UserMessage() string {
 	seconds := cooldownSeconds(d.Remaining)
 	if d.Scope == ampCommandCooldownScopeServer {
 		return fmt.Sprintf(
-			"⏱️ Aguarde **%d s** antes de enviar outro comando para a instância `%s`.",
+			i18n.Choose("⏱️ Aguarde **%d s** antes de enviar outro comando para a instância `%s`.", "⏱️ Wait **%d s** before sending another command to instance `%s`."),
 			seconds,
 			d.Server,
 		)
@@ -150,13 +152,13 @@ func (d ampCommandCooldownDecision) AuditReason() string {
 	seconds := cooldownSeconds(d.Remaining)
 	if d.Scope == ampCommandCooldownScopeServer {
 		return fmt.Sprintf(
-			"Recusado: cooldown da instância ativo por %d s",
+			i18n.Choose("Recusado: cooldown da instância ativo por %d s", "Rejected: instance cooldown active for %d s"),
 			seconds,
 		)
 	}
 
 	return fmt.Sprintf(
-		"Recusado: cooldown do usuário ativo por %d s",
+		i18n.Choose("Recusado: cooldown do usuário ativo por %d s", "Rejected: user cooldown active for %d s"),
 		seconds,
 	)
 }

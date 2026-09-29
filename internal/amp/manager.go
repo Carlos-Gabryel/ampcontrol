@@ -3,11 +3,14 @@ package amp
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 type ManagedInstance struct {
@@ -55,7 +58,7 @@ func DiscoverInstances(
 		}
 
 		return nil, fmt.Errorf(
-			"não foi possível listar as instâncias AMP: %w; saída: %s",
+			i18n.Choose("não foi possível listar as instâncias AMP: %w; saída: %s", "could not list the AMP instances: %w; output: %s"),
 			err,
 			strings.TrimSpace(string(output)),
 		)
@@ -213,7 +216,7 @@ func parseInstancesList(
 
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf(
-			"erro lendo a lista de instâncias AMP: %w",
+			i18n.Choose("erro lendo a lista de instâncias AMP: %w", "error reading the AMP instance list: %w"),
 			err,
 		)
 	}
@@ -221,9 +224,7 @@ func parseInstancesList(
 	appendCurrent()
 
 	if len(instances) == 0 {
-		return nil, fmt.Errorf(
-			"o AMP não retornou nenhuma instância reconhecível",
-		)
+		return nil, errors.New(i18n.Choose("o AMP não retornou nenhuma instância reconhecível", "AMP did not return any recognizable instance"))
 	}
 
 	names := make(
@@ -233,21 +234,19 @@ func parseInstancesList(
 
 	for _, instance := range instances {
 		if strings.TrimSpace(instance.Name) == "" {
-			return nil, fmt.Errorf(
-				"o AMP retornou uma instância sem nome",
-			)
+			return nil, errors.New(i18n.Choose("o AMP retornou uma instância sem nome", "AMP returned an instance without a name"))
 		}
 
 		if !instance.runningSet {
 			return nil, fmt.Errorf(
-				"o AMP não informou um estado Running válido para a instância %q",
+				i18n.Choose("o AMP não informou um estado Running válido para a instância %q", "AMP did not report a valid Running state for instance %q"),
 				instance.Name,
 			)
 		}
 
 		if _, exists := names[instance.Name]; exists {
 			return nil, fmt.Errorf(
-				"o AMP retornou a instância %q mais de uma vez",
+				i18n.Choose("o AMP retornou a instância %q mais de uma vez", "AMP returned instance %q more than once"),
 				instance.Name,
 			)
 		}

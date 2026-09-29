@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
 	"github.com/rs/zerolog"
@@ -45,15 +48,11 @@ func newIdleNotificationStopper(
 	log zerolog.Logger,
 ) (*idleNotificationStopper, error) {
 	if next == nil {
-		return nil, fmt.Errorf(
-			"o mecanismo real de parada do Idle não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o mecanismo real de parada do Idle não foi informado", "the actual Idle stop mechanism was not provided"))
 	}
 
 	if notifier == nil {
-		return nil, fmt.Errorf(
-			"o notificante do Idle não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o notificante do Idle não foi informado", "the Idle notifier was not provided"))
 	}
 
 	return &idleNotificationStopper{
@@ -70,9 +69,7 @@ func (s *idleNotificationStopper) StopApplication(
 	if s == nil ||
 		s.next == nil ||
 		s.notifier == nil {
-		return fmt.Errorf(
-			"o mecanismo de parada com notificações não está disponível",
-		)
+		return errors.New(i18n.Choose("o mecanismo de parada com notificações não está disponível", "the stop mechanism with notifications is not available"))
 	}
 
 	displayName := idleNotificationDisplayName(
@@ -81,8 +78,8 @@ func (s *idleNotificationStopper) StopApplication(
 	startedAt := time.Now()
 
 	warningMessage := fmt.Sprintf(
-		"⚠️ **%s está sem jogadores há %s.**\n"+
-			"O processo do jogo será encerrado e o servidor entrará em modo Idle.",
+		i18n.Choose("⚠️ **%s está sem jogadores há %s.**\n", "⚠️ **%s has had no players for %s.**\n")+
+			i18n.Choose("O processo do jogo será encerrado e o servidor entrará em modo Idle.", "The game process will be stopped and the server will enter Idle mode."),
 		displayName,
 		formatIdleNotificationDuration(
 			server.IdleTimeout,
@@ -106,7 +103,7 @@ func (s *idleNotificationStopper) StopApplication(
 		s.recordAudit(server, startedAt, err)
 		failureMessage := fmt.Sprintf(
 			"❌ Não foi possível colocar **%s** em modo Idle automaticamente.\n"+
-				"O erro foi registrado nos logs do serviço.",
+				i18n.Choose("O erro foi registrado nos logs do serviço.", "The error was recorded in the service logs."),
 			displayName,
 		)
 

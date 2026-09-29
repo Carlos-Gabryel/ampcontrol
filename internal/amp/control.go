@@ -2,10 +2,13 @@ package amp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 type InstanceOperation string
@@ -29,18 +32,16 @@ func ControlInstance(
 	instanceName = strings.TrimSpace(instanceName)
 
 	if instanceName == "" {
-		return fmt.Errorf(
-			"o nome da instância não foi informado",
-		)
+		return errors.New(i18n.Choose("o nome da instância não foi informado", "the instance name was not provided"))
 	}
 
 	if strings.EqualFold(instanceName, "ADS01") {
-		return fmt.Errorf("a instância ADS01 é protegida")
+		return errors.New(i18n.Choose("a instância ADS01 é protegida", "the ADS01 instance is protected"))
 	}
 
 	if !isValidInstanceOperation(operation) {
 		return fmt.Errorf(
-			"operação AMP inválida: %q",
+			i18n.Choose("operação AMP inválida: %q", "invalid AMP operation: %q"),
 			operation,
 		)
 	}
@@ -81,11 +82,11 @@ func ControlInstance(
 		)
 
 		if message == "" {
-			message = "o controlador não retornou detalhes"
+			message = i18n.Choose("o controlador não retornou detalhes", "the controller returned no details")
 		}
 
 		return fmt.Errorf(
-			"não foi possível executar %s na instância %s: %w; saída: %s",
+			i18n.Choose("não foi possível executar %s na instância %s: %w; saída: %s", "could not run %s on instance %s: %w; output: %s"),
 			operation,
 			instanceName,
 			err,

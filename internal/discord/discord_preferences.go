@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
+
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 )
 
@@ -28,9 +30,7 @@ type instancePresentationOverride struct {
 func loadDiscordPreferences(path string) (discordPreferences, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return discordPreferences{}, fmt.Errorf(
-			"o caminho das preferências do Discord não foi configurado",
-		)
+		return discordPreferences{}, errors.New(i18n.Choose("o caminho das preferências do Discord não foi configurado", "the Discord preferences path was not configured"))
 	}
 
 	data, err := os.ReadFile(path)
@@ -39,7 +39,7 @@ func loadDiscordPreferences(path string) (discordPreferences, error) {
 	}
 	if err != nil {
 		return discordPreferences{}, fmt.Errorf(
-			"não foi possível ler as preferências do Discord em %s: %w",
+			i18n.Choose("não foi possível ler as preferências do Discord em %s: %w", "could not read the Discord preferences at %s: %w"),
 			path,
 			err,
 		)
@@ -48,7 +48,7 @@ func loadDiscordPreferences(path string) (discordPreferences, error) {
 	var preferences discordPreferences
 	if err := json.Unmarshal(data, &preferences); err != nil {
 		return discordPreferences{}, fmt.Errorf(
-			"as preferências do Discord em %s são inválidas: %w",
+			i18n.Choose("as preferências do Discord em %s são inválidas: %w", "the Discord preferences at %s are invalid: %w"),
 			path,
 			err,
 		)
@@ -59,7 +59,7 @@ func loadDiscordPreferences(path string) (discordPreferences, error) {
 	)
 	preferences.InstanceSettings, err = normalizeInstancePresentationOverrides(preferences.InstanceSettings)
 	if err != nil {
-		return discordPreferences{}, fmt.Errorf("as preferências de apresentação são inválidas: %w", err)
+		return discordPreferences{}, fmt.Errorf(i18n.Choose("as preferências de apresentação são inválidas: %w", "the presentation preferences are invalid: %w"), err)
 	}
 
 	return preferences, nil
@@ -71,9 +71,7 @@ func saveDiscordPreferences(
 ) error {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return fmt.Errorf(
-			"o caminho das preferências do Discord não foi configurado",
-		)
+		return errors.New(i18n.Choose("o caminho das preferências do Discord não foi configurado", "the Discord preferences path was not configured"))
 	}
 
 	preferences.HiddenInstances = normalizeHiddenInstances(
@@ -87,7 +85,7 @@ func saveDiscordPreferences(
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf(
-			"não foi possível criar a pasta das preferências do Discord: %w",
+			i18n.Choose("não foi possível criar a pasta das preferências do Discord: %w", "could not create the Discord preferences folder: %w"),
 			err,
 		)
 	}
@@ -95,7 +93,7 @@ func saveDiscordPreferences(
 	data, err := json.MarshalIndent(preferences, "", "  ")
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível serializar as preferências do Discord: %w",
+			i18n.Choose("não foi possível serializar as preferências do Discord: %w", "could not serialize the Discord preferences: %w"),
 			err,
 		)
 	}
@@ -104,14 +102,14 @@ func saveDiscordPreferences(
 	temporaryPath := path + ".tmp"
 	if err := os.WriteFile(temporaryPath, data, 0o600); err != nil {
 		return fmt.Errorf(
-			"não foi possível gravar as preferências temporárias do Discord: %w",
+			i18n.Choose("não foi possível gravar as preferências temporárias do Discord: %w", "could not write the temporary Discord preferences: %w"),
 			err,
 		)
 	}
 
 	if err := os.Rename(temporaryPath, path); err != nil {
 		return fmt.Errorf(
-			"não foi possível publicar as preferências do Discord: %w",
+			i18n.Choose("não foi possível publicar as preferências do Discord: %w", "could not publish the Discord preferences: %w"),
 			err,
 		)
 	}
@@ -180,7 +178,7 @@ func splitAMPInstancesByVisibility(
 		hidden = append(hidden, amp.ManagedInstance{
 			Name:         name,
 			FriendlyName: name,
-			Game:         "Instância não encontrada",
+			Game:         i18n.Choose("Instância não encontrada", "Instance not found"),
 		})
 	}
 
@@ -274,14 +272,14 @@ func normalizeInstancePresentationOverrides(
 		override.Game = strings.TrimSpace(override.Game)
 		override.Address = strings.TrimSpace(override.Address)
 		if override.Instance == "" {
-			return nil, fmt.Errorf("há uma configuração de apresentação sem instância")
+			return nil, errors.New(i18n.Choose("há uma configuração de apresentação sem instância", "there is a presentation setting without an instance"))
 		}
 		if override.MaximumPlayers < 0 || override.MaximumPlayers > 100000 {
-			return nil, fmt.Errorf("o limite de jogadores de %s é inválido", override.Instance)
+			return nil, fmt.Errorf(i18n.Choose("o limite de jogadores de %s é inválido", "the player limit for %s is invalid"), override.Instance)
 		}
 		key := normalizeInstanceVisibilityKey(override.Instance)
 		if _, exists := byKey[key]; exists {
-			return nil, fmt.Errorf("a instância %s possui configurações de apresentação duplicadas", override.Instance)
+			return nil, fmt.Errorf(i18n.Choose("a instância %s possui configurações de apresentação duplicadas", "instance %s has duplicate presentation settings"), override.Instance)
 		}
 		byKey[key] = override
 	}
@@ -359,7 +357,7 @@ func (c *Client) setInstancePresentationSettings(
 		setting.Address = strings.TrimSpace(*address)
 	}
 	if setting.MaximumPlayers < 0 || setting.MaximumPlayers > 100000 {
-		return instancePresentationOverride{}, fmt.Errorf("o limite de jogadores precisa estar entre 0 e 100000")
+		return instancePresentationOverride{}, errors.New(i18n.Choose("o limite de jogadores precisa estar entre 0 e 100000", "the player limit must be between 0 and 100000"))
 	}
 	next.InstanceSettings[index] = setting
 

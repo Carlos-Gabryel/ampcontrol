@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -53,16 +54,16 @@ type commandAuditSession struct {
 func (c *Client) validateCommandAuditChannel() error {
 	channel, err := c.channels.GetChannel(c.auditChannelID)
 	if err != nil {
-		return fmt.Errorf("não foi possível acessar o canal de auditoria: %w", err)
+		return fmt.Errorf(i18n.Choose("não foi possível acessar o canal de auditoria: %w", "could not access the audit channel: %w"), err)
 	}
 
 	textChannel, ok := channel.(disgoDiscord.GuildTextChannel)
 	if !ok || textChannel.GuildID() != c.guildID {
-		return fmt.Errorf("o canal de auditoria configurado não é um canal de texto deste servidor")
+		return errors.New(i18n.Choose("o canal de auditoria configurado não é um canal de texto deste servidor", "the configured audit channel is not a text channel in this server"))
 	}
 
 	if c.auditChannelID == c.notificationChannelID {
-		return fmt.Errorf("o canal de auditoria precisa ser diferente do canal do painel")
+		return errors.New(i18n.Choose("o canal de auditoria precisa ser diferente do canal do painel", "the audit channel must be different from the dashboard channel"))
 	}
 
 	return nil
@@ -180,8 +181,8 @@ func (c *Client) beginCommandAudit(
 		c.finishCommandAudit(
 			interactionToken,
 			commandAuditPhaseFailed,
-			"A auditoria excedeu o tempo máximo de acompanhamento da operação.",
-			"Tempo limite excedido",
+			i18n.Choose("A auditoria excedeu o tempo máximo de acompanhamento da operação.", "The audit exceeded the maximum time for following the operation."),
+			i18n.Choose("Tempo limite excedido", "Time limit exceeded"),
 		)
 	})
 }
@@ -422,14 +423,16 @@ func inferCommandAuditFinalState(
 		return "Offline"
 	}
 	if strings.Contains(lower, "modo idle") ||
-		strings.Contains(lower, "em idle") {
+		strings.Contains(lower, "em idle") ||
+		strings.Contains(lower, "idle mode") {
 		return "Idle"
 	}
 	if strings.Contains(lower, "transição") ||
 		strings.Contains(lower, "transition") {
 		return "Em transição"
 	}
-	if strings.Contains(lower, "suspens") {
+	if strings.Contains(lower, "suspens") ||
+		strings.Contains(lower, "suspended") {
 		return "Suspenso"
 	}
 

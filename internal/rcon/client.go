@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 const (
@@ -74,7 +77,7 @@ func ExecuteCommand(
 	)
 	if err != nil {
 		return "", fmt.Errorf(
-			"não foi possível conectar ao RCON %s: %w",
+			i18n.Choose("não foi possível conectar ao RCON %s: %w", "could not connect to RCON %s: %w"),
 			address,
 			err,
 		)
@@ -127,7 +130,7 @@ func authenticate(
 
 	if _, err := connection.Write(packet); err != nil {
 		return fmt.Errorf(
-			"não foi possível enviar a autenticação RCON: %w",
+			i18n.Choose("não foi possível enviar a autenticação RCON: %w", "could not send the RCON authentication: %w"),
 			err,
 		)
 	}
@@ -138,7 +141,7 @@ func authenticate(
 		)
 		if err != nil {
 			return fmt.Errorf(
-				"não foi possível receber a autenticação RCON: %w",
+				i18n.Choose("não foi possível receber a autenticação RCON: %w", "could not receive the RCON authentication: %w"),
 				err,
 			)
 		}
@@ -148,9 +151,7 @@ func authenticate(
 		}
 
 		if packetID == -1 {
-			return fmt.Errorf(
-				"a senha RCON foi recusada",
-			)
+			return errors.New(i18n.Choose("a senha RCON foi recusada", "the RCON password was rejected"))
 		}
 
 		if packetID == authPacketID {
@@ -158,9 +159,7 @@ func authenticate(
 		}
 	}
 
-	return fmt.Errorf(
-		"o servidor não confirmou a autenticação RCON",
-	)
+	return errors.New(i18n.Choose("o servidor não confirmou a autenticação RCON", "the server did not confirm the RCON authentication"))
 }
 
 func executeCommand(
@@ -203,7 +202,7 @@ func executeCommand(
 	}
 
 	return "", fmt.Errorf(
-		"o servidor RCON não retornou resposta ao comando %s",
+		i18n.Choose("o servidor RCON não retornou resposta ao comando %s", "the RCON server did not respond to command %s"),
 		command,
 	)
 }
@@ -269,7 +268,7 @@ func receivePacket(
 	if packetSize < 10 ||
 		packetSize > maximumPacketSize {
 		return 0, 0, "", fmt.Errorf(
-			"tamanho de pacote RCON inválido: %d",
+			i18n.Choose("tamanho de pacote RCON inválido: %d", "invalid RCON packet size: %d"),
 			packetSize,
 		)
 	}
@@ -326,9 +325,7 @@ func parsePlayerCount(
 	}
 
 	if len(records) == 0 {
-		return 0, fmt.Errorf(
-			"ShowPlayers retornou uma resposta vazia",
-		)
+		return 0, errors.New(i18n.Choose("ShowPlayers retornou uma resposta vazia", "ShowPlayers returned an empty response"))
 	}
 
 	count := 0

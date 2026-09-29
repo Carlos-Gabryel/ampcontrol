@@ -37,7 +37,7 @@ func New() (*App, error) {
 		WrapperPath: cfg.AMPWrapperPath,
 		SudoPath:    cfg.SudoPath,
 	}); err != nil {
-		return nil, fmt.Errorf("configuração de execução do AMP inválida: %w", err)
+		return nil, fmt.Errorf(i18n.Choose("configuração de execução do AMP inválida: %w", "invalid AMP runtime configuration: %w"), err)
 	}
 
 	ampAPIClient := amp.NewAPIClient(
@@ -58,7 +58,7 @@ func New() (*App, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível carregar a configuração compartilhada do Idle: %w",
+			i18n.Choose("não foi possível carregar a configuração compartilhada do Idle: %w", "could not load the shared Idle configuration: %w"),
 			err,
 		)
 	}
