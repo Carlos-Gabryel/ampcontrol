@@ -14,6 +14,11 @@ LoadCredentialEncrypted=discord_token:/etc/credstore.encrypted/ampcontrol.discor
 LoadCredentialEncrypted=amp_password:/etc/credstore.encrypted/ampcontrol.amp_password
 Restart=on-failure
 RestartSec=5s
+# No stop/restart, o SIGTERM vai só para o bot, que espera as operações em
+# andamento (ex.: atualização pelo ampinstmgr) terminarem antes de sair; o
+# bot desiste após 15 minutos, antes deste prazo.
+KillMode=mixed
+TimeoutStopSec=16min
 PrivateTmp=yes
 UMask=0077
 

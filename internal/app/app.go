@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/config"
@@ -164,4 +165,30 @@ func (a *App) Start(
 	}
 
 	return nil
+}
+
+// discordCloseTimeout limita o fechamento da conexão com o Discord depois
+// que as operações terminaram.
+const discordCloseTimeout = 10 * time.Second
+
+// Shutdown encerra o serviço sem interromper operações em andamento: novas
+// operações passam a ser recusadas, as ativas terminam (até o prazo de ctx)
+// e só então a conexão com o Discord é fechada, para que a resposta final
+// dessas operações ainda chegue ao usuário. Retorna as operações que
+// continuavam ativas quando o prazo acabou.
+func (a *App) Shutdown(
+	ctx context.Context,
+) ([]operation.Info, error) {
+	remaining, err := a.Operations.Shutdown(ctx)
+
+	if a.Discord != nil {
+		closeCtx, cancel := context.WithTimeout(
+			context.Background(),
+			discordCloseTimeout,
+		)
+		defer cancel()
+		a.Discord.Close(closeCtx)
+	}
+
+	return remaining, err
 }

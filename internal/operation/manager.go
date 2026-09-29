@@ -1,10 +1,19 @@
 package operation
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+)
+
+// ErrShuttingDown é retornado por TryAcquire depois que o encerramento do
+// serviço começou.
+var ErrShuttingDown = errors.New(
+	"o AmpControl está sendo reiniciado; tente novamente em instantes",
 )
 
 // Info descreve uma operação que atualmente possui o controle
@@ -47,6 +56,11 @@ type Manager struct {
 	active    map[string]activeOperation
 	nextToken uint64
 	now       func() time.Time
+
+	// closing recusa novas operações; drained é fechado quando a última
+	// operação ativa termina durante o encerramento.
+	closing bool
+	drained chan struct{}
 }
 
 // Lease representa o controle exclusivo temporário de uma instância.
@@ -128,6 +142,10 @@ func (m *Manager) TryAcquire(
 		m.active = make(
 			map[string]activeOperation,
 		)
+	}
+
+	if m.closing {
+		return AcquireResult{}, ErrShuttingDown
 	}
 
 	if current, exists := m.active[key]; exists {
@@ -244,6 +262,60 @@ func (m *Manager) release(
 		m.active,
 		key,
 	)
+
+	if m.closing && len(m.active) == 0 && m.drained != nil {
+		close(m.drained)
+		m.drained = nil
+	}
+}
+
+// Shutdown passa a recusar novas operações e espera as que estão em
+// andamento terminarem. Se o contexto expirar antes, retorna as operações
+// que ainda estavam ativas junto com o erro do contexto.
+func (m *Manager) Shutdown(
+	ctx context.Context,
+) ([]Info, error) {
+	if m == nil {
+		return nil, nil
+	}
+
+	m.mu.Lock()
+	m.closing = true
+	if len(m.active) == 0 {
+		m.mu.Unlock()
+		return nil, nil
+	}
+	if m.drained == nil {
+		m.drained = make(chan struct{})
+	}
+	drained := m.drained
+	m.mu.Unlock()
+
+	select {
+	case <-drained:
+		return nil, nil
+	case <-ctx.Done():
+		return m.Active(), ctx.Err()
+	}
+}
+
+// Active retorna as operações em andamento, da mais antiga para a mais nova.
+func (m *Manager) Active() []Info {
+	if m == nil {
+		return nil
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	infos := make([]Info, 0, len(m.active))
+	for _, current := range m.active {
+		infos = append(infos, current.info)
+	}
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].StartedAt.Before(infos[j].StartedAt)
+	})
+	return infos
 }
 
 func normalizeInstance(
