@@ -112,7 +112,7 @@ sudo ampcontrol-maintenance status
 sudo ampcontrol-maintenance rollback
 ```
 
-The updater verifies the release checksum, validates the current configuration with the staged binary, and creates a backup before replacement. Startup failure triggers automatic rollback. Legacy `/opt/ampcontrol` installations have a [transactional migration procedure](docs/INSTALLATION.en.md#8-migrate-a-legacy-installation).
+The updater verifies the release checksum, validates the current configuration with the staged binary, and creates a backup before replacement. If the service does not stay active for the first 15 seconds (for example, crashing and being restarted by systemd), rollback is automatic. Legacy `/opt/ampcontrol` installations have a [transactional migration procedure](docs/INSTALLATION.en.md#8-migrate-a-legacy-installation).
 
 ## ⌨️ Commands
 

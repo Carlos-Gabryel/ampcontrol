@@ -81,6 +81,21 @@ ROLLBACK_ARMED=false
 SERVICE_WAS_ACTIVE=false
 SERVICE_WAS_ENABLED=false
 
+# Com Type=simple o serviço fica "active" assim que o processo nasce; só
+# observando por alguns segundos dá para ver um processo que cai e volta pelo
+# Restart=on-failure. Mesma função em install.sh e ampcontrol-maintenance.
+wait_for_stable_service() {
+    local seconds="${AMPCONTROL_START_CHECK_SECONDS:-15}"
+    local baseline state restarts elapsed
+    baseline="$(systemctl show ampcontrol.service --property=NRestarts --value)"
+    for (( elapsed = 0; elapsed < seconds; elapsed++ )); do
+        sleep 1
+        state="$(systemctl show ampcontrol.service --property=ActiveState --value)"
+        restarts="$(systemctl show ampcontrol.service --property=NRestarts --value)"
+        [[ "$state" == active && "$restarts" == "$baseline" ]] || return 1
+    done
+}
+
 copy_to_snapshot() {
     local source="$1"
     local destination="$SNAPSHOT_DIRECTORY$source"
@@ -169,11 +184,7 @@ AMPCONTROL_LEGACY_SYSTEMD_ENV_FILE="$SYSTEMD_ENVIRONMENT_FILE" \
 systemctl daemon-reload
 systemctl enable ampcontrol.service >/dev/null
 systemctl restart ampcontrol.service
-for _ in {1..10}; do
-    systemctl is-active --quiet ampcontrol.service && break
-    sleep 1
-done
-if ! systemctl is-active --quiet ampcontrol.service; then
+if ! wait_for_stable_service; then
     printf '%s\n' "$(msg 'O novo serviço não permaneceu ativo.' 'The new service did not remain active.')" >&2
     false
 fi

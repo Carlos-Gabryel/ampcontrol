@@ -74,6 +74,46 @@ expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" unknown
 eval "$(sed -n '/^prompt_secret() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/install.sh")"
 captured_secret="$(printf 'segredo com espaço\nsegredo com espaço\n' | prompt_secret 'Token' 2>/dev/null)"
 [[ "$captured_secret" == 'segredo com espaço' ]] || fail "$(msg 'prompt_secret alterou o segredo' 'prompt_secret changed the secret'): $(printf '%q' "$captured_secret")"
+
+extract_stable_service_check() {
+    sed -n '/^wait_for_stable_service() {/,/^}/p' "$1"
+}
+[[ -n "$(extract_stable_service_check "$PROJECT_DIRECTORY/scripts/install.sh")" ]] || fail "$(msg 'wait_for_stable_service ausente no instalador' 'wait_for_stable_service missing from the installer')"
+for script in migrate-legacy.sh ampcontrol-maintenance; do
+    [[ "$(extract_stable_service_check "$PROJECT_DIRECTORY/scripts/$script")" == "$(extract_stable_service_check "$PROJECT_DIRECTORY/scripts/install.sh")" ]] ||
+        fail "$(msg 'wait_for_stable_service divergiu em' 'wait_for_stable_service diverged in') $script"
+done
+eval "$(extract_stable_service_check "$PROJECT_DIRECTORY/scripts/install.sh")"
+# systemctl falso: o estado e o NRestarts vêm de listas, uma posição por consulta.
+# Os stubs e as listas FAKE_* são usados pela função carregada no eval acima.
+# shellcheck disable=SC2034,SC2329
+{
+    sleep() { :; }
+    systemctl() {
+        local property="${3#--property=}"
+        local -n values="FAKE_$property"
+        local index_file="$TEMP_DIRECTORY/index.$property"
+        local index=0
+        [[ ! -f "$index_file" ]] || index="$(<"$index_file")"
+        printf '%s' "${values[index]:-${values[-1]}}"
+        printf '%s' "$((index + 1))" >"$index_file"
+    }
+    run_stable_service_check() {
+        rm -f -- "$TEMP_DIRECTORY"/index.*
+        AMPCONTROL_START_CHECK_SECONDS=5 wait_for_stable_service
+    }
+    FAKE_ActiveState=(active)
+    FAKE_NRestarts=(0)
+    run_stable_service_check || fail "$(msg 'serviço estável foi recusado' 'a stable service was rejected')"
+    FAKE_ActiveState=(active)
+    FAKE_NRestarts=(0 0 0 1)
+    ! run_stable_service_check || fail "$(msg 'serviço em loop de reinício foi aceito' 'a service in a restart loop was accepted')"
+    FAKE_ActiveState=(active active activating)
+    FAKE_NRestarts=(0)
+    ! run_stable_service_check || fail "$(msg 'serviço que caiu foi aceito' 'a service that went down was accepted')"
+}
+unset -f sleep systemctl
+
 AMPCONTROL_LANGUAGE=pt-BR "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --help | grep -q -- '--binary CAMINHO'
 "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --language en-US --help | grep -q -- 'legacy installation'
 "$PROJECT_DIRECTORY/scripts/migration-preflight.sh" --language en-US --help | grep -q -- '^Usage:'

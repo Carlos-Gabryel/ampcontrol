@@ -76,6 +76,21 @@ backup_current() {
     printf '%s' "$backup"
 }
 
+# Com Type=simple o serviço fica "active" assim que o processo nasce; só
+# observando por alguns segundos dá para ver um processo que cai e volta pelo
+# Restart=on-failure. Mesma função em install.sh e migrate-legacy.sh.
+wait_for_stable_service() {
+    local seconds="${AMPCONTROL_START_CHECK_SECONDS:-15}"
+    local baseline state restarts elapsed
+    baseline="$(systemctl show ampcontrol.service --property=NRestarts --value)"
+    for (( elapsed = 0; elapsed < seconds; elapsed++ )); do
+        sleep 1
+        state="$(systemctl show ampcontrol.service --property=ActiveState --value)"
+        restarts="$(systemctl show ampcontrol.service --property=NRestarts --value)"
+        [[ "$state" == active && "$restarts" == "$baseline" ]] || return 1
+    done
+}
+
 restore_backup() {
     local backup="$1"
     [[ "$backup" == "$BACKUP_ROOT"/update-* && -d "$backup" ]] || fail "$(msg 'backup de atualização inválido' 'invalid update backup'): $backup"
@@ -87,7 +102,7 @@ restore_backup() {
     [[ ! -f "$backup/ampcontrol.service" ]] || install -o root -g root -m 0644 "$backup/ampcontrol.service" "$SERVICE_PATH"
     systemctl daemon-reload
     systemctl restart ampcontrol.service
-    systemctl is-active --quiet ampcontrol.service || fail "$(msg 'o serviço não iniciou após o rollback' 'the service did not start after rollback')"
+    wait_for_stable_service || fail "$(msg 'o serviço não permaneceu ativo após o rollback; consulte journalctl -u ampcontrol.service' 'the service did not stay active after rollback; check journalctl -u ampcontrol.service')"
     printf '%s %s\n' "$(msg 'Rollback concluído a partir de' 'Rollback completed from')" "$backup"
 }
 
@@ -154,7 +169,7 @@ update_ampcontrol() {
         fail "$(msg 'a instalação falhou e o backup foi restaurado' 'installation failed and the backup was restored')"
     fi
     systemctl daemon-reload
-    if ! systemctl restart ampcontrol.service || ! systemctl is-active --quiet ampcontrol.service; then
+    if ! systemctl restart ampcontrol.service || ! wait_for_stable_service; then
         restore_backup "$backup"
         fail "$(msg 'a nova versão não iniciou e o rollback automático foi executado' 'the new version did not start and automatic rollback was performed')"
     fi
