@@ -114,6 +114,20 @@ eval "$(extract_stable_service_check "$PROJECT_DIRECTORY/scripts/install.sh")"
 }
 unset -f sleep systemctl
 
+# Checagem de versão mínima do systemd, com systemctl falso em subshell.
+systemd_check="$(sed -n '/^command -v systemctl /,/^fi$/p' "$PROJECT_DIRECTORY/scripts/install.sh")"
+[[ "$systemd_check" == *'SYSTEMD_VERSION < 250'* ]] || fail "$(msg 'checagem de versão do systemd ausente' 'systemd version check missing')"
+for version_case in '249:false' '250:true' '255:true' 'x:false'; do
+    expected="${version_case#*:}"
+    actual=true
+    # shellcheck disable=SC2317,SC2329
+    (
+        systemctl() { printf 'systemd %s (fake)\n' "${version_case%%:*}"; }
+        eval "$systemd_check"
+    ) >/dev/null 2>&1 || actual=false
+    [[ "$actual" == "$expected" ]] || fail "$(msg 'checagem do systemd errada para' 'wrong systemd check for') ${version_case%%:*}"
+done
+
 AMPCONTROL_LANGUAGE=pt-BR "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --help | grep -q -- '--binary CAMINHO'
 "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --language en-US --help | grep -q -- 'legacy installation'
 "$PROJECT_DIRECTORY/scripts/migration-preflight.sh" --language en-US --help | grep -q -- '^Usage:'

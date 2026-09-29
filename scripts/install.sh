@@ -126,6 +126,13 @@ fi
 readonly INSTALL_LANGUAGE
 export AMPCONTROL_LANGUAGE="$INSTALL_LANGUAGE"
 
+command -v systemctl >/dev/null 2>&1 || fail "$(msg 'dependência ausente' 'missing dependency'): systemctl"
+# systemd-creds e LoadCredentialEncrypted só existem a partir do systemd 250.
+SYSTEMD_VERSION="$(systemctl --version | awk 'NR == 1 { print $2 }')"
+if [[ ! "$SYSTEMD_VERSION" =~ ^[0-9]+$ ]] || ((SYSTEMD_VERSION < 250)); then
+    fail "$(msg 'é necessário systemd 250 ou superior; versão encontrada' 'systemd 250 or later is required; found version'): ${SYSTEMD_VERSION:-?}"
+fi
+
 for command_name in systemctl systemd-creds install getent sudo visudo find sort python3; do
     command -v "$command_name" >/dev/null 2>&1 || fail "$(msg 'dependência ausente' 'missing dependency'): $command_name"
 done

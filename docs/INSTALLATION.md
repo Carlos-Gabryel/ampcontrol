@@ -6,7 +6,7 @@ Este guia instala uma cópia nova do AmpControl sem alterar as instâncias de jo
 
 ## 1. Requisitos
 
-- Linux com systemd e `systemd-creds`;
+- Linux com systemd **250 ou superior** (`systemd-creds` e `LoadCredentialEncrypted`), por exemplo Ubuntu 24.04 ou Debian 12. Ubuntu 22.04 e Debian 11 trazem versões anteriores e não são suportados. Confira com `systemctl --version`;
 - AMP instalado na mesma máquina;
 - usuário com `sudo`;
 - Git;
@@ -40,7 +40,16 @@ Para que `/ampconfig` seja exibido, o proprietário e os cargos administrativos 
 
 ## 3. Criar uma conta AMP dedicada
 
-Crie no AMP um usuário exclusivo para o bot. Conceda somente as permissões necessárias para listar e consultar instâncias e executar as operações que você pretende disponibilizar: iniciar, parar, reiniciar, desligar e atualizar.
+Crie no AMP um usuário exclusivo para o bot, com acesso às instâncias que o bot vai gerenciar. Pela API, o AmpControl só chama:
+
+| Método da API | Uso |
+| --- | --- |
+| `Core.Login` | autenticação no ADS e em cada instância |
+| `ADSModule.GetInstances` | inventário das instâncias |
+| `Core.GetStatus`, `Core.GetModuleInfo` | estado, jogadores e informações do jogo |
+| `Core.Start`, `Core.Stop` | iniciar e parar o processo do jogo (inclusive pelo Idle) |
+
+Conceda somente as permissões correspondentes a essas ações. Iniciar, parar, reiniciar e atualizar a **instância** inteira não passam pela API: são feitos pelo `ampinstmgr`, através do wrapper restrito instalado com o `sudo`.
 
 Valide o login diretamente no AMP antes de executar o instalador. Não reutilize a conta principal do administrador.
 

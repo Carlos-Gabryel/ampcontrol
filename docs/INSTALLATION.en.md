@@ -6,7 +6,7 @@ This guide installs AmpControl without modifying game instances. Use a maintenan
 
 ## 1. Requirements
 
-- Linux with systemd and `systemd-creds`;
+- Linux with systemd **250 or later** (`systemd-creds` and `LoadCredentialEncrypted`), e.g. Ubuntu 24.04 or Debian 12. Ubuntu 22.04 and Debian 11 ship older versions and are not supported. Check with `systemctl --version`;
 - AMP installed on the same host;
 - a user with `sudo` access;
 - Git and Python 3;
@@ -39,7 +39,18 @@ Discord only displays `/ampconfig` to members with Administrator permission. Amp
 
 ## 3. Create a dedicated AMP account
 
-Create an AMP user exclusively for the bot. Grant only the permissions needed to list/query instances and perform the operations you intend to expose: start, stop, restart, shut down, and update. Validate the login in AMP before installation and do not reuse the primary administrator account.
+Create an AMP user exclusively for the bot, with access to the instances the bot will manage. Through the API, AmpControl only calls:
+
+| API method | Purpose |
+| --- | --- |
+| `Core.Login` | authentication on ADS and on each instance |
+| `ADSModule.GetInstances` | instance inventory |
+| `Core.GetStatus`, `Core.GetModuleInfo` | state, players, and game information |
+| `Core.Start`, `Core.Stop` | start and stop the game process (including from Idle) |
+
+Grant only the permissions matching these actions. Starting, stopping, restarting, and updating the whole **instance** do not go through the API: they use `ampinstmgr` through the restricted wrapper installed with `sudo`.
+
+Validate the login in AMP before installation and do not reuse the primary administrator account.
 
 ## 4. Run the installer
 
