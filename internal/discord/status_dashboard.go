@@ -274,11 +274,6 @@ func dashboardMessageHasLogo(attachments []disgoDiscord.Attachment, filename str
 	return false
 }
 
-func statusDashboardNeedsOrderMigration(state statusDashboardState) bool {
-	return state.GuideMessageID != "" &&
-		state.MessageOrderVersion < statusDashboardMessageOrderVersion
-}
-
 func loadStatusDashboardState(path string) (statusDashboardState, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
