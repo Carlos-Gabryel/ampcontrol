@@ -185,6 +185,21 @@ prompt_optional() {
     printf '%s' "$value"
 }
 
+# Com Type=simple o serviço fica "active" assim que o processo nasce; só
+# observando por alguns segundos dá para ver um processo que cai e volta pelo
+# Restart=on-failure. Mesma função em ampcontrol-maintenance e migrate-legacy.sh.
+wait_for_stable_service() {
+    local seconds="${AMPCONTROL_START_CHECK_SECONDS:-15}"
+    local baseline state restarts elapsed
+    baseline="$(systemctl show ampcontrol.service --property=NRestarts --value)"
+    for (( elapsed = 0; elapsed < seconds; elapsed++ )); do
+        sleep 1
+        state="$(systemctl show ampcontrol.service --property=ActiveState --value)"
+        restarts="$(systemctl show ampcontrol.service --property=NRestarts --value)"
+        [[ "$state" == active && "$restarts" == "$baseline" ]] || return 1
+    done
+}
+
 prompt_secret() {
     local prompt="$1"
     local first=""
@@ -569,7 +584,10 @@ systemctl daemon-reload
 if [[ "$START_SERVICE" == true ]]; then
     systemctl enable ampcontrol.service >/dev/null
     systemctl restart ampcontrol.service
-systemctl is-active --quiet ampcontrol.service || fail "$(msg 'o serviço não iniciou; consulte journalctl -u ampcontrol.service' 'the service did not start; check journalctl -u ampcontrol.service')"
+    if ! wait_for_stable_service; then
+        journalctl -u ampcontrol.service -n 20 --no-pager >&2 || true
+        fail "$(msg 'o serviço não permaneceu ativo; consulte journalctl -u ampcontrol.service' 'the service did not stay active; check journalctl -u ampcontrol.service')"
+    fi
 printf '\n%s\n' "$(msg 'AmpControl instalado e em execução.' 'AmpControl installed and running.')"
 else
 printf '\n%s\n' "$(msg 'AmpControl instalado. Inicie com: systemctl enable --now ampcontrol.service' 'AmpControl installed. Start it with: systemctl enable --now ampcontrol.service')"

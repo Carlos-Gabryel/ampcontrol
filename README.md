@@ -136,7 +136,7 @@ Uma instalação configurada pode receber a versão estável mais recente com:
 sudo ampcontrol-maintenance update
 ```
 
-O atualizador confere o checksum, valida a configuração usando o novo binário e cria um backup antes da troca. Se o serviço não iniciar, o rollback é automático.
+O atualizador confere o checksum, valida a configuração usando o novo binário e cria um backup antes da troca. Se o serviço não permanecer ativo nos primeiros 15 segundos (por exemplo, caindo e sendo reiniciado pelo systemd), o rollback é automático.
 
 ```bash
 sudo ampcontrol-maintenance status

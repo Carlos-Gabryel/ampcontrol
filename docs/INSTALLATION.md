@@ -109,7 +109,7 @@ sudo ampcontrol-maintenance update v1.2.3
 sudo ampcontrol-maintenance status
 ```
 
-O atualizador baixa a release oficial, confere o SHA-256 publicado, valida a configuração atual em uma unidade systemd temporária e só então substitui o binário. Ele preserva TOML, credenciais, cadastro de Idle e demais estados locais. Uma falha de instalação ou inicialização aciona rollback automático.
+O atualizador baixa a release oficial, confere o SHA-256 publicado, valida a configuração atual em uma unidade systemd temporária e só então substitui o binário. Ele preserva TOML, credenciais, cadastro de Idle e demais estados locais. Uma falha de instalação, ou um serviço que não permanece ativo nos primeiros 15 segundos, aciona rollback automático.
 
 Para restaurar manualmente a versão anterior:
 

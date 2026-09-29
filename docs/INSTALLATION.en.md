@@ -99,7 +99,7 @@ sudo ampcontrol-maintenance status
 sudo ampcontrol-maintenance rollback
 ```
 
-The updater downloads the official release, verifies its SHA-256 checksum, validates the current configuration in a temporary systemd unit, and only then replaces files. TOML, credentials, Idle registration, and local state are preserved. Installation or startup failure triggers automatic rollback.
+The updater downloads the official release, verifies its SHA-256 checksum, validates the current configuration in a temporary systemd unit, and only then replaces files. TOML, credentials, Idle registration, and local state are preserved. Installation failure, or a service that does not stay active for the first 15 seconds, triggers automatic rollback.
 
 Backups are stored under `/var/backups/ampcontrol`. Keep the latest backup until Discord, dashboards, Idle, and RCON have been validated.
 
