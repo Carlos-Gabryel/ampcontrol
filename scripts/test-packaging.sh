@@ -86,7 +86,7 @@ done
 eval "$(extract_stable_service_check "$PROJECT_DIRECTORY/scripts/install.sh")"
 # systemctl falso: o estado e o NRestarts vêm de listas, uma posição por consulta.
 # Os stubs e as listas FAKE_* são usados pela função carregada no eval acima.
-# shellcheck disable=SC2034,SC2329
+# shellcheck disable=SC2034,SC2317,SC2329
 {
     sleep() { :; }
     systemctl() {
