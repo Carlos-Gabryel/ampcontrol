@@ -137,3 +137,34 @@ func TestBilingualExampleConfigsParse(t *testing.T) {
 		})
 	}
 }
+
+func TestDiscordAdministratorsDefault(t *testing.T) {
+	explicitTrue := true
+	cases := map[string]struct {
+		source fileConfig
+		want   bool
+	}{
+		"TOML sem a chave":     {source: fileConfig{present: true}, want: false},
+		"TOML com true":        {source: fileConfig{present: true, Discord: fileDiscordConfig{AllowDiscordAdministrators: &explicitTrue}}, want: true},
+		"modo legado sem TOML": {source: fileConfig{}, want: true},
+	}
+	for name, testCase := range cases {
+		var cfg Config
+		applyFileDefaults(&cfg, testCase.source)
+		if cfg.DiscordAllowAdministrators != testCase.want {
+			t.Fatalf("%s: allow_discord_administrators = %v, esperado %v", name, cfg.DiscordAllowAdministrators, testCase.want)
+		}
+	}
+}
+
+func TestLoadFileConfigMarksPresence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[discord]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AMPCONTROL_CONFIG", path)
+	result, err := loadFileConfig()
+	if err != nil || !result.present {
+		t.Fatalf("arquivo lido deveria ser marcado como presente: %#v, erro=%v", result, err)
+	}
+}

@@ -18,7 +18,7 @@ A configuração não secreta fica em `/etc/ampcontrol/config.toml`. O modelo co
 | `owner_user_id` | Proprietário com acesso ao `/ampconfig` |
 | `admin_role_ids` | Cargos adicionais autorizados no `/ampconfig` |
 | `restrict_commands_to_channel` | Recusa comandos fora do canal do painel |
-| `allow_discord_administrators` | Autoriza qualquer membro com Administrator, além da lista explícita |
+| `allow_discord_administrators` | Autoriza qualquer membro com Administrator, além da lista explícita. Padrão `false` quando omitido |
 | `notification_ttl_minutes` | Tempo de vida das mensagens transitórias |
 | `status_refresh_seconds` | Intervalo de atualização dos cartões |
 | `command_user_cooldown_seconds` | Intervalo mínimo por usuário |
