@@ -21,6 +21,16 @@ go vet ./...
 bash scripts/test-packaging.sh
 ```
 
+CI also rehearses the installer end to end in a disposable systemd container (`scripts/test-installer.sh`, "Installer rehearsal" job). To repeat it locally with Docker:
+
+```bash
+CGO_ENABLED=0 go build -trimpath -o /tmp/ampcontrol ./cmd/ampcontrol
+docker build -t ampcontrol-installer-test -f packaging/test/installer.Dockerfile packaging/test
+docker run -d --rm --name installer-test --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/src:ro" -v /tmp/ampcontrol:/tmp/ampcontrol:ro ampcontrol-installer-test
+docker exec installer-test bash -c 'cp -r /src /work && /work/scripts/test-installer.sh /tmp/ampcontrol'
+docker stop installer-test
+```
+
 Integration tests require an isolated AMP installation and must never target production:
 
 ```bash
