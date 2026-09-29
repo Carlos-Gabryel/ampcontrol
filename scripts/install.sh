@@ -191,10 +191,10 @@ prompt_secret() {
     local second=""
     while true; do
         read -r -s -p "$prompt: " first
-        printf '\n'
+        printf '\n' >&2
         [[ -n "$first" ]] || { printf '%s\n' "$(msg 'O valor não pode ficar vazio.' 'The value cannot be empty.')" >&2; continue; }
         read -r -s -p "$(msg 'Confirme o valor' 'Confirm the value'): " second
-        printf '\n'
+        printf '\n' >&2
         [[ "$first" == "$second" ]] || { printf '%s\n' "$(msg 'Os valores não coincidem.' 'The values do not match.')" >&2; continue; }
         printf '%s' "$first"
         return
