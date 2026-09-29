@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 type RuntimeConfig struct {
@@ -53,7 +55,7 @@ func normalizeRuntimeConfig(config RuntimeConfig) (RuntimeConfig, error) {
 	config.SudoPath = strings.TrimSpace(config.SudoPath)
 
 	if !systemUserPattern.MatchString(config.SystemUser) {
-		return RuntimeConfig{}, fmt.Errorf("usuário de sistema do AMP inválido: %q", config.SystemUser)
+		return RuntimeConfig{}, fmt.Errorf(i18n.Choose("usuário de sistema do AMP inválido: %q", "invalid AMP system user: %q"), config.SystemUser)
 	}
 	for name, value := range map[string]string{
 		"manager_path": config.ManagerPath,
@@ -61,7 +63,7 @@ func normalizeRuntimeConfig(config RuntimeConfig) (RuntimeConfig, error) {
 		"sudo_path":    config.SudoPath,
 	} {
 		if !path.IsAbs(value) {
-			return RuntimeConfig{}, fmt.Errorf("%s precisa ser um caminho Linux absoluto", name)
+			return RuntimeConfig{}, fmt.Errorf(i18n.Choose("%s precisa ser um caminho Linux absoluto", "%s must be an absolute Linux path"), name)
 		}
 	}
 	return config, nil

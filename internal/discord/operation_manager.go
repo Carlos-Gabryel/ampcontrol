@@ -1,8 +1,10 @@
 package discord
 
 import (
-	"fmt"
+	"errors"
 	"sync"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/operation"
 )
@@ -24,15 +26,11 @@ func (c *Client) SetOperationManager(
 	manager *operation.Manager,
 ) error {
 	if c == nil {
-		return fmt.Errorf(
-			"o cliente Discord não foi inicializado",
-		)
+		return errors.New(i18n.Choose("o cliente Discord não foi inicializado", "the Discord client was not initialized"))
 	}
 
 	if manager == nil {
-		return fmt.Errorf(
-			"o gerenciador de operações não foi informado",
-		)
+		return errors.New(i18n.Choose("o gerenciador de operações não foi informado", "the operation manager was not provided"))
 	}
 
 	clientOperationManagers.Store(
@@ -52,25 +50,19 @@ func (c *Client) operationManager() (
 	error,
 ) {
 	if c == nil {
-		return nil, fmt.Errorf(
-			"o cliente Discord não foi inicializado",
-		)
+		return nil, errors.New(i18n.Choose("o cliente Discord não foi inicializado", "the Discord client was not initialized"))
 	}
 
 	value, exists := clientOperationManagers.Load(
 		c,
 	)
 	if !exists {
-		return nil, fmt.Errorf(
-			"o gerenciador de operações do cliente Discord não foi configurado",
-		)
+		return nil, errors.New(i18n.Choose("o gerenciador de operações do cliente Discord não foi configurado", "the Discord client operation manager was not configured"))
 	}
 
 	manager, valid := value.(*operation.Manager)
 	if !valid || manager == nil {
-		return nil, fmt.Errorf(
-			"o gerenciador de operações do cliente Discord é inválido",
-		)
+		return nil, errors.New(i18n.Choose("o gerenciador de operações do cliente Discord é inválido", "the Discord client operation manager is invalid"))
 	}
 
 	return manager, nil

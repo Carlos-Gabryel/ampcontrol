@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 const engineStateVersion = 1
@@ -31,9 +33,7 @@ func WithStatePath(path string) EngineOption {
 	return func(engine *Engine) error {
 		path = strings.TrimSpace(path)
 		if path == "" {
-			return fmt.Errorf(
-				"o caminho do estado persistente do motor de Idle esta vazio",
-			)
+			return errors.New(i18n.Choose("o caminho do estado persistente do motor de Idle esta vazio", "the Idle engine persistent state path is empty"))
 		}
 
 		state, err := loadEngineState(path)
@@ -55,7 +55,7 @@ func loadEngineState(path string) (engineState, error) {
 	}
 	if err != nil {
 		return engineState{}, fmt.Errorf(
-			"nao foi possivel abrir o estado do motor de Idle em %s: %w",
+			i18n.Choose("nao foi possivel abrir o estado do motor de Idle em %s: %w", "could not open the Idle engine state at %s: %w"),
 			path,
 			err,
 		)
@@ -68,7 +68,7 @@ func loadEngineState(path string) (engineState, error) {
 	var state engineState
 	if err := decoder.Decode(&state); err != nil {
 		return engineState{}, fmt.Errorf(
-			"o estado do motor de Idle em %s e invalido: %w",
+			i18n.Choose("o estado do motor de Idle em %s e invalido: %w", "the Idle engine state at %s is invalid: %w"),
 			path,
 			err,
 		)
@@ -76,7 +76,7 @@ func loadEngineState(path string) (engineState, error) {
 
 	if state.Version != engineStateVersion {
 		return engineState{}, fmt.Errorf(
-			"a versao %d do estado do motor de Idle nao e suportada",
+			i18n.Choose("a versao %d do estado do motor de Idle nao e suportada", "Idle engine state version %d is not supported"),
 			state.Version,
 		)
 	}
@@ -149,7 +149,7 @@ func (e *Engine) persistState(now time.Time) error {
 
 	if err := os.MkdirAll(filepath.Dir(e.statePath), 0o750); err != nil {
 		return fmt.Errorf(
-			"nao foi possivel criar a pasta do estado do motor de Idle: %w",
+			i18n.Choose("nao foi possivel criar a pasta do estado do motor de Idle: %w", "could not create the Idle engine state folder: %w"),
 			err,
 		)
 	}
@@ -157,7 +157,7 @@ func (e *Engine) persistState(now time.Time) error {
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf(
-			"nao foi possivel serializar o estado do motor de Idle: %w",
+			i18n.Choose("nao foi possivel serializar o estado do motor de Idle: %w", "could not serialize the Idle engine state: %w"),
 			err,
 		)
 	}
@@ -166,7 +166,7 @@ func (e *Engine) persistState(now time.Time) error {
 	temporaryPath := e.statePath + ".tmp"
 	if err := os.WriteFile(temporaryPath, data, 0o600); err != nil {
 		return fmt.Errorf(
-			"nao foi possivel gravar o estado temporario do motor de Idle: %w",
+			i18n.Choose("nao foi possivel gravar o estado temporario do motor de Idle: %w", "could not write the temporary Idle engine state: %w"),
 			err,
 		)
 	}
@@ -175,7 +175,7 @@ func (e *Engine) persistState(now time.Time) error {
 		_ = os.Remove(temporaryPath)
 
 		return fmt.Errorf(
-			"nao foi possivel publicar o estado do motor de Idle: %w",
+			i18n.Choose("nao foi possivel publicar o estado do motor de Idle: %w", "could not publish the Idle engine state: %w"),
 			err,
 		)
 	}

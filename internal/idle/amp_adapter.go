@@ -2,11 +2,14 @@ package idle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 )
@@ -66,7 +69,7 @@ func NewAMPAdapterWithInventory(
 	inventory amp.InstanceDiscoverer,
 ) (*AMPAdapter, error) {
 	if inventory == nil {
-		return nil, fmt.Errorf("o inventário AMP não foi informado")
+		return nil, errors.New(i18n.Choose("o inventário AMP não foi informado", "the AMP inventory was not provided"))
 	}
 	return newAMPAdapter(client, inventory.DiscoverInstances)
 }
@@ -76,15 +79,11 @@ func newAMPAdapter(
 	discover ampDiscoverInstancesFunc,
 ) (*AMPAdapter, error) {
 	if client == nil {
-		return nil, fmt.Errorf(
-			"o cliente da API AMP não foi informado",
-		)
+		return nil, errors.New(i18n.Choose("o cliente da API AMP não foi informado", "the AMP API client was not provided"))
 	}
 
 	if discover == nil {
-		return nil, fmt.Errorf(
-			"a função de descoberta das instâncias AMP não foi informada",
-		)
+		return nil, errors.New(i18n.Choose("a função de descoberta das instâncias AMP não foi informada", "the AMP instance discovery function was not provided"))
 	}
 
 	return &AMPAdapter{
@@ -136,7 +135,7 @@ func (a *AMPAdapter) RuntimeObservation(
 
 	if apiURL == "" {
 		return RuntimeObservation{State: RuntimeStateUnknown}, fmt.Errorf(
-			"a instância AMP %s está ligada, mas não possui URL de API",
+			i18n.Choose("a instância AMP %s está ligada, mas não possui URL de API", "AMP instance %s is running but has no API URL"),
 			instance.Name,
 		)
 	}
@@ -147,7 +146,7 @@ func (a *AMPAdapter) RuntimeObservation(
 	)
 	if err != nil {
 		return RuntimeObservation{State: RuntimeStateUnknown}, fmt.Errorf(
-			"não foi possível consultar o estado da aplicação da instância %s: %w",
+			i18n.Choose("não foi possível consultar o estado da aplicação da instância %s: %w", "could not query the application state of instance %s: %w"),
 			instance.Name,
 			err,
 		)
@@ -220,7 +219,7 @@ func (a *AMPAdapter) PlayerCount(
 
 	if !instance.Running {
 		return 0, fmt.Errorf(
-			"a instância AMP %s está Offline",
+			i18n.Choose("a instância AMP %s está Offline", "AMP instance %s is Offline"),
 			instance.Name,
 		)
 	}
@@ -228,7 +227,7 @@ func (a *AMPAdapter) PlayerCount(
 	apiURL := strings.TrimSpace(instance.APIURL)
 	if apiURL == "" {
 		return 0, fmt.Errorf(
-			"a instância AMP %s está ligada, mas não possui URL de API",
+			i18n.Choose("a instância AMP %s está ligada, mas não possui URL de API", "AMP instance %s is running but has no API URL"),
 			instance.Name,
 		)
 	}
@@ -236,7 +235,7 @@ func (a *AMPAdapter) PlayerCount(
 	status, err := a.client.GetApplicationStatus(ctx, apiURL)
 	if err != nil {
 		return 0, fmt.Errorf(
-			"não foi possível consultar jogadores da instância %s: %w",
+			i18n.Choose("não foi possível consultar jogadores da instância %s: %w", "could not query players of instance %s: %w"),
 			instance.Name,
 			err,
 		)
@@ -245,7 +244,7 @@ func (a *AMPAdapter) PlayerCount(
 	counts, err := status.PlayerCounts()
 	if err != nil {
 		return 0, fmt.Errorf(
-			"a contagem de jogadores da instância %s é inválida: %w",
+			i18n.Choose("a contagem de jogadores da instância %s é inválida: %w", "the player count of instance %s is invalid: %w"),
 			instance.Name,
 			err,
 		)
@@ -275,7 +274,7 @@ func (a *AMPAdapter) StopApplication(
 
 	if !instance.Running {
 		return fmt.Errorf(
-			"a instância AMP %s ficou Offline antes da parada automática",
+			i18n.Choose("a instância AMP %s ficou Offline antes da parada automática", "AMP instance %s went Offline before the automatic stop"),
 			instance.Name,
 		)
 	}
@@ -286,7 +285,7 @@ func (a *AMPAdapter) StopApplication(
 
 	if apiURL == "" {
 		return fmt.Errorf(
-			"a instância AMP %s está ligada, mas não possui URL de API",
+			i18n.Choose("a instância AMP %s está ligada, mas não possui URL de API", "AMP instance %s is running but has no API URL"),
 			instance.Name,
 		)
 	}
@@ -297,7 +296,7 @@ func (a *AMPAdapter) StopApplication(
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível confirmar o estado da aplicação da instância %s antes da parada: %w",
+			i18n.Choose("não foi possível confirmar o estado da aplicação da instância %s antes da parada: %w", "could not confirm the application state of instance %s before stopping: %w"),
 			instance.Name,
 			err,
 		)
@@ -318,27 +317,27 @@ func (a *AMPAdapter) StopApplication(
 
 	case RuntimeStateBusy:
 		return fmt.Errorf(
-			"a aplicação da instância %s entrou em transição antes da parada automática; estado AMP: %s",
+			i18n.Choose("a aplicação da instância %s entrou em transição antes da parada automática; estado AMP: %s", "the application of instance %s entered a transition before the automatic stop; AMP state: %s"),
 			instance.Name,
 			status.State.String(),
 		)
 
 	case RuntimeStateFailed:
 		return fmt.Errorf(
-			"a aplicação da instância %s está em estado de falha ou suspensão; estado AMP: %s",
+			i18n.Choose("a aplicação da instância %s está em estado de falha ou suspensão; estado AMP: %s", "the application of instance %s is failed or suspended; AMP state: %s"),
 			instance.Name,
 			status.State.String(),
 		)
 
 	case RuntimeStateOffline:
 		return fmt.Errorf(
-			"a aplicação da instância %s ficou Offline antes da parada automática",
+			i18n.Choose("a aplicação da instância %s ficou Offline antes da parada automática", "the application of instance %s went Offline before the automatic stop"),
 			instance.Name,
 		)
 
 	default:
 		return fmt.Errorf(
-			"o estado da aplicação da instância %s não é reconhecido; estado AMP: %s",
+			i18n.Choose("o estado da aplicação da instância %s não é reconhecido; estado AMP: %s", "the application state of instance %s is not recognized; AMP state: %s"),
 			instance.Name,
 			status.State.String(),
 		)
@@ -364,40 +363,30 @@ func (a *AMPAdapter) resolveInstance(
 	allowCache bool,
 ) (amp.ManagedInstance, error) {
 	if a == nil {
-		return amp.ManagedInstance{}, fmt.Errorf(
-			"o adaptador AMP não foi inicializado",
-		)
+		return amp.ManagedInstance{}, errors.New(i18n.Choose("o adaptador AMP não foi inicializado", "the AMP adapter was not initialized"))
 	}
 
 	if ctx == nil {
-		return amp.ManagedInstance{}, fmt.Errorf(
-			"o contexto da operação AMP é nulo",
-		)
+		return amp.ManagedInstance{}, errors.New(i18n.Choose("o contexto da operação AMP é nulo", "the AMP operation context is nil"))
 	}
 
 	if err := ctx.Err(); err != nil {
 		return amp.ManagedInstance{}, fmt.Errorf(
-			"o contexto da operação AMP foi encerrado: %w",
+			i18n.Choose("o contexto da operação AMP foi encerrado: %w", "the AMP operation context has ended: %w"),
 			err,
 		)
 	}
 
 	if a.client == nil {
-		return amp.ManagedInstance{}, fmt.Errorf(
-			"o cliente da API AMP não foi inicializado",
-		)
+		return amp.ManagedInstance{}, errors.New(i18n.Choose("o cliente da API AMP não foi inicializado", "the AMP API client was not initialized"))
 	}
 
 	if a.discover == nil {
-		return amp.ManagedInstance{}, fmt.Errorf(
-			"a descoberta das instâncias AMP não foi inicializada",
-		)
+		return amp.ManagedInstance{}, errors.New(i18n.Choose("a descoberta das instâncias AMP não foi inicializada", "AMP instance discovery was not initialized"))
 	}
 
 	if a.now == nil {
-		return amp.ManagedInstance{}, fmt.Errorf(
-			"o relógio interno do adaptador AMP não foi inicializado",
-		)
+		return amp.ManagedInstance{}, errors.New(i18n.Choose("o relógio interno do adaptador AMP não foi inicializado", "the AMP adapter's internal clock was not initialized"))
 	}
 
 	instanceName := strings.TrimSpace(
@@ -405,9 +394,7 @@ func (a *AMPAdapter) resolveInstance(
 	)
 
 	if instanceName == "" {
-		return amp.ManagedInstance{}, fmt.Errorf(
-			"o servidor de Idle não informou o nome da instância AMP",
-		)
+		return amp.ManagedInstance{}, errors.New(i18n.Choose("o servidor de Idle não informou o nome da instância AMP", "the Idle server did not provide the AMP instance name"))
 	}
 
 	instances, err := a.discoverInstances(
@@ -416,7 +403,7 @@ func (a *AMPAdapter) resolveInstance(
 	)
 	if err != nil {
 		return amp.ManagedInstance{}, fmt.Errorf(
-			"não foi possível descobrir as instâncias AMP: %w",
+			i18n.Choose("não foi possível descobrir as instâncias AMP: %w", "could not discover the AMP instances: %w"),
 			err,
 		)
 	}
@@ -431,7 +418,7 @@ func (a *AMPAdapter) resolveInstance(
 	}
 
 	return amp.ManagedInstance{}, fmt.Errorf(
-		"a instância AMP %q configurada no monitor de Idle não foi encontrada",
+		i18n.Choose("a instância AMP %q configurada no monitor de Idle não foi encontrada", "AMP instance %q configured in the Idle monitor was not found"),
 		instanceName,
 	)
 }

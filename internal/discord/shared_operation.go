@@ -3,6 +3,8 @@ package discord
 import (
 	"fmt"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 // acquireSharedOperation tenta reservar uma instância usando o mesmo
@@ -27,7 +29,7 @@ func (c *Client) acquireSharedOperation(
 	manager, err := c.operationManager()
 	if err != nil {
 		return nil, "", false, fmt.Errorf(
-			"não foi possível acessar o gerenciador compartilhado de operações: %w",
+			i18n.Choose("não foi possível acessar o gerenciador compartilhado de operações: %w", "could not access the shared operation manager: %w"),
 			err,
 		)
 	}

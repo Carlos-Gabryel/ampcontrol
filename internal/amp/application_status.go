@@ -2,8 +2,11 @@ package amp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 type ApplicationState int
@@ -61,9 +64,7 @@ func (c *APIClient) GetApplicationStatus(
 	baseURL = strings.TrimSpace(baseURL)
 
 	if baseURL == "" {
-		return ApplicationStatus{}, fmt.Errorf(
-			"a URL da instância AMP não foi informada",
-		)
+		return ApplicationStatus{}, errors.New(i18n.Choose("a URL da instância AMP não foi informada", "the AMP instance URL was not provided"))
 	}
 
 	sessionID, err := c.login(

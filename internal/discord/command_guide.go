@@ -68,7 +68,7 @@ func (c *Client) upsertCommandGuideMessage() error {
 				)
 				if updateErr != nil {
 					return fmt.Errorf(
-						"não foi possível editar o guia fixo de comandos: %w",
+						i18n.Choose("não foi possível editar o guia fixo de comandos: %w", "could not edit the pinned command guide: %w"),
 						updateErr,
 					)
 				}
@@ -89,7 +89,7 @@ func (c *Client) upsertCommandGuideMessage() error {
 
 			if getErr != nil && !isDiscordNotFound(getErr) {
 				return fmt.Errorf(
-					"não foi possível consultar o guia fixo de comandos: %w",
+					i18n.Choose("não foi possível consultar o guia fixo de comandos: %w", "could not query the pinned command guide: %w"),
 					getErr,
 				)
 			}
@@ -103,7 +103,7 @@ func (c *Client) upsertCommandGuideMessage() error {
 			WithEmbeds(embeds...),
 	)
 	if err != nil {
-		return fmt.Errorf("não foi possível criar o guia fixo de comandos: %w", err)
+		return fmt.Errorf(i18n.Choose("não foi possível criar o guia fixo de comandos: %w", "could not create the pinned command guide: %w"), err)
 	}
 
 	state.GuideMessageID = created.ID.String()

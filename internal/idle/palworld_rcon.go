@@ -2,8 +2,11 @@ package idle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/rcon"
 )
@@ -38,9 +41,7 @@ func (d PalworldRCONDetector) PlayerCount(
 	server Server,
 ) (int, error) {
 	if ctx == nil {
-		return 0, fmt.Errorf(
-			"o contexto da consulta RCON é nulo",
-		)
+		return 0, errors.New(i18n.Choose("o contexto da consulta RCON é nulo", "the RCON query context is nil"))
 	}
 
 	address := strings.TrimSpace(
@@ -49,7 +50,7 @@ func (d PalworldRCONDetector) PlayerCount(
 
 	if address == "" {
 		return 0, fmt.Errorf(
-			"o endereço RCON da instância %s não foi informado",
+			i18n.Choose("o endereço RCON da instância %s não foi informado", "the RCON address of instance %s was not provided"),
 			server.Instance,
 		)
 	}
@@ -80,7 +81,7 @@ func (d PalworldRCONDetector) PlayerCount(
 
 	if playerCount < 0 {
 		return 0, fmt.Errorf(
-			"a consulta Palworld RCON retornou uma quantidade negativa de jogadores: %d",
+			i18n.Choose("a consulta Palworld RCON retornou uma quantidade negativa de jogadores: %d", "the Palworld RCON query returned a negative player count: %d"),
 			playerCount,
 		)
 	}

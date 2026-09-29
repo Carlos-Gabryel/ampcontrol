@@ -2,6 +2,7 @@ package discord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -111,11 +112,11 @@ func New(
 		return nil, err
 	}
 	if config.Inventory == nil {
-		return nil, fmt.Errorf("o inventário AMP não foi informado")
+		return nil, errors.New(i18n.Choose("o inventário AMP não foi informado", "the AMP inventory was not provided"))
 	}
 	adminRoleIDs, err := parseSnowflakeSet(config.AdminRoleIDs)
 	if err != nil {
-		return nil, fmt.Errorf("cargos administrativos inválidos: %w", err)
+		return nil, fmt.Errorf(i18n.Choose("cargos administrativos inválidos: %w", "invalid administrator roles: %w"), err)
 	}
 
 	disgoClient, err := disgo.New(
@@ -188,7 +189,7 @@ func parseSnowflakeSet(values []string) (map[snowflake.ID]struct{}, error) {
 	for _, value := range values {
 		id, err := snowflake.Parse(strings.TrimSpace(value))
 		if err != nil || id == 0 {
-			return nil, fmt.Errorf("ID inválido: %q", value)
+			return nil, fmt.Errorf(i18n.Choose("ID inválido: %q", "invalid ID: %q"), value)
 		}
 		result[id] = struct{}{}
 	}
@@ -262,7 +263,7 @@ func (c *Client) sendInteractionMessage(
 		c.finishCommandAudit(
 			event.Token(),
 			commandAuditPhaseFailed,
-			"Não foi possível responder ao comando no Discord.",
+			i18n.Choose("Não foi possível responder ao comando no Discord.", "Could not reply to the command in Discord."),
 			"",
 		)
 		return
@@ -307,7 +308,7 @@ func (c *Client) updateInteractionMessageByToken(
 		c.finishCommandAudit(
 			interactionToken,
 			commandAuditPhaseFailed,
-			"Não foi possível atualizar a resposta do comando no Discord.",
+			i18n.Choose("Não foi possível atualizar a resposta do comando no Discord.", "Could not update the command response in Discord."),
 			"",
 		)
 		return
@@ -354,7 +355,7 @@ func (c *Client) sendChannelMessage(
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível enviar mensagem ao canal: %w",
+			i18n.Choose("não foi possível enviar mensagem ao canal: %w", "could not send the message to the channel: %w"),
 			err,
 		)
 	}

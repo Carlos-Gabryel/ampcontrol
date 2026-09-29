@@ -187,6 +187,11 @@ var englishReplacements = []struct {
 	{"visível", "visible"},
 	{"preferência", "preference"},
 	{"preferências", "preferences"},
+	// Textos de constantes e variáveis de pacote, que não podem usar Choose
+	// porque são avaliados antes da escolha do idioma.
+	{"o AmpControl está sendo reiniciado; tente novamente em instantes", "AmpControl is restarting; try again in a moment"},
+	{"modo de observação: Core.Stop não foi executado", "observation mode: Core.Stop was not executed"},
+	{"Idle automático", "automatic Idle"},
 	{"Não foi possível", "Could not"},
 	{"não foi possível", "could not"},
 	{"não foi informado", "was not provided"},

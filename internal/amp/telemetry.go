@@ -2,6 +2,7 @@ package amp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -9,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 const activeUsersMetricName = "Active Users"
@@ -60,7 +63,7 @@ func (s ApplicationStatus) PlayerCounts() (PlayerCounts, error) {
 
 	if !found {
 		return PlayerCounts{}, fmt.Errorf(
-			"a métrica %q não foi retornada pelo AMP",
+			i18n.Choose("a métrica %q não foi retornada pelo AMP", "AMP did not return the %q metric"),
 			activeUsersMetricName,
 		)
 	}
@@ -68,7 +71,7 @@ func (s ApplicationStatus) PlayerCounts() (PlayerCounts, error) {
 	if !validWholeNumber(metric.RawValue) ||
 		!validWholeNumber(metric.MaxValue) {
 		return PlayerCounts{}, fmt.Errorf(
-			"a métrica %q contém valores não inteiros ou não finitos: atual=%v máximo=%v",
+			i18n.Choose("a métrica %q contém valores não inteiros ou não finitos: atual=%v máximo=%v", "the %q metric has non-integer or non-finite values: current=%v maximum=%v"),
 			activeUsersMetricName,
 			metric.RawValue,
 			metric.MaxValue,
@@ -80,7 +83,7 @@ func (s ApplicationStatus) PlayerCounts() (PlayerCounts, error) {
 
 	if current < 0 || maximum <= 0 || current > maximum {
 		return PlayerCounts{}, fmt.Errorf(
-			"a métrica %q contém valores inválidos: atual=%d máximo=%d",
+			i18n.Choose("a métrica %q contém valores inválidos: atual=%d máximo=%d", "the %q metric has invalid values: current=%d maximum=%d"),
 			activeUsersMetricName,
 			current,
 			maximum,
@@ -108,9 +111,7 @@ func (c *APIClient) GetModuleInfo(
 ) (ModuleInfo, error) {
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL == "" {
-		return ModuleInfo{}, fmt.Errorf(
-			"a URL da instância AMP não foi informada",
-		)
+		return ModuleInfo{}, errors.New(i18n.Choose("a URL da instância AMP não foi informada", "the AMP instance URL was not provided"))
 	}
 
 	var response ModuleInfo
@@ -139,7 +140,7 @@ func (c *APIClient) DiscoverManagedInstances(
 ) ([]ManagedInstance, error) {
 	adsURL = strings.TrimSpace(adsURL)
 	if adsURL == "" {
-		return nil, fmt.Errorf("a URL do ADS não foi informada")
+		return nil, errors.New(i18n.Choose("a URL do ADS não foi informada", "the ADS URL was not provided"))
 	}
 
 	sessionID, err := c.login(ctx, adsURL)
@@ -195,7 +196,7 @@ func (c *APIClient) DiscoverManagedInstances(
 	}
 
 	if len(instances) == 0 {
-		return nil, fmt.Errorf("o ADS não retornou instâncias controláveis")
+		return nil, errors.New(i18n.Choose("o ADS não retornou instâncias controláveis", "ADS did not return any controllable instance"))
 	}
 
 	sort.Slice(instances, func(left, right int) bool {

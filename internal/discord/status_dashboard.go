@@ -277,9 +277,7 @@ func dashboardMessageHasLogo(attachments []disgoDiscord.Attachment, filename str
 func loadStatusDashboardState(path string) (statusDashboardState, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return statusDashboardState{}, fmt.Errorf(
-			"o caminho do estado do painel não foi configurado",
-		)
+		return statusDashboardState{}, errors.New(i18n.Choose("o caminho do estado do painel não foi configurado", "the dashboard state path was not configured"))
 	}
 
 	data, err := os.ReadFile(path)
@@ -297,7 +295,7 @@ func loadStatusDashboardState(path string) (statusDashboardState, error) {
 	var state statusDashboardState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return statusDashboardState{}, fmt.Errorf(
-			"o estado do painel em %s é inválido: %w",
+			i18n.Choose("o estado do painel em %s é inválido: %w", "the dashboard state at %s is invalid: %w"),
 			path,
 			err,
 		)
@@ -312,7 +310,7 @@ func saveStatusDashboardState(
 ) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf(
-			"não foi possível criar a pasta de estado do painel: %w",
+			i18n.Choose("não foi possível criar a pasta de estado do painel: %w", "could not create the dashboard state folder: %w"),
 			err,
 		)
 	}
@@ -320,7 +318,7 @@ func saveStatusDashboardState(
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível serializar o estado do painel: %w",
+			i18n.Choose("não foi possível serializar o estado do painel: %w", "could not serialize the dashboard state: %w"),
 			err,
 		)
 	}
@@ -329,14 +327,14 @@ func saveStatusDashboardState(
 	temporaryPath := path + ".tmp"
 	if err := os.WriteFile(temporaryPath, data, 0o600); err != nil {
 		return fmt.Errorf(
-			"não foi possível gravar o estado temporário do painel: %w",
+			i18n.Choose("não foi possível gravar o estado temporário do painel: %w", "could not write the temporary dashboard state: %w"),
 			err,
 		)
 	}
 
 	if err := os.Rename(temporaryPath, path); err != nil {
 		return fmt.Errorf(
-			"não foi possível publicar o estado do painel: %w",
+			i18n.Choose("não foi possível publicar o estado do painel: %w", "could not publish the dashboard state: %w"),
 			err,
 		)
 	}

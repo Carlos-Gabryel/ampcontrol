@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/amp"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/idle"
@@ -45,7 +48,7 @@ func newDashboardPlayerCountResolver(
 	ampAdapter, err := idle.NewAMPAdapterWithInventory(ampClient, inventory)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar o adaptador AMP do painel: %w",
+			i18n.Choose("não foi possível criar o adaptador AMP do painel: %w", "could not create the dashboard AMP adapter: %w"),
 			err,
 		)
 	}
@@ -53,7 +56,7 @@ func newDashboardPlayerCountResolver(
 	ampPlayersDetector, err := idle.NewAMPPlayersDetector(ampAdapter)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar o detector AMP do painel: %w",
+			i18n.Choose("não foi possível criar o detector AMP do painel: %w", "could not create the dashboard AMP detector: %w"),
 			err,
 		)
 	}
@@ -61,7 +64,7 @@ func newDashboardPlayerCountResolver(
 	detectors, err := idle.NewDefaultDetectorRegistry(ampPlayersDetector)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível criar os detectores do painel: %w",
+			i18n.Choose("não foi possível criar os detectores do painel: %w", "could not create the dashboard detectors: %w"),
 			err,
 		)
 	}
@@ -81,9 +84,7 @@ func (r *dashboardPlayerCountResolver) ResolvePlayerCount(
 	error,
 ) {
 	if r == nil || r.detectors == nil {
-		return 0, false, fmt.Errorf(
-			"o resolvedor de jogadores do painel não foi inicializado",
-		)
+		return 0, false, errors.New(i18n.Choose("o resolvedor de jogadores do painel não foi inicializado", "the dashboard player resolver was not initialized"))
 	}
 
 	server, exists := r.configSnapshot().FindServer(instance)

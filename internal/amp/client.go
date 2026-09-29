@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 type APIClient struct {
@@ -95,7 +98,7 @@ func (c *APIClient) StartApplication(
 	}
 
 	if !response.Status {
-		reason := "o AMP não informou o motivo"
+		reason := i18n.Choose("o AMP não informou o motivo", "AMP did not give a reason")
 
 		if response.Reason != nil &&
 			strings.TrimSpace(*response.Reason) != "" {
@@ -192,7 +195,7 @@ func (c *APIClient) login(
 		)
 
 		if reason == "" {
-			reason = "o AMP não informou o motivo"
+			reason = i18n.Choose("o AMP não informou o motivo", "AMP did not give a reason")
 		}
 
 		return "", fmt.Errorf(
@@ -202,9 +205,7 @@ func (c *APIClient) login(
 	}
 
 	if strings.TrimSpace(response.SessionID) == "" {
-		return "", fmt.Errorf(
-			"o login AMP não retornou uma sessão",
-		)
+		return "", errors.New(i18n.Choose("o login AMP não retornou uma sessão", "the AMP login did not return a session"))
 	}
 
 	return response.SessionID, nil
@@ -222,7 +223,7 @@ func (c *APIClient) postJSON(
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível gerar o JSON da requisição: %w",
+			i18n.Choose("não foi possível gerar o JSON da requisição: %w", "could not build the request JSON: %w"),
 			err,
 		)
 	}
@@ -235,7 +236,7 @@ func (c *APIClient) postJSON(
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível criar a requisição HTTP: %w",
+			i18n.Choose("não foi possível criar a requisição HTTP: %w", "could not create the HTTP request: %w"),
 			err,
 		)
 	}
@@ -262,7 +263,7 @@ func (c *APIClient) postJSON(
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"erro de comunicação com o AMP: %w",
+			i18n.Choose("erro de comunicação com o AMP: %w", "communication error with AMP: %w"),
 			err,
 		)
 	}
@@ -276,7 +277,7 @@ func (c *APIClient) postJSON(
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível ler a resposta do AMP: %w",
+			i18n.Choose("não foi possível ler a resposta do AMP: %w", "could not read the AMP response: %w"),
 			err,
 		)
 	}
@@ -299,7 +300,7 @@ func (c *APIClient) postJSON(
 		responseBody,
 	); err != nil {
 		return fmt.Errorf(
-			"resposta JSON inválida do AMP: %w; conteúdo: %s",
+			i18n.Choose("resposta JSON inválida do AMP: %w; conteúdo: %s", "invalid JSON response from AMP: %w; content: %s"),
 			err,
 			strings.TrimSpace(string(body)),
 		)

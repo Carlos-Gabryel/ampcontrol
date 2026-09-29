@@ -23,7 +23,7 @@ func (c *Client) acquireAMPCommandOperation(
 	manager, err := c.operationManager()
 	if err != nil {
 		return nil, nil, fmt.Errorf(
-			"não foi possível acessar o gerenciador de operações: %w",
+			i18n.Choose("não foi possível acessar o gerenciador de operações: %w", "could not access the operation manager: %w"),
 			err,
 		)
 	}

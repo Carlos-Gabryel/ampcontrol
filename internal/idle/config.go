@@ -2,11 +2,14 @@ package idle
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/secret"
 )
@@ -88,9 +91,7 @@ func Load(
 	)
 
 	if path == "" {
-		return Config{}, fmt.Errorf(
-			"o caminho do arquivo de configuração de Idle não foi informado",
-		)
+		return Config{}, errors.New(i18n.Choose("o caminho do arquivo de configuração de Idle não foi informado", "the Idle configuration file path was not provided"))
 	}
 
 	file, err := os.Open(
@@ -98,7 +99,7 @@ func Load(
 	)
 	if err != nil {
 		return Config{}, fmt.Errorf(
-			"não foi possível abrir a configuração de Idle em %s: %w",
+			i18n.Choose("não foi possível abrir a configuração de Idle em %s: %w", "could not open the Idle configuration at %s: %w"),
 			path,
 			err,
 		)
@@ -115,7 +116,7 @@ func Load(
 
 	if err := decoder.Decode(&raw); err != nil {
 		return Config{}, fmt.Errorf(
-			"não foi possível interpretar a configuração de Idle em %s: %w",
+			i18n.Choose("não foi possível interpretar a configuração de Idle em %s: %w", "could not parse the Idle configuration at %s: %w"),
 			path,
 			err,
 		)
@@ -149,14 +150,14 @@ func ensureSingleJSONObject(
 
 	if err != nil {
 		return fmt.Errorf(
-			"há conteúdo inválido depois da configuração de Idle em %s: %w",
+			i18n.Choose("há conteúdo inválido depois da configuração de Idle em %s: %w", "there is invalid content after the Idle configuration at %s: %w"),
 			path,
 			err,
 		)
 	}
 
 	return fmt.Errorf(
-		"o arquivo %s contém mais de um objeto JSON",
+		i18n.Choose("o arquivo %s contém mais de um objeto JSON", "file %s contains more than one JSON object"),
 		path,
 	)
 }
@@ -211,7 +212,7 @@ func buildConfig(
 		)
 		if err != nil {
 			return Config{}, fmt.Errorf(
-				"servidor de índice %d: %w",
+				i18n.Choose("servidor de índice %d: %w", "server at index %d: %w"),
 				index,
 				err,
 			)
@@ -223,7 +224,7 @@ func buildConfig(
 
 		if _, exists := instances[instanceKey]; exists {
 			return Config{}, fmt.Errorf(
-				"a instância %q aparece mais de uma vez na configuração de Idle",
+				i18n.Choose("a instância %q aparece mais de uma vez na configuração de Idle", "instance %q appears more than once in the Idle configuration"),
 				server.Instance,
 			)
 		}
@@ -248,9 +249,7 @@ func buildServer(
 	)
 
 	if instance == "" {
-		return Server{}, fmt.Errorf(
-			"o nome da instância AMP não foi informado",
-		)
+		return Server{}, errors.New(i18n.Choose("o nome da instância AMP não foi informado", "the AMP instance name was not provided"))
 	}
 
 	displayName := strings.TrimSpace(
@@ -269,7 +268,7 @@ func buildServer(
 
 	if !isKnownServerMode(mode) {
 		return Server{}, fmt.Errorf(
-			"o modo de Idle %q da instância %s não é reconhecido",
+			i18n.Choose("o modo de Idle %q da instância %s não é reconhecido", "Idle mode %q of instance %s is not recognized"),
 			mode,
 			instance,
 		)
@@ -283,7 +282,7 @@ func buildServer(
 
 	if idleTimeoutMinutes <= 0 {
 		return Server{}, fmt.Errorf(
-			"idle_timeout_minutes da instância %s precisa ser maior que zero",
+			i18n.Choose("idle_timeout_minutes da instância %s precisa ser maior que zero", "idle_timeout_minutes of instance %s must be greater than zero"),
 			instance,
 		)
 	}
@@ -296,7 +295,7 @@ func buildServer(
 
 	if startupGraceMinutes <= 0 {
 		return Server{}, fmt.Errorf(
-			"startup_grace_minutes da instância %s precisa ser maior que zero",
+			i18n.Choose("startup_grace_minutes da instância %s precisa ser maior que zero", "startup_grace_minutes of instance %s must be greater than zero"),
 			instance,
 		)
 	}
@@ -321,7 +320,7 @@ func buildServer(
 		if server.Detector != "" &&
 			!isKnownDetector(server.Detector) {
 			return Server{}, fmt.Errorf(
-				"o detector %q da instância %s não é reconhecido",
+				i18n.Choose("o detector %q da instância %s não é reconhecido", "detector %q of instance %s is not recognized"),
 				server.Detector,
 				instance,
 			)
@@ -330,7 +329,7 @@ func buildServer(
 		if server.FallbackDetector != "" &&
 			!isKnownDetector(server.FallbackDetector) {
 			return Server{}, fmt.Errorf(
-				"o detector fallback %q da instância %s não é reconhecido",
+				i18n.Choose("o detector fallback %q da instância %s não é reconhecido", "fallback detector %q of instance %s is not recognized"),
 				server.FallbackDetector,
 				instance,
 			)
@@ -342,13 +341,13 @@ func buildServer(
 	if !isImplementedDetector(server.Detector) {
 		if server.Detector == "" {
 			return Server{}, fmt.Errorf(
-				"a instância %s está habilitada, mas nenhum detector foi informado",
+				i18n.Choose("a instância %s está habilitada, mas nenhum detector foi informado", "instance %s is enabled, but no detector was provided"),
 				instance,
 			)
 		}
 
 		return Server{}, fmt.Errorf(
-			"o detector %q da instância %s ainda não foi implementado",
+			i18n.Choose("o detector %q da instância %s ainda não foi implementado", "detector %q of instance %s is not implemented yet"),
 			server.Detector,
 			instance,
 		)
@@ -357,14 +356,14 @@ func buildServer(
 	if server.FallbackDetector != "" {
 		if server.FallbackDetector == server.Detector {
 			return Server{}, fmt.Errorf(
-				"a instância %s usa o mesmo detector como primário e fallback",
+				i18n.Choose("a instância %s usa o mesmo detector como primário e fallback", "instance %s uses the same detector as primary and fallback"),
 				instance,
 			)
 		}
 
 		if !isImplementedDetector(server.FallbackDetector) {
 			return Server{}, fmt.Errorf(
-				"o detector fallback %q da instância %s ainda não foi implementado",
+				i18n.Choose("o detector fallback %q da instância %s ainda não foi implementado", "fallback detector %q of instance %s is not implemented yet"),
 				server.FallbackDetector,
 				instance,
 			)
@@ -375,7 +374,7 @@ func buildServer(
 		detectorUsesRCON(server.FallbackDetector) {
 		if raw.RCON == nil {
 			return Server{}, fmt.Errorf(
-				"a instância %s usa um detector RCON, mas não possui configuração RCON",
+				i18n.Choose("a instância %s usa um detector RCON, mas não possui configuração RCON", "instance %s uses an RCON detector but has no RCON configuration"),
 				instance,
 			)
 		}
@@ -393,14 +392,14 @@ func buildServer(
 
 		if server.RCONAddress == "" {
 			return Server{}, fmt.Errorf(
-				"o endereço RCON da instância %s não foi informado",
+				i18n.Choose("o endereço RCON da instância %s não foi informado", "the RCON address of instance %s was not provided"),
 				instance,
 			)
 		}
 
 		if server.RCONPasswordCredentialName() == "" && server.RCONPasswordEnv == "" {
 			return Server{}, fmt.Errorf(
-				"a credencial de senha RCON da instância %s não foi informada",
+				i18n.Choose("a credencial de senha RCON da instância %s não foi informada", "the RCON password credential of instance %s was not provided"),
 				instance,
 			)
 		}
@@ -518,7 +517,7 @@ func (s Server) RCONPassword() (string, error) {
 	environmentName := strings.TrimSpace(s.RCONPasswordEnv)
 	if credentialName == "" && environmentName == "" {
 		return "", fmt.Errorf(
-			"a instância %s não possui uma credencial de senha RCON configurada",
+			i18n.Choose("a instância %s não possui uma credencial de senha RCON configurada", "instance %s has no RCON password credential configured"),
 			s.Instance,
 		)
 	}
@@ -533,7 +532,7 @@ func (s Server) RCONPassword() (string, error) {
 	}
 	password := os.Getenv(environmentName)
 	if password == "" {
-		return "", fmt.Errorf("a variável %s, usada pela instância %s, não foi configurada", environmentName, s.Instance)
+		return "", fmt.Errorf(i18n.Choose("a variável %s, usada pela instância %s, não foi configurada", "variable %s, used by instance %s, is not set"), environmentName, s.Instance)
 	}
 	return password, nil
 }

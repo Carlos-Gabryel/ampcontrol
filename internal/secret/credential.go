@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 const maximumCredentialSize = 64 * 1024
@@ -17,7 +19,7 @@ var credentialNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 func ReadCredential(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if !credentialNamePattern.MatchString(name) {
-		return "", fmt.Errorf("nome de credencial inválido: %q", name)
+		return "", fmt.Errorf(i18n.Choose("nome de credencial inválido: %q", "invalid credential name: %q"), name)
 	}
 
 	directory := strings.TrimSpace(os.Getenv("CREDENTIALS_DIRECTORY"))
@@ -31,10 +33,10 @@ func ReadCredential(name string) (string, error) {
 		return "", err
 	}
 	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("a credencial %s não é um arquivo regular", name)
+		return "", fmt.Errorf(i18n.Choose("a credencial %s não é um arquivo regular", "credential %s is not a regular file"), name)
 	}
 	if info.Size() > maximumCredentialSize {
-		return "", fmt.Errorf("a credencial %s excede o limite de %d bytes", name, maximumCredentialSize)
+		return "", fmt.Errorf(i18n.Choose("a credencial %s excede o limite de %d bytes", "credential %s exceeds the %d-byte limit"), name, maximumCredentialSize)
 	}
 
 	content, err := os.ReadFile(path)
@@ -45,7 +47,7 @@ func ReadCredential(name string) (string, error) {
 	// duas pontas evita cabeçalhos inválidos quando o arquivo vem com sobras.
 	value := strings.Trim(string(content), "\r\n")
 	if value == "" {
-		return "", fmt.Errorf("a credencial %s está vazia", name)
+		return "", fmt.Errorf(i18n.Choose("a credencial %s está vazia", "credential %s is empty"), name)
 	}
 	return value, nil
 }
@@ -64,7 +66,7 @@ func ReadRequired(credentialName string, legacyEnvironmentName string) (string, 
 	value = os.Getenv(legacyEnvironmentName)
 	if value == "" {
 		return "", fmt.Errorf(
-			"credencial %s não foi fornecida pelo systemd e %s não foi configurada",
+			i18n.Choose("credencial %s não foi fornecida pelo systemd e %s não foi configurada", "credential %s was not provided by systemd and %s is not set"),
 			credentialName,
 			legacyEnvironmentName,
 		)

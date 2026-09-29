@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
 var ErrServerAlreadyRegistered = errors.New(
@@ -109,7 +111,7 @@ func loadAdditionalServers(path string) ([]Server, error) {
 		)
 		if buildErr != nil {
 			return nil, fmt.Errorf(
-				"servidor adicional de índice %d: %w",
+				i18n.Choose("servidor adicional de índice %d: %w", "additional server at index %d: %w"),
 				index,
 				buildErr,
 			)
@@ -123,9 +125,7 @@ func loadAdditionalServers(path string) ([]Server, error) {
 func loadRawAdditionalServers(path string) (rawAdditionalServers, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return rawAdditionalServers{}, fmt.Errorf(
-			"o caminho dos servidores adicionais de Idle não foi configurado",
-		)
+		return rawAdditionalServers{}, errors.New(i18n.Choose("o caminho dos servidores adicionais de Idle não foi configurado", "the additional Idle servers path was not configured"))
 	}
 
 	file, err := os.Open(path)
@@ -134,7 +134,7 @@ func loadRawAdditionalServers(path string) (rawAdditionalServers, error) {
 	}
 	if err != nil {
 		return rawAdditionalServers{}, fmt.Errorf(
-			"não foi possível abrir os servidores adicionais em %s: %w",
+			i18n.Choose("não foi possível abrir os servidores adicionais em %s: %w", "could not open the additional servers at %s: %w"),
 			path,
 			err,
 		)
@@ -147,7 +147,7 @@ func loadRawAdditionalServers(path string) (rawAdditionalServers, error) {
 	var raw rawAdditionalServers
 	if err := decoder.Decode(&raw); err != nil {
 		return rawAdditionalServers{}, fmt.Errorf(
-			"não foi possível interpretar os servidores adicionais em %s: %w",
+			i18n.Choose("não foi possível interpretar os servidores adicionais em %s: %w", "could not parse the additional servers at %s: %w"),
 			path,
 			err,
 		)
@@ -176,7 +176,7 @@ func mergeAdditionalServers(
 		key := strings.ToLower(strings.TrimSpace(server.Instance))
 		if _, exists := seen[key]; exists {
 			return Config{}, fmt.Errorf(
-				"a instância %q aparece mais de uma vez na configuração combinada de Idle",
+				i18n.Choose("a instância %q aparece mais de uma vez na configuração combinada de Idle", "instance %q appears more than once in the combined Idle configuration"),
 				server.Instance,
 			)
 		}
@@ -201,7 +201,7 @@ func saveRawAdditionalServers(
 	data, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
 		return fmt.Errorf(
-			"não foi possível serializar os servidores adicionais: %w",
+			i18n.Choose("não foi possível serializar os servidores adicionais: %w", "could not serialize the additional servers: %w"),
 			err,
 		)
 	}
@@ -210,19 +210,19 @@ func saveRawAdditionalServers(
 	temporaryPath := path + ".tmp"
 	if err := os.WriteFile(temporaryPath, data, 0o600); err != nil {
 		return fmt.Errorf(
-			"não foi possível gravar os servidores adicionais temporários: %w",
+			i18n.Choose("não foi possível gravar os servidores adicionais temporários: %w", "could not write the temporary additional servers: %w"),
 			err,
 		)
 	}
 	if err := os.Chmod(temporaryPath, 0o600); err != nil {
 		return fmt.Errorf(
-			"não foi possível proteger os servidores adicionais temporários: %w",
+			i18n.Choose("não foi possível proteger os servidores adicionais temporários: %w", "could not protect the temporary additional servers: %w"),
 			err,
 		)
 	}
 	if err := os.Rename(temporaryPath, path); err != nil {
 		return fmt.Errorf(
-			"não foi possível publicar os servidores adicionais: %w",
+			i18n.Choose("não foi possível publicar os servidores adicionais: %w", "could not publish the additional servers: %w"),
 			err,
 		)
 	}

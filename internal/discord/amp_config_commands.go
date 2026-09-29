@@ -103,7 +103,7 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 	gameValue = strings.TrimSpace(gameValue)
 	addressValue = strings.TrimSpace(addressValue)
 	if !hasName && !hasGame && !hasMaximum && !hasAddress && !hasDetector {
-		c.updateInteractionMessage(event, "⚠️ Informe pelo menos uma configuração para alterar.")
+		c.updateInteractionMessage(event, i18n.Choose("⚠️ Informe pelo menos uma configuração para alterar.", "⚠️ Provide at least one setting to change."))
 		return
 	}
 	if (hasName && nameValue == "") || (hasGame && gameValue == "") || (hasAddress && addressValue == "") {
@@ -131,7 +131,7 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 		if err != nil {
 			c.log.Error().Err(err).Str("instance", instance.Name).Msg("Não foi possível alterar o detector da instância")
 			c.updateInteractionMessage(event, fmt.Sprintf(
-				"❌ Não foi possível alterar o método de detecção de **%s**.\nErro: `%s`",
+				i18n.Choose("❌ Não foi possível alterar o método de detecção de **%s**.\nErro: `%s`", "❌ Could not change the detection method for **%s**.\nError: `%s`"),
 				ampInstanceDisplayName(instance), sanitizeAMPError(err),
 			))
 			return
@@ -192,7 +192,7 @@ func (c *Client) handleAMPInstanceSettingsCommand(
 	if setting.MaximumPlayers > 0 {
 		maximum = fmt.Sprintf("%d", setting.MaximumPlayers)
 	}
-	detector := "API do AMP"
+	detector := i18n.Choose("API do AMP", "AMP API")
 	if hasDetector {
 		detector = describeIdleDetectionMethod(updatedDetection.Method)
 	} else if manager != nil {
@@ -226,7 +226,7 @@ func (c *Client) handleAMPInstanceSettingsDetailsCommand(
 	}
 	instance, err := c.resolveAMPInstance(instanceName)
 	if err != nil {
-		c.updateInteractionMessage(event, "⚠️ A instância selecionada não existe.")
+		c.updateInteractionMessage(event, i18n.Choose("⚠️ A instância selecionada não existe.", "⚠️ The selected instance does not exist."))
 		return
 	}
 	setting, customized := c.instancePresentationSettings(instance.Name)
@@ -270,7 +270,7 @@ func (c *Client) handleAMPInstanceSettingsResetCommand(
 	}
 	instance, err := c.resolveAMPInstance(instanceName)
 	if err != nil {
-		c.updateInteractionMessage(event, "⚠️ A instância selecionada não existe.")
+		c.updateInteractionMessage(event, i18n.Choose("⚠️ A instância selecionada não existe.", "⚠️ The selected instance does not exist."))
 		return
 	}
 
@@ -285,7 +285,7 @@ func (c *Client) handleAMPInstanceSettingsResetCommand(
 	}
 	removed, err := c.resetInstancePresentationSettings(instance.Name)
 	if err != nil {
-		c.updateInteractionMessage(event, "❌ O detector foi restaurado, mas não foi possível remover a apresentação personalizada.")
+		c.updateInteractionMessage(event, i18n.Choose("❌ O detector foi restaurado, mas não foi possível remover a apresentação personalizada.", "❌ The detector was restored, but the custom presentation could not be removed."))
 		return
 	}
 	c.requestStatusRefresh()
@@ -311,7 +311,7 @@ func describeIdleDetectionMethod(method string) string {
 	case "amp_project_zomboid_rcon":
 		return "API AMP + RCON Project Zomboid"
 	default:
-		return "API do AMP"
+		return i18n.Choose("API do AMP", "AMP API")
 	}
 }
 
@@ -388,7 +388,7 @@ func (c *Client) handleAMPIdleRegistrationCommand(
 		c.log.Error().
 			Err(registrationErr).
 			Msg("Idle ativado, mas os comandos não foram atualizados")
-		message += "\n⚠️ O Idle já está ativo, mas a lista do comando será atualizada na próxima conexão do bot."
+		message += i18n.Choose("\n⚠️ O Idle já está ativo, mas a lista do comando será atualizada na próxima conexão do bot.", "\n⚠️ Idle is already active, but the command list will only be updated on the bot's next connection.")
 	}
 
 	c.updateInteractionMessage(event, message)
@@ -490,7 +490,7 @@ func (c *Client) handleAMPInstanceVisibilityCommand(
 		c.log.Error().
 			Err(registrationErr).
 			Msg("Preferência salva, mas os comandos não foram atualizados")
-		message += "\n⚠️ A preferência foi salva, mas a lista dos comandos só será atualizada na próxima conexão do bot."
+		message += i18n.Choose("\n⚠️ A preferência foi salva, mas a lista dos comandos só será atualizada na próxima conexão do bot.", "\n⚠️ The preference was saved, but the command list will only be updated on the bot's next connection.")
 	}
 
 	c.updateInteractionMessage(event, message)

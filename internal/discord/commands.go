@@ -2,6 +2,7 @@ package discord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -79,7 +80,7 @@ func RegisterCommands(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"não foi possível registrar os comandos da guilda: %w",
+			i18n.Choose("não foi possível registrar os comandos da guilda: %w", "could not register the guild commands: %w"),
 			err,
 		)
 	}
@@ -90,7 +91,7 @@ func RegisterCommands(
 func (c *Client) registerCommands(ctx context.Context) error {
 	instances, err := c.discoverAMPInstances(ctx)
 	if err != nil {
-		return fmt.Errorf("não foi possível descobrir as instâncias para registrar os comandos: %w", err)
+		return fmt.Errorf(i18n.Choose("não foi possível descobrir as instâncias para registrar os comandos: %w", "could not discover the instances to register the commands: %w"), err)
 	}
 	return c.registerCommandsWithInstances(instances)
 }
@@ -279,7 +280,7 @@ func buildAMPConfigCommand(
 						Name:        "detector",
 						Description: l("Método usado para confirmar jogadores conectados", "Method used to confirm connected players"),
 						Choices: []discord.ApplicationCommandOptionChoiceString{
-							{Name: "API do AMP", Value: "amp"},
+							{Name: i18n.Choose("API do AMP", "AMP API"), Value: "amp"},
 							{Name: "API AMP + RCON Palworld", Value: "amp_palworld_rcon"},
 							{Name: "API AMP + RCON Project Zomboid", Value: "amp_project_zomboid_rcon"},
 						},
@@ -378,7 +379,7 @@ func buildAMPInstanceChoices(
 ) ([]discord.ApplicationCommandOptionChoiceString, error) {
 	if len(instances) > maximumDiscordChoices {
 		return nil, fmt.Errorf(
-			"foram encontradas %d instâncias, mas o Discord aceita no máximo %d opções estáticas",
+			i18n.Choose("foram encontradas %d instâncias, mas o Discord aceita no máximo %d opções estáticas", "found %d instances, but Discord accepts at most %d static choices"),
 			len(instances),
 			maximumDiscordChoices,
 		)
@@ -396,9 +397,7 @@ func buildAMPInstanceChoices(
 		)
 
 		if instanceName == "" {
-			return nil, fmt.Errorf(
-				"foi encontrada uma instância AMP sem nome",
-			)
+			return nil, errors.New(i18n.Choose("foi encontrada uma instância AMP sem nome", "found an AMP instance without a name"))
 		}
 
 		choices = append(
