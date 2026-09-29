@@ -349,6 +349,7 @@ func TestLockedStopperRejectsNilContext(
 	}
 
 	err = stopper.StopApplication(
+		//lint:ignore SA1012 o teste verifica justamente a rejeição de contexto nulo
 		nil,
 		Server{
 			Instance: "AlamamaPal01",
