@@ -39,6 +39,7 @@ Novas instâncias aparecem automaticamente no Discord, mas o ingresso no Idle ex
 - o Discord autentica o usuário, mas o AmpControl valida canal, proprietário e cargos;
 - a conta AMP deve ter privilégios mínimos;
 - o processo não executa `ampinstmgr` diretamente como root: usa um wrapper validado e sudoers restrito;
+- o wrapper recusa o controlador ADS: pelo nome `ADS01` e pelo módulo `ADS` registrado no `instances.json` do AMP, qualquer que seja o nome da instância;
 - segredos chegam ao processo por arquivos de credenciais temporários do systemd;
 - uma contagem de jogadores inconclusiva bloqueia ações destrutivas para usuários comuns.
 

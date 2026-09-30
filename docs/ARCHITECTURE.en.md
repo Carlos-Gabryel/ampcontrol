@@ -38,6 +38,7 @@ ADS is preferred. If it is temporarily unavailable, local `ampinstmgr` inventory
 - Discord authenticates the user; AmpControl still validates channel, owner, and roles;
 - the AMP account should use least privilege;
 - the process does not execute `ampinstmgr` directly as root, using a validated wrapper and restricted sudoers policy;
+- the wrapper refuses the ADS controller: by the `ADS01` name and by the `ADS` module recorded in AMP's `instances.json`, whatever the instance is called;
 - secrets reach the process through temporary systemd credential files;
 - inconclusive player counts block destructive actions from regular users.
 
