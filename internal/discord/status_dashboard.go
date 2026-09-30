@@ -23,6 +23,16 @@ const statusDashboardTimeout = 45 * time.Second
 
 const statusDashboardMessageOrderVersion = 1
 
+// O Discord responde 429 a edições seguidas das mensagens do painel sem
+// anunciar esse limite nos cabeçalhos (medido em produção: uma edição
+// ~0,3 s depois da anterior é recusada; ~1,3 s depois passa). Espaçar as
+// escritas evita as recusas; o orçamento impede que muitas instâncias
+// estourem statusDashboardTimeout.
+const (
+	statusDashboardEditSpacing = 1500 * time.Millisecond
+	statusDashboardEditBudget  = 20 * time.Second
+)
+
 type statusDashboardState struct {
 	MessageID           string   `json:"message_id"`
 	MessageIDs          []string `json:"message_ids,omitempty"`
@@ -122,7 +132,7 @@ func (c *Client) refreshStatusDashboard(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.upsertStatusDashboardMessages(pages, statuses); err != nil {
+	if err := c.upsertStatusDashboardMessages(ctx, pages, statuses); err != nil {
 		return err
 	}
 
@@ -172,7 +182,7 @@ func (c *Client) setGameOverride(instance string, game string) {
 	c.gameOverridesMu.Unlock()
 }
 
-func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComponent, statuses []ampInstanceStatusView) error {
+func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]disgoDiscord.LayoutComponent, statuses []ampInstanceStatusView) error {
 	state, err := loadStatusDashboardState(c.statusStatePath)
 	if err != nil {
 		return err
@@ -183,8 +193,12 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 	}
 	newIDs := make([]string, 0, len(pages))
 	usedOld := make(map[string]struct{})
+	spacing := dashboardEditSpacing(c.dashboardEditSpacing, statusDashboardEditBudget, len(pages))
 
 	for index, page := range pages {
+		if index > 0 {
+			waitDashboardEditSpacing(ctx, spacing)
+		}
 		game := ""
 		logoFilename := ""
 		if index < len(statuses) {
@@ -253,6 +267,30 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 	}
 	state.MessageOrderVersion = statusDashboardMessageOrderVersion
 	return saveStatusDashboardState(c.statusStatePath, state)
+}
+
+// dashboardEditSpacing reduz o intervalo entre páginas quando o intervalo
+// cheio não caberia no orçamento do ciclo.
+func dashboardEditSpacing(maxSpacing, budget time.Duration, pages int) time.Duration {
+	if pages > 1 && budget/time.Duration(pages) < maxSpacing {
+		return budget / time.Duration(pages)
+	}
+	return maxSpacing
+}
+
+// waitDashboardEditSpacing é só uma gentileza com o rate limit: com o prazo
+// do ciclo esgotado ele retorna na hora, e o painel termina de gravar em
+// vez de abandonar mensagens já criadas sem registrá-las no estado.
+func waitDashboardEditSpacing(ctx context.Context, spacing time.Duration) {
+	if spacing <= 0 {
+		return
+	}
+	timer := time.NewTimer(spacing)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
 }
 
 // updateStatusDashboardPage edita uma página existente do painel. Devolve

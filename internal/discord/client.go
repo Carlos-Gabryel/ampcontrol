@@ -43,6 +43,7 @@ type Client struct {
 	statusRefreshMu         sync.Mutex
 	dashboardVerified       map[snowflake.ID]string // logo conferido por mensagem do painel; protegido por statusRefreshMu
 	guideSyncedSignature    string                  // última versão do guia enviada; protegido por statusRefreshMu
+	dashboardEditSpacing    time.Duration
 	commandRegistrationMu   sync.Mutex
 	commandInventoryMu      sync.RWMutex
 	commandInventory        string
@@ -166,6 +167,7 @@ func New(
 		preferences:            preferences,
 		idleRegistered:         instanceNameMap(config.IdleRegisteredInstances),
 		statusRefreshRequests:  make(chan struct{}, 1),
+		dashboardEditSpacing:   statusDashboardEditSpacing,
 		commandCooldowns: newAMPCommandCooldowns(
 			config.CommandUserCooldown,
 			config.CommandServerCooldown,
