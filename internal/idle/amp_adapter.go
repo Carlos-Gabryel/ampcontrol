@@ -417,11 +417,28 @@ func (a *AMPAdapter) resolveInstance(
 		}
 	}
 
-	return amp.ManagedInstance{}, fmt.Errorf(
+	notFound := fmt.Errorf(
 		i18n.Choose("a instância AMP %q configurada no monitor de Idle não foi encontrada", "AMP instance %q configured in the Idle monitor was not found"),
 		instanceName,
 	)
+	// Um inventário vazio não prova que a instância foi apagada.
+	if len(instances) == 0 {
+		return amp.ManagedInstance{}, notFound
+	}
+	return amp.ManagedInstance{}, &instanceNotFoundError{err: notFound}
 }
+
+// ErrInstanceNotFound indica que o inventário AMP foi lido com sucesso e
+// a instância configurada não está nele.
+var ErrInstanceNotFound = errors.New("AMP instance not found in inventory")
+
+type instanceNotFoundError struct {
+	err error
+}
+
+func (e *instanceNotFoundError) Error() string { return e.err.Error() }
+
+func (e *instanceNotFoundError) Is(target error) bool { return target == ErrInstanceNotFound }
 
 func (a *AMPAdapter) discoverInstances(
 	ctx context.Context,

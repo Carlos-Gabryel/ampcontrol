@@ -117,6 +117,8 @@ Exemplo completo (também em [`config/idle.example.json`](../config/idle.example
 
 > **Atenção ao `mode`:** sem `"mode": "active"`, a instância fica em `observe` e o Idle **nunca para o servidor**, só registra no log. Chaves desconhecidas ou valores inválidos fazem o serviço recusar o arquivo e **não iniciar**. Guarde uma cópia antes de editar e, depois de reiniciar, confira `systemctl status ampcontrol.service` e `journalctl -u ampcontrol.service -n 20`.
 
+**Instância apagada do AMP:** se uma instância cadastrada some do inventário do AMP por 10 minutos seguidos, o Idle registra um aviso único e deixa de consultá-la, em vez de repetir o erro a cada ciclo. Se ela voltar (backup restaurado, instância recriada com o mesmo nome), o monitoramento recomeça sozinho com a mesma configuração. O `idle.json` nunca é alterado pelo bot: o `/ampconfig diagnostico` lista essas instâncias para você removê-las do arquivo quando quiser. Falhas do AMP ou inventário vazio não contam como instância apagada.
+
 ### RCON
 
 O RCON dá uma contagem de jogadores mais confiável para Palworld e Project Zomboid. A senha nunca vai no JSON: ela é uma credencial criptografada do systemd, com nome no formato `rcon_<instância>`. Para configurar numa instalação nova (exemplo com `Palworld01`):

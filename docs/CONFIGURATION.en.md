@@ -110,6 +110,8 @@ Full example (also in [`config/idle.example.json`](../config/idle.example.json))
 
 > **Mind `mode`:** without `"mode": "active"`, the instance stays in `observe` and Idle **never stops the server**; it only logs. Unknown keys or invalid values make the service reject the file and **fail to start**. Keep a copy before editing and, after restarting, check `systemctl status ampcontrol.service` and `journalctl -u ampcontrol.service -n 20`.
 
+**Instance deleted from AMP:** if a registered instance is missing from the AMP inventory for 10 consecutive minutes, Idle logs a single warning and stops querying it instead of repeating the error every cycle. If it comes back (restored backup, instance recreated with the same name), monitoring resumes on its own with the same settings. The bot never edits `idle.json`: `/ampconfig diagnostics` lists these instances so you can remove them from the file whenever you like. AMP failures or an empty inventory never count as a deleted instance.
+
 ### RCON
 
 RCON gives a more reliable player count for Palworld and Project Zomboid. The password never goes into the JSON: it is an encrypted systemd credential named `rcon_<instance>`. To set it up on a fresh installation (example with `Palworld01`):

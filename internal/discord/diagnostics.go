@@ -155,6 +155,10 @@ func (c *Client) collectDiagnostics(
 			Severity: idleSeverity,
 		})
 
+		if item, ok := missingInstancesDiagnostic(idleSnapshot.MissingServers); ok {
+			items = append(items, item)
+		}
+
 		rconSeverity := diagnosticHealthy
 		rconDetail := i18n.Choose("Nenhum detector RCON configurado", "No RCON detector configured")
 		if idleSnapshot.RCONServers > 0 {
@@ -217,6 +221,22 @@ func (c *Client) idleDiagnosticsSnapshot() (
 		return IdleDiagnosticsSnapshot{}, false
 	}
 	return provider.IdleDiagnostics(), true
+}
+
+// missingInstancesDiagnostic avisa sobre instâncias cadastradas no Idle
+// que não existem mais no AMP; o motor já pausou o monitoramento delas.
+func missingInstancesDiagnostic(instances []string) (diagnosticItem, bool) {
+	if len(instances) == 0 {
+		return diagnosticItem{}, false
+	}
+	return diagnosticItem{
+		Name: i18n.Choose("Instâncias que não existem mais no AMP", "Instances no longer in AMP"),
+		Detail: fmt.Sprintf(
+			i18n.Choose("%s: cadastradas no Idle, mas ausentes do AMP; o monitoramento foi pausado e volta sozinho se elas reaparecerem. Para limpar, remova-as de config/idle.json.", "%s: registered in Idle but missing from AMP; monitoring is paused and resumes automatically if they reappear. To clean up, remove them from config/idle.json."),
+			sanitizeAuditText(strings.Join(instances, ", "), 300),
+		),
+		Severity: diagnosticWarning,
+	}, true
 }
 
 func formatDiagnosticsReport(

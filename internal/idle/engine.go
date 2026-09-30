@@ -76,6 +76,8 @@ const (
 	EventStopSucceeded          EventType = "stop_succeeded"
 	EventStopFailed             EventType = "stop_failed"
 	EventStatePersistenceFailed EventType = "state_persistence_failed"
+	EventInstanceMissing        EventType = "instance_missing"
+	EventInstanceBack           EventType = "instance_back"
 )
 
 type Event struct {
@@ -102,9 +104,19 @@ type serverTracker struct {
 	EmptySince           time.Time
 	ApplicationStartedAt time.Time
 	Restored             bool
+
+	// Só em memória: após um reinício a ausência é confirmada de novo.
+	MissingSince    time.Time
+	MissingReported bool
 }
 
 const applicationIdentityTolerance = 2 * time.Minute
+
+// Uma instância apagada do AMP gera o mesmo aviso a cada ciclo. Depois
+// de ausente do inventário por esse tempo, o motor avisa uma vez e fica
+// em silêncio até ela voltar; a checagem continua (usa o inventário em
+// cache), então uma instância restaurada volta a ser monitorada sozinha.
+const instanceMissingGrace = 10 * time.Minute
 
 type EngineOption func(*Engine) error
 
@@ -340,6 +352,28 @@ func (e *Engine) checkServer(
 		server,
 	)
 	if err != nil {
+		if tracker.MissingReported {
+			return nil
+		}
+		if errors.Is(err, ErrInstanceNotFound) {
+			if tracker.MissingSince.IsZero() {
+				tracker.MissingSince = now
+			}
+			if now.Sub(tracker.MissingSince) >= instanceMissingGrace {
+				tracker.MissingReported = true
+				return e.emitMany(
+					ctx,
+					Event{
+						Type:         EventInstanceMissing,
+						Instance:     server.Instance,
+						DisplayName:  server.DisplayName,
+						RuntimeState: RuntimeStateUnknown,
+						Err:          err,
+					},
+				)
+			}
+		}
+
 		// Uma falha transitória apenas pausa este ciclo. O progresso é
 		// preservado, mas nenhuma decisão de parada é tomada sem que o
 		// estado e os jogadores possam ser confirmados novamente.
@@ -354,6 +388,41 @@ func (e *Engine) checkServer(
 			},
 		)
 	}
+
+	var back []Event
+	if tracker.MissingReported {
+		back = e.emitMany(
+			ctx,
+			Event{
+				Type:         EventInstanceBack,
+				Instance:     server.Instance,
+				DisplayName:  server.DisplayName,
+				RuntimeState: observation.State,
+			},
+		)
+	}
+	tracker.MissingSince = time.Time{}
+	tracker.MissingReported = false
+
+	return append(
+		back,
+		e.checkObservedServer(
+			ctx,
+			server,
+			tracker,
+			now,
+			observation,
+		)...,
+	)
+}
+
+func (e *Engine) checkObservedServer(
+	ctx context.Context,
+	server Server,
+	tracker *serverTracker,
+	now time.Time,
+	observation RuntimeObservation,
+) []Event {
 	runtimeState := observation.State
 
 	if runtimeState != RuntimeStateOnline {

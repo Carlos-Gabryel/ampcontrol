@@ -43,3 +43,16 @@ func TestMaxDiagnosticSeverity(t *testing.T) {
 		t.Fatalf("falha não prevaleceu: %d", actual)
 	}
 }
+
+func TestMissingInstancesDiagnostic(t *testing.T) {
+	if _, ok := missingInstancesDiagnostic(nil); ok {
+		t.Fatal("sem instâncias ausentes o diagnóstico não deveria ganhar item")
+	}
+	item, ok := missingInstancesDiagnostic([]string{"AIO01", "Velha02"})
+	if !ok || item.Severity != diagnosticWarning {
+		t.Fatalf("instâncias ausentes deveriam gerar um aviso: %+v", item)
+	}
+	if !strings.Contains(item.Detail, "AIO01, Velha02") || !strings.Contains(item.Detail, "config/idle.json") {
+		t.Fatalf("o aviso deveria listar as instâncias e dizer onde limpar: %q", item.Detail)
+	}
+}

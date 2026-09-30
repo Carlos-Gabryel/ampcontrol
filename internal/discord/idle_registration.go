@@ -44,6 +44,8 @@ type IdleDiagnosticsSnapshot struct {
 	ObserveServers    int
 	RCONServers       int
 	RCONReadyServers  int
+	// Cadastradas no Idle, mas ausentes do inventário AMP há algum tempo.
+	MissingServers []string
 }
 
 type IdleDiagnosticsProvider interface {

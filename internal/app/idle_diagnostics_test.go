@@ -76,3 +76,23 @@ func TestRCONServerReadyRejectsMissingCredential(t *testing.T) {
 		t.Fatal("credencial RCON ausente não deveria estar pronta")
 	}
 }
+
+func TestIdleDiagnosticsListsInstancesMissingFromAMP(t *testing.T) {
+	observer := &idleObserver{}
+	observer.recordEvent(idle.Event{Type: idle.EventInstanceMissing, Instance: "Velha02", Err: idle.ErrInstanceNotFound})
+	observer.recordEvent(idle.Event{Type: idle.EventInstanceMissing, Instance: "AIO01", Err: idle.ErrInstanceNotFound})
+
+	missing := observer.IdleDiagnostics().MissingServers
+	if len(missing) != 2 || missing[0] != "AIO01" || missing[1] != "Velha02" {
+		t.Fatalf("instâncias ausentes deveriam aparecer em ordem: %v", missing)
+	}
+	if !observer.IdleDiagnostics().LastErrorAt.IsZero() {
+		t.Fatal("instância apagada do AMP não é falha do motor")
+	}
+
+	observer.recordEvent(idle.Event{Type: idle.EventInstanceBack, Instance: "aio01"})
+	missing = observer.IdleDiagnostics().MissingServers
+	if len(missing) != 1 || missing[0] != "Velha02" {
+		t.Fatalf("instância que voltou deveria sair da lista: %v", missing)
+	}
+}
