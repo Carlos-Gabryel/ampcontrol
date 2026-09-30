@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
@@ -49,6 +50,7 @@ func (c *Client) upsertCommandGuideMessage() error {
 	}
 
 	embeds := buildAMPCommandGuideEmbeds(c.restrictCommandChannel)
+	content := i18n.Choose(commandGuideContent, "— How to use the commands")
 	if state.GuideMessageID != "" {
 		messageID, parseErr := snowflake.Parse(state.GuideMessageID)
 		if parseErr == nil && messageID != 0 {
@@ -57,23 +59,31 @@ func (c *Client) upsertCommandGuideMessage() error {
 				messageID,
 			)
 			if getErr == nil && existing.Author.ID == c.bot.ID() {
-				update := disgoDiscord.NewMessageUpdate().
-					WithContent(i18n.Choose(commandGuideContent, "— How to use the commands")).
-					WithEmbeds(embeds...)
+				// O guia só muda com a configuração; reeditar a mesma
+				// mensagem a cada minuto só gastaria rate limit do canal.
+				signature := commandGuideSignature(messageID, content, embeds)
+				pinned := existing.Pinned
+				if signature != c.guideSyncedSignature {
+					update := disgoDiscord.NewMessageUpdate().
+						WithContent(content).
+						WithEmbeds(embeds...)
 
-				updated, updateErr := c.channels.UpdateMessage(
-					c.notificationChannelID,
-					messageID,
-					update,
-				)
-				if updateErr != nil {
-					return fmt.Errorf(
-						i18n.Choose("não foi possível editar o guia fixo de comandos: %w", "could not edit the pinned command guide: %w"),
-						updateErr,
+					updated, updateErr := c.channels.UpdateMessage(
+						c.notificationChannelID,
+						messageID,
+						update,
 					)
+					if updateErr != nil {
+						return fmt.Errorf(
+							i18n.Choose("não foi possível editar o guia fixo de comandos: %w", "could not edit the pinned command guide: %w"),
+							updateErr,
+						)
+					}
+					c.guideSyncedSignature = signature
+					pinned = updated.Pinned
 				}
 
-				if !updated.Pinned {
+				if !pinned {
 					if pinErr := c.channels.PinMessage(
 						c.notificationChannelID,
 						messageID,
@@ -99,7 +109,7 @@ func (c *Client) upsertCommandGuideMessage() error {
 	created, err := c.channels.CreateMessage(
 		c.notificationChannelID,
 		disgoDiscord.NewMessageCreate().
-			WithContent(i18n.Choose(commandGuideContent, "— How to use the commands")).
+			WithContent(content).
 			WithEmbeds(embeds...),
 	)
 	if err != nil {
@@ -125,4 +135,14 @@ func (c *Client) upsertCommandGuideMessage() error {
 		Msg("Guia fixo de comandos criado no Discord")
 
 	return nil
+}
+
+// commandGuideSignature identifica a versão do guia enviada para uma
+// mensagem específica; um guia recriado ganha outro ID e é editado de novo.
+func commandGuideSignature(messageID snowflake.ID, content string, embeds []disgoDiscord.Embed) string {
+	payload, err := json.Marshal(embeds)
+	if err != nil {
+		return ""
+	}
+	return messageID.String() + "\x00" + content + "\x00" + string(payload)
 }
