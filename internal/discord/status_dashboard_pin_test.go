@@ -1,6 +1,8 @@
 package discord
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -23,6 +25,7 @@ type fakeDashboardChannels struct {
 	pins     int
 	updates  int
 	gets     int
+	writes   []time.Time
 }
 
 func discordNotFound() error {
@@ -45,6 +48,7 @@ func (f *fakeDashboardChannels) UpdateMessage(_ snowflake.ID, messageID snowflak
 		return nil, discordNotFound()
 	}
 	f.updates++
+	f.writes = append(f.writes, time.Now())
 	if update.Attachments != nil {
 		message.Attachments = fakeAttachments(update.Files)
 	}
@@ -54,6 +58,7 @@ func (f *fakeDashboardChannels) UpdateMessage(_ snowflake.ID, messageID snowflak
 
 func (f *fakeDashboardChannels) CreateMessage(_ snowflake.ID, create disgoDiscord.MessageCreate, _ ...rest.RequestOpt) (*disgoDiscord.Message, error) {
 	f.nextID++
+	f.writes = append(f.writes, time.Now())
 	message := &disgoDiscord.Message{ID: f.nextID, Flags: disgoDiscord.MessageFlagIsComponentsV2, Attachments: fakeAttachments(create.Files)}
 	f.messages[message.ID] = message
 	copied := *message
@@ -113,7 +118,7 @@ func TestStatusDashboardDoesNotRepinPinnedMessage(t *testing.T) {
 	pages, statuses := dashboardPinTestPages()
 
 	for range 3 {
-		if err := client.upsertStatusDashboardMessages(pages, statuses); err != nil {
+		if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
 			t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
 		}
 	}
@@ -136,7 +141,7 @@ func TestStatusDashboardPinsUnpinnedAndNewMessages(t *testing.T) {
 	client := newDashboardPinTestClient(t, channels, "500")
 	pages, statuses := dashboardPinTestPages()
 
-	if err := client.upsertStatusDashboardMessages(pages, statuses); err != nil {
+	if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
 		t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
 	}
 	if channels.pins != 1 || !channels.messages[500].Pinned {
@@ -145,7 +150,7 @@ func TestStatusDashboardPinsUnpinnedAndNewMessages(t *testing.T) {
 
 	channels.pins = 0
 	fresh := newDashboardPinTestClient(t, channels)
-	if err := fresh.upsertStatusDashboardMessages(pages, statuses); err != nil {
+	if err := fresh.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
 		t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
 	}
 	if channels.pins != 1 || !channels.messages[1001].Pinned {
@@ -164,7 +169,7 @@ func TestStatusDashboardVerifiesEachMessageOnlyOnce(t *testing.T) {
 	pages, statuses := dashboardPinTestPages()
 
 	for range 3 {
-		if err := client.upsertStatusDashboardMessages(pages, statuses); err != nil {
+		if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
 			t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
 		}
 	}
@@ -187,11 +192,11 @@ func TestStatusDashboardRecreatesMessageDeletedAfterVerification(t *testing.T) {
 	client := newDashboardPinTestClient(t, channels, "500")
 	pages, statuses := dashboardPinTestPages()
 
-	if err := client.upsertStatusDashboardMessages(pages, statuses); err != nil {
+	if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
 		t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
 	}
 	delete(channels.messages, 500)
-	if err := client.upsertStatusDashboardMessages(pages, statuses); err != nil {
+	if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
 		t.Fatalf("painel apagado deveria ser recriado sem erro: %v", err)
 	}
 
@@ -244,7 +249,7 @@ func TestStatusDashboardSwapsLogoOfVerifiedMessageWithoutQuerying(t *testing.T) 
 		t.Helper()
 		statuses := []ampInstanceStatusView{{Instance: amp.ManagedInstance{Name: "Jogo01", Game: game}}}
 		pages := buildAMPStatusPages(statuses, time.Unix(1_700_000_000, 0), "192.168.1.22")
-		if err := client.upsertStatusDashboardMessages(pages, statuses); err != nil {
+		if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
 			t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
 		}
 	}
@@ -262,5 +267,77 @@ func TestStatusDashboardSwapsLogoOfVerifiedMessageWithoutQuerying(t *testing.T) 
 	}
 	if len(channels.messages) != 1 {
 		t.Fatalf("a troca de logo não deveria recriar a mensagem: %d mensagens", len(channels.messages))
+	}
+}
+
+func dashboardPacingTestPages(count int) ([][]disgoDiscord.LayoutComponent, []ampInstanceStatusView) {
+	statuses := make([]ampInstanceStatusView, count)
+	for index := range statuses {
+		statuses[index].Instance = amp.ManagedInstance{Name: fmt.Sprintf("Jogo%02d", index), Game: "Jogo sem logo"}
+	}
+	return buildAMPStatusPages(statuses, time.Unix(1_700_000_000, 0), "192.168.1.22"), statuses
+}
+
+func TestStatusDashboardSpacesMessageWrites(t *testing.T) {
+	const spacing = 40 * time.Millisecond
+	channels := &fakeDashboardChannels{messages: map[snowflake.ID]*disgoDiscord.Message{}, nextID: 1000}
+	client := newDashboardPinTestClient(t, channels)
+	client.dashboardEditSpacing = spacing
+	pages, statuses := dashboardPacingTestPages(4)
+
+	if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
+		t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
+	}
+
+	if len(channels.writes) != 4 {
+		t.Fatalf("esperadas 4 escritas no Discord: %d", len(channels.writes))
+	}
+	for index := 1; index < len(channels.writes); index++ {
+		if gap := channels.writes[index].Sub(channels.writes[index-1]); gap < spacing {
+			t.Fatalf("escritas %d e %d com intervalo de %v; mínimo %v", index-1, index, gap, spacing)
+		}
+	}
+}
+
+func TestStatusDashboardFinishesWithoutSpacingAfterDeadline(t *testing.T) {
+	channels := &fakeDashboardChannels{messages: map[snowflake.ID]*disgoDiscord.Message{}, nextID: 1000}
+	client := newDashboardPinTestClient(t, channels)
+	client.dashboardEditSpacing = time.Hour
+	pages, statuses := dashboardPacingTestPages(3)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	started := time.Now()
+	if err := client.upsertStatusDashboardMessages(ctx, pages, statuses); err != nil {
+		t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > 5*time.Second {
+		t.Fatalf("com o prazo esgotado o painel não deveria esperar: %v", elapsed)
+	}
+
+	state, err := loadStatusDashboardState(client.statusStatePath)
+	if err != nil {
+		t.Fatalf("loadStatusDashboardState retornou erro: %v", err)
+	}
+	if len(state.MessageIDs) != 3 {
+		t.Fatalf("todas as mensagens criadas precisam ficar registradas no estado: %+v", state)
+	}
+}
+
+func TestStatusDashboardEditSpacingFitsBudget(t *testing.T) {
+	tests := []struct {
+		pages    int
+		expected time.Duration
+	}{
+		{pages: 0, expected: 1500 * time.Millisecond},
+		{pages: 1, expected: 1500 * time.Millisecond},
+		{pages: 12, expected: 1500 * time.Millisecond},
+		{pages: 40, expected: 500 * time.Millisecond},
+	}
+	for _, test := range tests {
+		actual := dashboardEditSpacing(1500*time.Millisecond, 20*time.Second, test.pages)
+		if actual != test.expected {
+			t.Fatalf("espaçamento para %d páginas: %v; esperado %v", test.pages, actual, test.expected)
+		}
 	}
 }
