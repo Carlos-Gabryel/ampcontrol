@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,7 @@ type idleObserver struct {
 	lastEventAt    time.Time
 	lastErrorAt    time.Time
 	lastError      string
+	missing        map[string]string
 	log            zerolog.Logger
 }
 
@@ -292,6 +294,15 @@ func buildIdleEventHandler(
 				Err(event.Err).
 				Msg("Motor de Idle não conseguiu consultar o estado da aplicação")
 
+		case idle.EventInstanceMissing:
+			eventLog.Warn().
+				Err(event.Err).
+				Msg("Motor de Idle deixou de monitorar uma instância que não existe mais no AMP")
+
+		case idle.EventInstanceBack:
+			eventLog.Info().
+				Msg("Motor de Idle voltou a monitorar uma instância que reapareceu no AMP")
+
 		case idle.EventRuntimeNotOnline:
 			eventLog.Debug().
 				Msg("Motor de Idle ignorou aplicação que não está Online")
@@ -463,6 +474,15 @@ func (o *idleObserver) recordEvent(event idle.Event) {
 	now := time.Now()
 	o.healthMu.Lock()
 	o.lastEventAt = now
+	switch event.Type {
+	case idle.EventInstanceMissing:
+		if o.missing == nil {
+			o.missing = make(map[string]string)
+		}
+		o.missing[strings.ToLower(event.Instance)] = event.Instance
+	case idle.EventInstanceBack:
+		delete(o.missing, strings.ToLower(event.Instance))
+	}
 	if idleEventIsDiagnosticFailure(event) {
 		o.lastErrorAt = now
 		o.lastError = strings.TrimSpace(event.Err.Error())
@@ -527,7 +547,11 @@ func (o *idleObserver) IdleDiagnostics() discordClient.IdleDiagnosticsSnapshot {
 		RCONServers:       rconServers,
 		RCONReadyServers:  rconReady,
 	}
+	for _, instance := range o.missing {
+		snapshot.MissingServers = append(snapshot.MissingServers, instance)
+	}
 	o.healthMu.RUnlock()
+	sort.Strings(snapshot.MissingServers)
 
 	return snapshot
 }
