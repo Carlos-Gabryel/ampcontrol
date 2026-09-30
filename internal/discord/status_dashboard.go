@@ -196,29 +196,14 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 		if index < len(oldIDs) {
 			parsed, parseErr := snowflake.Parse(oldIDs[index])
 			if parseErr == nil {
-				existing, getErr := c.channels.GetMessage(c.notificationChannelID, parsed)
-				if getErr == nil && existing.Author.ID == c.bot.ID() && existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
+				updated, updateErr := c.updateStatusDashboardPage(index, parsed, page, game, logoFilename)
+				if updateErr != nil {
+					return updateErr
+				}
+				if updated != nil {
 					messageID = parsed
-					update := disgoDiscord.NewMessageUpdateV2(page...)
-					if !dashboardMessageHasLogo(existing.Attachments, logoFilename) {
-						attachments := []disgoDiscord.AttachmentUpdate{}
-						update.Attachments = &attachments
-						logo, logoErr := gameIconFile(game)
-						if logoErr != nil {
-							return logoErr
-						}
-						if logo != nil {
-							update = update.WithFiles(logo)
-						}
-					}
-					updated, err := c.channels.UpdateMessage(c.notificationChannelID, parsed, update)
-					if err != nil {
-						return fmt.Errorf("não foi possível atualizar o painel %d: %w", index+1, err)
-					}
 					pinned = updated.Pinned
 					usedOld[oldIDs[index]] = struct{}{}
-				} else if getErr != nil && !isDiscordNotFound(getErr) {
-					return fmt.Errorf("não foi possível consultar o painel %d: %w", index+1, getErr)
 				}
 			}
 		}
@@ -236,10 +221,11 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 				return fmt.Errorf("não foi possível criar o painel %d: %w", index+1, createErr)
 			}
 			messageID = created.ID
+			c.rememberDashboardMessage(created, logoFilename)
 		}
 		newIDs = append(newIDs, messageID.String())
-		// A rota de pins tem limite apertado no Discord; refixar a cada
-		// atualização gerava avisos constantes de rate limit.
+		// Refixar uma mensagem já fixada gastaria uma chamada ao Discord
+		// por página a cada atualização.
 		if !pinned {
 			if pinErr := c.channels.PinMessage(c.notificationChannelID, messageID); pinErr != nil {
 				c.log.Warn().Err(pinErr).Str("message_id", messageID.String()).Msg("Painel atualizado, mas não foi possível fixá-lo")
@@ -253,6 +239,7 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 		}
 		parsed, parseErr := snowflake.Parse(oldID)
 		if parseErr == nil && parsed != 0 {
+			delete(c.dashboardVerified, parsed)
 			if deleteErr := c.channels.DeleteMessage(c.notificationChannelID, parsed); deleteErr != nil && !isDiscordNotFound(deleteErr) {
 				c.log.Warn().Err(deleteErr).Str("message_id", oldID).Msg("Não foi possível remover um painel antigo")
 			}
@@ -266,6 +253,78 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 	}
 	state.MessageOrderVersion = statusDashboardMessageOrderVersion
 	return saveStatusDashboardState(c.statusStatePath, state)
+}
+
+// updateStatusDashboardPage edita uma página existente do painel. Devolve
+// nil sem erro quando a mensagem não pode ser reaproveitada (apagada, de
+// outro autor ou no formato antigo) e precisa ser recriada.
+//
+// A mensagem só é consultada na primeira vez; depois disso o Discord
+// devolve 404 na edição se ela sumir. Em produção o canal responde com
+// rate limit a rajadas de chamadas por mensagem, então cada consulta
+// evitada conta.
+func (c *Client) updateStatusDashboardPage(
+	index int,
+	messageID snowflake.ID,
+	page []disgoDiscord.LayoutComponent,
+	game string,
+	logoFilename string,
+) (*disgoDiscord.Message, error) {
+	knownLogo, verified := c.dashboardVerified[messageID]
+	replaceLogo := verified && knownLogo != logoFilename
+	if !verified {
+		existing, err := c.channels.GetMessage(c.notificationChannelID, messageID)
+		if err != nil {
+			if isDiscordNotFound(err) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("não foi possível consultar o painel %d: %w", index+1, err)
+		}
+		if existing.Author.ID != c.bot.ID() || !existing.Flags.Has(disgoDiscord.MessageFlagIsComponentsV2) {
+			return nil, nil
+		}
+		replaceLogo = !dashboardMessageHasLogo(existing.Attachments, logoFilename)
+	}
+
+	update := disgoDiscord.NewMessageUpdateV2(page...)
+	if replaceLogo {
+		attachments := []disgoDiscord.AttachmentUpdate{}
+		update.Attachments = &attachments
+		logo, err := gameIconFile(game)
+		if err != nil {
+			return nil, err
+		}
+		if logo != nil {
+			update = update.WithFiles(logo)
+		}
+	}
+
+	updated, err := c.channels.UpdateMessage(c.notificationChannelID, messageID, update)
+	if err != nil {
+		delete(c.dashboardVerified, messageID)
+		if verified && isDiscordNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("não foi possível atualizar o painel %d: %w", index+1, err)
+	}
+	c.rememberDashboardMessage(updated, logoFilename)
+	return updated, nil
+}
+
+// rememberDashboardMessage marca a mensagem como conferida quando ela já
+// carrega o logo esperado; senão, a próxima atualização consulta de novo.
+func (c *Client) rememberDashboardMessage(message *disgoDiscord.Message, logoFilename string) {
+	if message == nil {
+		return
+	}
+	if !dashboardMessageHasLogo(message.Attachments, logoFilename) {
+		delete(c.dashboardVerified, message.ID)
+		return
+	}
+	if c.dashboardVerified == nil {
+		c.dashboardVerified = make(map[snowflake.ID]string)
+	}
+	c.dashboardVerified[message.ID] = logoFilename
 }
 
 func dashboardMessageHasLogo(attachments []disgoDiscord.Attachment, filename string) bool {

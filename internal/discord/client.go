@@ -41,6 +41,8 @@ type Client struct {
 	statusStatePath         string
 	statusRefreshRequests   chan struct{}
 	statusRefreshMu         sync.Mutex
+	dashboardVerified       map[snowflake.ID]string // logo conferido por mensagem do painel; protegido por statusRefreshMu
+	guideSyncedSignature    string                  // última versão do guia enviada; protegido por statusRefreshMu
 	commandRegistrationMu   sync.Mutex
 	commandInventoryMu      sync.RWMutex
 	commandInventory        string
