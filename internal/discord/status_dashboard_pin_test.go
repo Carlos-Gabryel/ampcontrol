@@ -389,9 +389,10 @@ func TestStatusDashboardSkipsUnchangedCards(t *testing.T) {
 	test := newDashboardSkipTest(t)
 	test.refresh(t, "Alfa", "Beta", "Gama")
 	writes := len(test.channels.writes)
+	// Passos menores que a primeira edição forçada (intervalo/3 cards).
 
 	for range 3 {
-		test.now = test.now.Add(time.Minute)
+		test.now = test.now.Add(20 * time.Second)
 		test.refresh(t, "Alfa", "Beta", "Gama")
 	}
 	if extra := len(test.channels.writes) - writes; extra != 0 {
@@ -401,28 +402,40 @@ func TestStatusDashboardSkipsUnchangedCards(t *testing.T) {
 		t.Fatalf("cards sem mudança não deveriam ser consultados: %d consultas", test.channels.gets)
 	}
 
-	test.now = test.now.Add(time.Minute)
+	test.now = test.now.Add(20 * time.Second)
 	test.refresh(t, "Alfa", "Beta mudou", "Gama")
 	if extra := len(test.channels.writes) - writes; extra != 1 {
 		t.Fatalf("só o card que mudou deveria ser editado: %d escritas", extra)
 	}
 }
 
-func TestStatusDashboardRefreshesUnchangedCardsPeriodically(t *testing.T) {
+func TestStatusDashboardStaggersForcedEdits(t *testing.T) {
 	test := newDashboardSkipTest(t)
-	test.refresh(t, "Alfa", "Beta")
+	names := []string{"Alfa", "Beta", "Gama", "Delta", "Épsilon"}
+	test.refresh(t, names...)
 	writes := len(test.channels.writes)
 
-	test.now = test.now.Add(statusDashboardForcedEditInterval - time.Second)
-	test.refresh(t, "Alfa", "Beta")
-	if extra := len(test.channels.writes) - writes; extra != 0 {
-		t.Fatalf("antes do intervalo forçado nada deveria ser editado: %d escritas", extra)
+	// Sem mudanças, cada card precisa ser editado uma vez a cada intervalo
+	// forçado, mas sem que todos vençam no mesmo ciclo.
+	for minute := 1; minute <= 5; minute++ {
+		test.now = test.now.Add(time.Minute)
+		test.refresh(t, names...)
+		if perMinute := len(test.channels.writes) - writes; perMinute > 1 {
+			t.Fatalf("minuto %d: %d edições forçadas no mesmo ciclo", minute, perMinute)
+		}
+		writes = len(test.channels.writes)
+	}
+	if test.channels.updates != len(names) {
+		t.Fatalf("cada card deveria ser editado uma vez em %v: %d edições", statusDashboardForcedEditInterval, test.channels.updates)
 	}
 
-	test.now = test.now.Add(time.Second)
-	test.refresh(t, "Alfa", "Beta")
-	if extra := len(test.channels.writes) - writes; extra != 2 {
-		t.Fatalf("depois do intervalo forçado todos os cards deveriam ser editados: %d escritas", extra)
+	// Depois do primeiro ciclo cada card mantém o próprio ritmo de 5 min.
+	for range 5 {
+		test.now = test.now.Add(time.Minute)
+		test.refresh(t, names...)
+	}
+	if test.channels.updates != 2*len(names) {
+		t.Fatalf("no intervalo seguinte cada card deveria ser editado mais uma vez: %d edições", test.channels.updates)
 	}
 }
 

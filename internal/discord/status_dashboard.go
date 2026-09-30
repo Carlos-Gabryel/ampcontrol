@@ -214,8 +214,10 @@ func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]di
 		signature := dashboardPageSignature(page, logoFilename)
 		var messageID snowflake.ID
 		pinned := false
+		known := false
 		if index < len(oldIDs) {
 			parsed, parseErr := snowflake.Parse(oldIDs[index])
+			_, known = c.dashboardLastEdit[parsed]
 			if parseErr == nil && c.dashboardPageUnchanged(parsed, signature, now) {
 				usedOld[oldIDs[index]] = struct{}{}
 				newIDs = append(newIDs, oldIDs[index])
@@ -253,7 +255,14 @@ func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]di
 			c.rememberDashboardMessage(created, logoFilename)
 		}
 		newIDs = append(newIDs, messageID.String())
-		c.recordDashboardEdit(messageID, signature, now)
+		editedAt := now
+		if !known {
+			// Card visto pela primeira vez nesta execução: adianta a
+			// próxima edição forçada conforme a posição, para os cards não
+			// vencerem todos no mesmo ciclo (e estourarem o limite).
+			editedAt = now.Add(-statusDashboardForcedEditInterval * time.Duration(index) / time.Duration(len(pages)))
+		}
+		c.recordDashboardEdit(messageID, signature, editedAt)
 		// Refixar uma mensagem já fixada gastaria uma chamada ao Discord
 		// por página a cada atualização.
 		if !pinned {
