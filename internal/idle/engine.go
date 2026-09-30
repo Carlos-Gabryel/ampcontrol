@@ -258,6 +258,17 @@ func (e *Engine) ReplaceConfig(config Config) error {
 	return nil
 }
 
+// Config devolve uma cópia da configuração em uso pelo motor.
+func (e *Engine) Config() Config {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return Config{
+		CheckInterval: e.config.CheckInterval,
+		Servers:       append([]Server(nil), e.config.Servers...),
+	}
+}
+
 // Run executa uma verificação imediatamente e depois repete
 // conforme o intervalo definido na configuração.
 //
