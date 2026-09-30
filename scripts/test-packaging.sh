@@ -65,6 +65,28 @@ expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Missing01
 expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Game01 extra
 expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" unknown
 
+# O controlador ADS é protegido pelo módulo registrado no instances.json do
+# AMP, qualquer que seja o nome. Sem índice legível, valem as checagens antigas.
+mkdir -p "$TEMP_DIRECTORY/instances/Controller02"
+cat >"$TEMP_DIRECTORY/instances.json" <<'EOF'
+[
+  {"InstanceName": "ADS01", "Module": "ADS"},
+  {"InstanceName": "Controller02", "Module": "ADS"},
+  {"InstanceName": "Game01", "Module": "GenericModule"}
+]
+EOF
+expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Controller02
+expect_failure "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" update Controller02
+grep -q 'ADS' "$TEMP_DIRECTORY/rejected.out" || fail "$(msg 'recusa sem citar o ADS' 'rejection does not mention ADS')"
+"$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Game01
+assert_last_call "--StartInstance Game01"
+printf '{ quebrado' >"$TEMP_DIRECTORY/instances.json"
+"$PROJECT_DIRECTORY/scripts/ampcontrol-amp" restart Game01
+assert_last_call "--RestartInstance Game01"
+rm -f "$TEMP_DIRECTORY/instances.json"
+"$PROJECT_DIRECTORY/scripts/ampcontrol-amp" stop Controller02
+assert_last_call "--StopInstance Controller02"
+
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--binary CAMINHO'
 "$PROJECT_DIRECTORY/scripts/install.sh" --help | grep -q -- '--language'
 "$PROJECT_DIRECTORY/scripts/install.sh" --language en-US --help | grep -q -- 'installs an already compiled binary'
