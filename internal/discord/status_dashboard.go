@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -194,22 +195,35 @@ func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]di
 	newIDs := make([]string, 0, len(pages))
 	usedOld := make(map[string]struct{})
 	spacing := dashboardEditSpacing(c.dashboardEditSpacing, statusDashboardEditBudget, len(pages))
-
-	for index, page := range pages {
-		if index > 0 {
+	now := c.dashboardClock()
+	wrote := false
+	beforeWrite := func() {
+		if wrote {
 			waitDashboardEditSpacing(ctx, spacing)
 		}
+		wrote = true
+	}
+
+	for index, page := range pages {
 		game := ""
 		logoFilename := ""
 		if index < len(statuses) {
 			game = dashboardGameName(statuses[index].Instance)
 			logoFilename = gameIconFilename(game)
 		}
+		signature := dashboardPageSignature(page, logoFilename)
 		var messageID snowflake.ID
 		pinned := false
 		if index < len(oldIDs) {
 			parsed, parseErr := snowflake.Parse(oldIDs[index])
+			if parseErr == nil && c.dashboardPageUnchanged(parsed, signature, now) {
+				usedOld[oldIDs[index]] = struct{}{}
+				newIDs = append(newIDs, oldIDs[index])
+				continue
+			}
 			if parseErr == nil {
+				beforeWrite()
+				delete(c.dashboardLastEdit, parsed)
 				updated, updateErr := c.updateStatusDashboardPage(index, parsed, page, game, logoFilename)
 				if updateErr != nil {
 					return updateErr
@@ -222,6 +236,7 @@ func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]di
 			}
 		}
 		if messageID == 0 {
+			beforeWrite()
 			create := disgoDiscord.NewMessageCreateV2(page...)
 			logo, logoErr := gameIconFile(game)
 			if logoErr != nil {
@@ -238,6 +253,7 @@ func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]di
 			c.rememberDashboardMessage(created, logoFilename)
 		}
 		newIDs = append(newIDs, messageID.String())
+		c.recordDashboardEdit(messageID, signature, now)
 		// Refixar uma mensagem já fixada gastaria uma chamada ao Discord
 		// por página a cada atualização.
 		if !pinned {
@@ -254,6 +270,7 @@ func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]di
 		parsed, parseErr := snowflake.Parse(oldID)
 		if parseErr == nil && parsed != 0 {
 			delete(c.dashboardVerified, parsed)
+			delete(c.dashboardLastEdit, parsed)
 			if deleteErr := c.channels.DeleteMessage(c.notificationChannelID, parsed); deleteErr != nil && !isDiscordNotFound(deleteErr) {
 				c.log.Warn().Err(deleteErr).Str("message_id", oldID).Msg("Não foi possível remover um painel antigo")
 			}
@@ -267,6 +284,52 @@ func (c *Client) upsertStatusDashboardMessages(ctx context.Context, pages [][]di
 	}
 	state.MessageOrderVersion = statusDashboardMessageOrderVersion
 	return saveStatusDashboardState(c.statusStatePath, state)
+}
+
+// Cards cujo conteúdo não mudou não são reeditados: o Discord aguenta só
+// ~12–15 edições por minuto nesse canal (medido em produção) e o painel
+// faz uma por instância. A edição forçada mantém o "Atualizado há" dentro
+// desse intervalo e recria/refixa mensagens apagadas ou desafixadas.
+const statusDashboardForcedEditInterval = 5 * time.Minute
+
+// dashboardTimestampPattern casa o carimbo relativo do rodapé
+// (<t:UNIX:R>), que muda a cada atualização mesmo sem mudança no card.
+var dashboardTimestampPattern = regexp.MustCompile(`t:[0-9]+:R`)
+
+type dashboardEditRecord struct {
+	signature string
+	editedAt  time.Time
+}
+
+func dashboardPageSignature(page []disgoDiscord.LayoutComponent, logoFilename string) string {
+	payload, err := json.Marshal(page)
+	if err != nil {
+		return ""
+	}
+	return logoFilename + "|" + dashboardTimestampPattern.ReplaceAllString(string(payload), "t:R")
+}
+
+func (c *Client) dashboardClock() time.Time {
+	if c.dashboardNow != nil {
+		return c.dashboardNow()
+	}
+	return time.Now()
+}
+
+func (c *Client) dashboardPageUnchanged(messageID snowflake.ID, signature string, now time.Time) bool {
+	record, ok := c.dashboardLastEdit[messageID]
+	if !ok || signature == "" || record.signature != signature {
+		return false
+	}
+	elapsed := now.Sub(record.editedAt)
+	return elapsed >= 0 && elapsed < statusDashboardForcedEditInterval
+}
+
+func (c *Client) recordDashboardEdit(messageID snowflake.ID, signature string, now time.Time) {
+	if c.dashboardLastEdit == nil {
+		c.dashboardLastEdit = make(map[snowflake.ID]dashboardEditRecord)
+	}
+	c.dashboardLastEdit[messageID] = dashboardEditRecord{signature: signature, editedAt: now}
 }
 
 // dashboardEditSpacing reduz o intervalo entre páginas quando o intervalo

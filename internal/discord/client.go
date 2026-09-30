@@ -44,6 +44,8 @@ type Client struct {
 	dashboardVerified       map[snowflake.ID]string // logo conferido por mensagem do painel; protegido por statusRefreshMu
 	guideSyncedSignature    string                  // última versão do guia enviada; protegido por statusRefreshMu
 	dashboardEditSpacing    time.Duration
+	dashboardLastEdit       map[snowflake.ID]dashboardEditRecord // protegido por statusRefreshMu
+	dashboardNow            func() time.Time
 	commandRegistrationMu   sync.Mutex
 	commandInventoryMu      sync.RWMutex
 	commandInventory        string

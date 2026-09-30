@@ -107,6 +107,17 @@ func dashboardPinTestPages() ([][]disgoDiscord.LayoutComponent, []ampInstanceSta
 	return buildAMPStatusPages(statuses, time.Unix(1_700_000_000, 0), "192.168.1.22"), statuses
 }
 
+// forceDashboardEditEachRefresh faz cada atualização cair numa edição
+// forçada, para testes que precisam de uma edição por atualização mesmo
+// com o mesmo conteúdo.
+func forceDashboardEditEachRefresh(client *Client) {
+	now := time.Date(2026, time.September, 30, 2, 0, 0, 0, time.UTC)
+	client.dashboardNow = func() time.Time {
+		now = now.Add(statusDashboardForcedEditInterval)
+		return now
+	}
+}
+
 func TestStatusDashboardDoesNotRepinPinnedMessage(t *testing.T) {
 	channels := &fakeDashboardChannels{
 		messages: map[snowflake.ID]*disgoDiscord.Message{
@@ -115,6 +126,7 @@ func TestStatusDashboardDoesNotRepinPinnedMessage(t *testing.T) {
 		nextID: 1000,
 	}
 	client := newDashboardPinTestClient(t, channels, "500")
+	forceDashboardEditEachRefresh(client)
 	pages, statuses := dashboardPinTestPages()
 
 	for range 3 {
@@ -166,6 +178,7 @@ func TestStatusDashboardVerifiesEachMessageOnlyOnce(t *testing.T) {
 		nextID: 1000,
 	}
 	client := newDashboardPinTestClient(t, channels, "500")
+	forceDashboardEditEachRefresh(client)
 	pages, statuses := dashboardPinTestPages()
 
 	for range 3 {
@@ -190,6 +203,7 @@ func TestStatusDashboardRecreatesMessageDeletedAfterVerification(t *testing.T) {
 		nextID: 1000,
 	}
 	client := newDashboardPinTestClient(t, channels, "500")
+	forceDashboardEditEachRefresh(client)
 	pages, statuses := dashboardPinTestPages()
 
 	if err := client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
@@ -339,5 +353,87 @@ func TestStatusDashboardEditSpacingFitsBudget(t *testing.T) {
 		if actual != test.expected {
 			t.Fatalf("espaçamento para %d páginas: %v; esperado %v", test.pages, actual, test.expected)
 		}
+	}
+}
+
+type dashboardSkipTest struct {
+	channels *fakeDashboardChannels
+	client   *Client
+	now      time.Time
+}
+
+func newDashboardSkipTest(t *testing.T) *dashboardSkipTest {
+	test := &dashboardSkipTest{
+		channels: &fakeDashboardChannels{messages: map[snowflake.ID]*disgoDiscord.Message{}, nextID: 1000},
+		now:      time.Date(2026, time.September, 30, 2, 0, 0, 0, time.UTC),
+	}
+	test.client = newDashboardPinTestClient(t, test.channels)
+	test.client.dashboardNow = func() time.Time { return test.now }
+	return test
+}
+
+func (d *dashboardSkipTest) refresh(t *testing.T, names ...string) {
+	t.Helper()
+	statuses := make([]ampInstanceStatusView, len(names))
+	for index, name := range names {
+		statuses[index].Instance = amp.ManagedInstance{Name: fmt.Sprintf("Jogo%02d", index), FriendlyName: name, Game: "Jogo sem logo"}
+	}
+	// O rodapé muda a cada atualização, como em produção.
+	pages := buildAMPStatusPages(statuses, d.now, "192.168.1.22")
+	if err := d.client.upsertStatusDashboardMessages(context.Background(), pages, statuses); err != nil {
+		t.Fatalf("upsertStatusDashboardMessages retornou erro: %v", err)
+	}
+}
+
+func TestStatusDashboardSkipsUnchangedCards(t *testing.T) {
+	test := newDashboardSkipTest(t)
+	test.refresh(t, "Alfa", "Beta", "Gama")
+	writes := len(test.channels.writes)
+
+	for range 3 {
+		test.now = test.now.Add(time.Minute)
+		test.refresh(t, "Alfa", "Beta", "Gama")
+	}
+	if extra := len(test.channels.writes) - writes; extra != 0 {
+		t.Fatalf("cards sem mudança não deveriam ser editados: %d escritas extras", extra)
+	}
+	if test.channels.gets != 0 {
+		t.Fatalf("cards sem mudança não deveriam ser consultados: %d consultas", test.channels.gets)
+	}
+
+	test.now = test.now.Add(time.Minute)
+	test.refresh(t, "Alfa", "Beta mudou", "Gama")
+	if extra := len(test.channels.writes) - writes; extra != 1 {
+		t.Fatalf("só o card que mudou deveria ser editado: %d escritas", extra)
+	}
+}
+
+func TestStatusDashboardRefreshesUnchangedCardsPeriodically(t *testing.T) {
+	test := newDashboardSkipTest(t)
+	test.refresh(t, "Alfa", "Beta")
+	writes := len(test.channels.writes)
+
+	test.now = test.now.Add(statusDashboardForcedEditInterval - time.Second)
+	test.refresh(t, "Alfa", "Beta")
+	if extra := len(test.channels.writes) - writes; extra != 0 {
+		t.Fatalf("antes do intervalo forçado nada deveria ser editado: %d escritas", extra)
+	}
+
+	test.now = test.now.Add(time.Second)
+	test.refresh(t, "Alfa", "Beta")
+	if extra := len(test.channels.writes) - writes; extra != 2 {
+		t.Fatalf("depois do intervalo forçado todos os cards deveriam ser editados: %d escritas", extra)
+	}
+}
+
+func TestStatusDashboardRecreatesDeletedCardOnForcedEdit(t *testing.T) {
+	test := newDashboardSkipTest(t)
+	test.refresh(t, "Alfa")
+	delete(test.channels.messages, 1001)
+
+	test.now = test.now.Add(statusDashboardForcedEditInterval)
+	test.refresh(t, "Alfa")
+	if message, ok := test.channels.messages[1002]; !ok || !message.Pinned {
+		t.Fatalf("card apagado deveria ser recriado e fixado na edição forçada: %+v", test.channels.messages)
 	}
 }
