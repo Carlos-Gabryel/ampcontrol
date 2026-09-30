@@ -192,6 +192,7 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 			logoFilename = gameIconFilename(game)
 		}
 		var messageID snowflake.ID
+		pinned := false
 		if index < len(oldIDs) {
 			parsed, parseErr := snowflake.Parse(oldIDs[index])
 			if parseErr == nil {
@@ -210,10 +211,11 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 							update = update.WithFiles(logo)
 						}
 					}
-					_, err = c.channels.UpdateMessage(c.notificationChannelID, parsed, update)
+					updated, err := c.channels.UpdateMessage(c.notificationChannelID, parsed, update)
 					if err != nil {
 						return fmt.Errorf("não foi possível atualizar o painel %d: %w", index+1, err)
 					}
+					pinned = updated.Pinned
 					usedOld[oldIDs[index]] = struct{}{}
 				} else if getErr != nil && !isDiscordNotFound(getErr) {
 					return fmt.Errorf("não foi possível consultar o painel %d: %w", index+1, getErr)
@@ -236,8 +238,12 @@ func (c *Client) upsertStatusDashboardMessages(pages [][]disgoDiscord.LayoutComp
 			messageID = created.ID
 		}
 		newIDs = append(newIDs, messageID.String())
-		if pinErr := c.channels.PinMessage(c.notificationChannelID, messageID); pinErr != nil {
-			c.log.Warn().Err(pinErr).Str("message_id", messageID.String()).Msg("Painel atualizado, mas não foi possível fixá-lo")
+		// A rota de pins tem limite apertado no Discord; refixar a cada
+		// atualização gerava avisos constantes de rate limit.
+		if !pinned {
+			if pinErr := c.channels.PinMessage(c.notificationChannelID, messageID); pinErr != nil {
+				c.log.Warn().Err(pinErr).Str("message_id", messageID.String()).Msg("Painel atualizado, mas não foi possível fixá-lo")
+			}
 		}
 	}
 
