@@ -98,6 +98,22 @@ check_installation() {
     ! sudo -u ampcontrol sudo -n -u amp /bin/true 2>/dev/null ||
         fail "$(msg 'o sudoers permite mais que o wrapper' 'sudoers allows more than the wrapper')"
 
+    # O wrapper recusa um amp-runtime.conf que outro usuário possa alterar.
+    local runtime_config=/etc/ampcontrol/amp-runtime.conf
+    for unsafe in 'chmod 0664' 'chmod 0646' 'chown amp'; do
+        $unsafe "$runtime_config"
+        ! sudo -u ampcontrol sudo -n -u amp /usr/local/bin/ampcontrol-amp list >/dev/null 2>&1 ||
+            fail "$(msg 'o wrapper aceitou um amp-runtime.conf inseguro' 'the wrapper accepted an unsafe amp-runtime.conf'): $unsafe"
+        chown root:root "$runtime_config"
+        chmod 0644 "$runtime_config"
+    done
+    chmod g+w /etc/ampcontrol
+    ! sudo -u ampcontrol sudo -n -u amp /usr/local/bin/ampcontrol-amp list >/dev/null 2>&1 ||
+        fail "$(msg 'o wrapper aceitou /etc/ampcontrol gravável pelo grupo' 'the wrapper accepted a group-writable /etc/ampcontrol')"
+    chmod g-w /etc/ampcontrol
+    sudo -u ampcontrol sudo -n -u amp /usr/local/bin/ampcontrol-amp list >/dev/null ||
+        fail "$(msg 'o wrapper não voltou a funcionar com as permissões corretas' 'the wrapper did not recover with correct permissions')"
+
     # --check-config fora do systemd: segredos pelas variáveis legadas.
     (cd /var/lib/ampcontrol && sudo -u ampcontrol env -i PATH=/usr/bin:/bin \
         AMPCONTROL_CONFIG=/etc/ampcontrol/config.toml DISCORD_TOKEN="$token" AMP_PASSWORD="$AMP_PASSWORD" \
