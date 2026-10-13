@@ -11,7 +11,7 @@ This guide installs AmpControl without modifying game instances. Use a maintenan
 - a user with `sudo` access;
 - Git and Python 3;
 - `curl`, `tar`, and `sha256sum` for updates;
-- Go 1.26.6+ unless using `--binary`;
+- Go 1.26.9+ unless using `--binary`;
 - a Discord server where you may install applications.
 
 The installer requires an interactive terminal and must run from the repository root.

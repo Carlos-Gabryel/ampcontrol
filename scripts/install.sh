@@ -405,7 +405,7 @@ read -r -p "$(msg 'Continuar com a instalação? [s/N]: ' 'Continue with the ins
 [[ "$CONFIRMATION" =~ ^[sSyY]$ ]] || { printf '%s\n' "$(msg 'Instalação cancelada.' 'Installation canceled.')"; exit 10; }
 
 if [[ -z "$BINARY_SOURCE" ]]; then
-    command -v go >/dev/null 2>&1 || fail "$(msg 'Go não foi encontrado; instale Go 1.26.6+ ou use --binary' 'Go was not found; install Go 1.26.6+ or use --binary')"
+    command -v go >/dev/null 2>&1 || fail "$(msg 'Go não foi encontrado; instale Go 1.26.9+ ou use --binary' 'Go was not found; install Go 1.26.9+ or use --binary')"
     TEMP_DIRECTORY="$(mktemp -d)"
     printf '%s\n' "$(msg 'Compilando AmpControl...' 'Building AmpControl...')"
     (cd "$PROJECT_DIRECTORY" && GOTOOLCHAIN=auto go build -trimpath -o "$TEMP_DIRECTORY/ampcontrol" ./cmd/ampcontrol)

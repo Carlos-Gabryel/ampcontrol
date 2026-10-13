@@ -6,7 +6,7 @@ Contribuições são bem-vindas. Antes de uma alteração grande, abra uma discu
 
 ## Ambiente
 
-1. Instale Go 1.26.6 ou superior.
+1. Instale Go 1.26.9 ou superior.
 2. Crie uma branch a partir da principal.
 3. Não use credenciais ou IDs reais em testes, exemplos ou commits.
 4. Preserve compatibilidade com instalações existentes sempre que possível.

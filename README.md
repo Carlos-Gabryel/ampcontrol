@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/Carlos-Gabryel/ampcontrol/actions/workflows/ci.yml/badge.svg)](https://github.com/Carlos-Gabryel/ampcontrol/actions/workflows/ci.yml)
 [![Security](https://github.com/Carlos-Gabryel/ampcontrol/actions/workflows/security.yml/badge.svg)](https://github.com/Carlos-Gabryel/ampcontrol/actions/workflows/security.yml)
-[![Go](https://img.shields.io/badge/Go-1.26.6%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.26.9%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/licen%C3%A7a-MIT-green.svg)](LICENSE)
 
 O AmpControl conecta o [AMP, da CubeCoders](https://cubecoders.com/AMP), ao Discord. A comunidade acompanha e controla os servidores de jogos sem receber acesso ao painel administrativo — e máquinas com vários jogos não precisam manter todos os processos consumindo recursos o tempo inteiro.
@@ -98,7 +98,7 @@ Os comandos podem ser restritos a um único canal. O botão administrativo que a
 - Linux com systemd e `systemd-creds`;
 - AMP instalado na mesma máquina;
 - Git, Python 3 e acesso `sudo`;
-- Go 1.26.6 ou superior, salvo ao instalar um binário de release;
+- Go 1.26.9 ou superior, salvo ao instalar um binário de release;
 - aplicação Discord criada pelo próprio administrador.
 
 ```bash

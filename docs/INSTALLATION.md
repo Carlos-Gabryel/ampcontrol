@@ -12,7 +12,7 @@ Este guia instala uma cópia nova do AmpControl sem alterar as instâncias de jo
 - Git;
 - Python 3 (leitura segura da configuração legada);
 - `curl`, `tar` e `sha256sum` para atualizações;
-- Go 1.26.6 ou superior, salvo se usar `--binary`;
+- Go 1.26.9 ou superior, salvo se usar `--binary`;
 - um servidor Discord e permissão para adicionar aplicações.
 
 O instalador precisa de terminal interativo e deve ser executado na raiz do repositório.
