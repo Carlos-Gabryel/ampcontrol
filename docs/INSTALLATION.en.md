@@ -9,12 +9,12 @@ This guide installs AmpControl without modifying game instances. Use a maintenan
 - Linux with systemd **250 or later** (`systemd-creds` and `LoadCredentialEncrypted`), e.g. Ubuntu 24.04 or Debian 12. Ubuntu 22.04 and Debian 11 ship older versions and are not supported. Check with `systemctl --version`;
 - AMP installed on the same host;
 - a user with `sudo` access;
-- Git and Python 3;
+- Python 3, plus Git only when installing from source;
 - `curl`, `tar`, and `sha256sum` for updates;
-- Go 1.26.9+ unless using `--binary`;
+- Go 1.26.9+, only when installing from source (the release package and `--binary` do not need Go);
 - a Discord server where you may install applications.
 
-The installer requires an interactive terminal and must run from the repository root.
+The installer requires an interactive terminal and must run from the repository root or the extracted release package.
 
 ## 2. Create the Discord application
 
@@ -53,6 +53,25 @@ Grant only the permissions matching these actions. Starting, stopping, restartin
 Validate the login in AMP before installation and do not reuse the primary administrator account.
 
 ## 4. Run the installer
+
+### From the release package (recommended, no Go needed)
+
+Pick the latest version on the [Releases](https://github.com/Carlos-Gabryel/ampcontrol/releases) page and adjust `VERSION` and `ARCH`:
+
+```bash
+VERSION=v1.0.7   # use the latest version from the Releases page
+ARCH=amd64       # or arm64
+curl -fLO "https://github.com/Carlos-Gabryel/ampcontrol/releases/download/$VERSION/ampcontrol_${VERSION}_linux_${ARCH}.tar.gz"
+curl -fLO "https://github.com/Carlos-Gabryel/ampcontrol/releases/download/$VERSION/checksums.txt"
+sha256sum -c --ignore-missing checksums.txt
+tar -xzf "ampcontrol_${VERSION}_linux_${ARCH}.tar.gz"
+cd "ampcontrol_${VERSION}_linux_${ARCH}"
+sudo ./scripts/install.sh
+```
+
+The package ships the compiled binary and the installer uses it automatically.
+
+### From source (requires Go 1.26.9+)
 
 ```bash
 git clone https://github.com/Carlos-Gabryel/ampcontrol.git

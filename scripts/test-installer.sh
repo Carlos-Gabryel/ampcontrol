@@ -53,10 +53,19 @@ exit 1
 EOF
 chmod 0755 /usr/bin/ampinstmgr
 
+# Sem o segundo parâmetro, usa o install.sh do repositório com --binary. Com ele
+# (caminho do install.sh), os demais parâmetros são as opções extras exatas.
 run_installer() {
     local answers="$1"
-    printf '%s
-' "$answers" | script -qec "'$SCRIPT_DIRECTORY/install.sh' --language pt-BR --binary '$BINARY' --no-start" /dev/null
+    local script_path="$SCRIPT_DIRECTORY/install.sh"
+    local -a extra=(--binary "$BINARY")
+    if (($# >= 2)); then
+        script_path="$2"
+        extra=("${@:3}")
+    fi
+    local command_line
+    command_line="$(printf '%q ' "$script_path" --language pt-BR "${extra[@]}" --no-start)"
+    printf '%s\n' "$answers" | script -qec "$command_line" /dev/null
 }
 
 discord_and_amp_answers() {
@@ -128,5 +137,20 @@ check_installation "$TOKEN_FIRST"
 printf '== %s\n' "$(msg 'Reexecução para trocar o token, mantendo o Idle' 'Re-run to rotate the token, keeping Idle')"
 run_installer "$(printf '\n'; discord_and_amp_answers "$TOKEN_SECOND")"
 check_installation "$TOKEN_SECOND"
+
+printf '== %s\n' "$(msg 'Reinstalação a partir do pacote de release, sem Go e sem --binary' 'Reinstall from the release package, without Go or --binary')"
+! command -v go >/dev/null 2>&1 ||
+    fail "$(msg 'Go está instalado; o cenário do pacote de release perderia o sentido' 'Go is installed; the release package scenario would be meaningless')"
+PACKAGE_DIRECTORY="$(mktemp -d)"
+trap 'rm -rf -- "$PACKAGE_DIRECTORY"' EXIT
+# Pacote de release: scripts, packaging, config, docs e o binário; sem go.mod.
+for entry in scripts packaging config docs; do
+    cp -r "$SCRIPT_DIRECTORY/../$entry" "$PACKAGE_DIRECTORY/$entry"
+done
+install -m 0755 "$BINARY" "$PACKAGE_DIRECTORY/ampcontrol"
+run_installer "$(printf '\n'; discord_and_amp_answers "$TOKEN_FIRST")" "$PACKAGE_DIRECTORY/scripts/install.sh"
+check_installation "$TOKEN_FIRST"
+cmp "$PACKAGE_DIRECTORY/ampcontrol" /usr/lib/ampcontrol/ampcontrol ||
+    fail "$(msg 'o binário instalado não é o do pacote de release' 'the installed binary is not the release package binary')"
 
 printf '%s\n' "$(msg 'Ensaio do instalador: OK' 'Installer rehearsal: OK')"
