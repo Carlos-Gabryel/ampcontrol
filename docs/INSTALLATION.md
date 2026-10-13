@@ -20,7 +20,7 @@ O instalador precisa de terminal interativo e deve ser executado na raiz do repo
 ## 2. Criar a aplicação Discord
 
 1. No [Discord Developer Portal](https://discord.com/developers/applications), crie uma aplicação e adicione um bot.
-2. Guarde o token em um gerenciador de senhas. Nunca o coloque em issue, commit, captura de tela ou arquivo TOML.
+2. O token vem de **Bot → Reset Token**, não do Client Secret nem da Public Key; o instalador rejeita outros valores. Guarde o token em um gerenciador de senhas. Nunca o coloque em issue, commit, captura de tela ou arquivo TOML.
 3. Em **Installation**, habilite instalação no servidor (Guild Install).
 4. Gere o link com os escopos `bot` e `applications.commands`.
 5. Conceda ao bot somente estas permissões no canal do painel: View Channel, Send Messages, Embed Links, Attach Files, Read Message History e Manage Messages.

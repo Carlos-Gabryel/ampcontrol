@@ -269,6 +269,21 @@ discord_application_id_from_token() {
     return 0
 }
 
+# Token de bot válido: três segmentos não vazios separados por ponto e o
+# primeiro decodifica para o ID da aplicação. Nunca imprime o valor.
+valid_discord_bot_token() {
+    local token="$1"
+    local first="" second="" third="" rest=""
+    [[ "$token" == *.*.* ]] || return 1
+    IFS=. read -r first second third rest <<<"$token"
+    [[ -n "$first" && -n "$second" && -n "$third" && -z "$rest" ]] || return 1
+    [[ -n "$(discord_application_id_from_token "$token")" ]]
+}
+
+discord_token_help() {
+    msg 'Isto não parece um token de bot. Use Developer Portal → sua aplicação → Bot → Reset Token (não use Client Secret nem Public Key). O token tem três partes separadas por ponto.' 'This does not look like a bot token. Use Developer Portal → your application → Bot → Reset Token (do not use the Client Secret or Public Key). The token has three parts separated by dots.'
+}
+
 toml_escape() {
     local value="$1"
     value="${value//\\/\\\\}"
@@ -329,7 +344,7 @@ if ! AMP_INVENTORY_OUTPUT="$(sudo -n -u "$AMP_SYSTEM_USER" "$AMP_MANAGER_PATH" -
     fail "$(msg 'não foi possível consultar o AMP como' 'could not query AMP as') $AMP_SYSTEM_USER: $AMP_INVENTORY_OUTPUT"
 fi
 AMP_INSTANCE_COUNT="$(grep -c 'Instance Name' <<<"$AMP_INVENTORY_OUTPUT" || true)"
-printf '%s %s\n' "$AMP_INSTANCE_COUNT" "$(msg 'instância(s) AMP encontrada(s).' 'AMP instance(s) found.')"
+printf '%s %s\n' "$AMP_INSTANCE_COUNT" "$(msg 'instância(s) AMP encontrada(s), incluindo o controlador ADS.' 'AMP instance(s) found, including the ADS controller.')"
 unset AMP_INVENTORY_OUTPUT
 
 PRESERVE_EXISTING_IDLE=false
@@ -350,7 +365,7 @@ mapfile -t DETECTED_INSTANCES < <(
 )
 SELECTED_IDLE_INSTANCES=()
 if [[ "$PRESERVE_EXISTING_IDLE" == false ]] && ((${#DETECTED_INSTANCES[@]} > 0)); then
-    printf '\n%s\n' "$(msg 'Instâncias disponíveis para Idle automático:' 'Instances available for automatic Idle:')"
+    printf '\n%s\n' "$(msg 'Instâncias disponíveis para Idle automático (o controlador ADS01 fica de fora):' 'Instances available for automatic Idle (the ADS01 controller is left out):')"
     for index in "${!DETECTED_INSTANCES[@]}"; do
         printf '  %d) %s\n' "$((index + 1))" "${DETECTED_INSTANCES[$index]}"
     done
@@ -416,9 +431,20 @@ GAME_SERVER_ADDRESS="$(prompt_default "$(msg 'Endereço público padrão dos jog
 DISCORD_TOKEN="$(legacy_env_value DISCORD_TOKEN 2>/dev/null || true)"
 AMP_PASSWORD="$(legacy_env_value AMP_PASSWORD 2>/dev/null || true)"
 if [[ -n "$LEGACY_DIRECTORY" && -n "$DISCORD_TOKEN" && -n "$AMP_PASSWORD" ]]; then
+    valid_discord_bot_token "$DISCORD_TOKEN" || fail "$(discord_token_help)"
     printf '%s\n' "$(msg 'Token Discord e senha AMP serão migrados diretamente para credenciais criptografadas.' 'The Discord token and AMP password will be migrated directly into encrypted credentials.')"
 else
-    [[ -n "$DISCORD_TOKEN" ]] || DISCORD_TOKEN="$(prompt_secret "$(msg 'Token do bot Discord' 'Discord bot token')")"
+    if [[ -n "$DISCORD_TOKEN" ]]; then
+        valid_discord_bot_token "$DISCORD_TOKEN" || fail "$(discord_token_help)"
+    else
+        for token_attempt in 1 2 3; do
+            DISCORD_TOKEN="$(prompt_secret "$(msg 'Token do bot Discord' 'Discord bot token')")"
+            valid_discord_bot_token "$DISCORD_TOKEN" && break
+            DISCORD_TOKEN=""
+            printf '%s\n' "$(discord_token_help)" >&2
+            ((token_attempt < 3)) || fail "$(msg 'token do bot inválido após 3 tentativas' 'invalid bot token after 3 attempts')"
+        done
+    fi
     [[ -n "$AMP_PASSWORD" ]] || AMP_PASSWORD="$(prompt_secret "$(msg 'Senha do usuário da API do AMP' 'AMP API user password')")"
 fi
 
@@ -580,6 +606,7 @@ encrypt_credential() {
     chmod 0600 "$temporary"
     mv -f -- "$temporary" "$destination"
 }
+printf '%s\n' "$(msg 'Aviso normal do systemd: a chave de credenciais do host não está em disco criptografado; os segredos continuam criptografados com ela.' 'Normal systemd notice: the host credential key is not on encrypted media; the secrets are still encrypted with it.')"
 encrypt_credential discord_token "$DISCORD_TOKEN"
 encrypt_credential amp_password "$AMP_PASSWORD"
 unset DISCORD_TOKEN AMP_PASSWORD
