@@ -1,8 +1,11 @@
 package discord
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
+
+	disgoDiscord "github.com/disgoorg/disgo/discord"
 )
 
 func TestFormatCommandAuditPath(t *testing.T) {
@@ -115,6 +118,22 @@ func TestFormatCommandAuditDuration(t *testing.T) {
 	for duration, expected := range tests {
 		if actual := formatCommandAuditDuration(duration); actual != expected {
 			t.Fatalf("duração %s: obtido %q, esperado %q", duration, actual, expected)
+		}
+	}
+}
+
+func TestCommandAuditOptionValueHandlesNonStringOptions(t *testing.T) {
+	cases := []struct {
+		option disgoDiscord.SlashCommandOption
+		want   string
+	}{
+		{disgoDiscord.SlashCommandOption{Name: "minutos", Type: disgoDiscord.ApplicationCommandOptionTypeInt, Value: json.RawMessage(`20`)}, "20"},
+		{disgoDiscord.SlashCommandOption{Name: "confirmar", Type: disgoDiscord.ApplicationCommandOptionTypeBool, Value: json.RawMessage(`true`)}, "true"},
+		{disgoDiscord.SlashCommandOption{Name: "servidor", Type: disgoDiscord.ApplicationCommandOptionTypeString, Value: json.RawMessage(`"Valheim01"`)}, "Valheim01"},
+	}
+	for _, testCase := range cases {
+		if got := commandAuditOptionValue(testCase.option); got != testCase.want {
+			t.Fatalf("%s: got %q, want %q", testCase.option.Name, got, testCase.want)
 		}
 	}
 }
