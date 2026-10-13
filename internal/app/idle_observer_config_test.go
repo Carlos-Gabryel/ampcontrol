@@ -60,6 +60,11 @@ func (emptyInventory) DiscoverInstances(context.Context) ([]amp.ManagedInstance,
 // observador são relativos), grava config/idle.json e cria o observador.
 func newConfigTestObserver(t *testing.T) (*idleObserver, []byte) {
 	t.Helper()
+	return newConfigTestObserverWithFixture(t, idleConfigTestFixture)
+}
+
+func newConfigTestObserverWithFixture(t *testing.T, fixture string) (*idleObserver, []byte) {
+	t.Helper()
 	t.Chdir(t.TempDir())
 
 	if err := os.MkdirAll("config", 0o750); err != nil {
@@ -68,7 +73,7 @@ func newConfigTestObserver(t *testing.T) (*idleObserver, []byte) {
 	if err := os.MkdirAll("data", 0o750); err != nil {
 		t.Fatalf("não foi possível criar data/: %v", err)
 	}
-	if err := os.WriteFile(idleObserverConfigPath, []byte(idleConfigTestFixture), 0o600); err != nil {
+	if err := os.WriteFile(idleObserverConfigPath, []byte(fixture), 0o600); err != nil {
 		t.Fatalf("não foi possível gravar idle.json: %v", err)
 	}
 
@@ -294,6 +299,48 @@ func TestSetIdleDetectionMethodRejectsUnknownInstanceAndMissingRCON(t *testing.T
 	}
 	if len(engineConfig(t, observer).Servers) != 3 {
 		t.Fatal("o motor não deveria ter mudado")
+	}
+}
+
+func TestSetIdleDetectionMethodUsesRCONBlockOfAMPOnlyServer(t *testing.T) {
+	// Servidor só com amp_players, mas com bloco rcon preenchido: a troca para
+	// um método RCON pelo Discord precisa usar esse bloco.
+	observer, original := newConfigTestObserverWithFixture(t, `{
+  "servers": [
+    {
+      "instance": "Pal01",
+      "display_name": "Palworld",
+      "enabled": true,
+      "mode": "active",
+      "detector": "amp_players",
+      "rcon": {
+        "address": "127.0.0.1:25575",
+        "password_env": "TEST_PAL01_RCON_PASSWORD"
+      }
+    }
+  ]
+}
+`)
+
+	settings, err := observer.SetIdleDetectionMethod(
+		context.Background(),
+		"Pal01",
+		"amp_palworld_rcon",
+	)
+	if err != nil {
+		t.Fatalf("SetIdleDetectionMethod falhou: %v", err)
+	}
+	if settings.FallbackDetector != string(idle.DetectorPalworldRCON) ||
+		!settings.RCONConfigured {
+		t.Fatalf("configurações retornadas inesperadas: %+v", settings)
+	}
+
+	assertIdleJSONUntouched(t, original)
+
+	engineServer := findTestServer(t, engineConfig(t, observer), "Pal01")
+	if engineServer.FallbackDetector != idle.DetectorPalworldRCON ||
+		engineServer.RCONAddress != "127.0.0.1:25575" {
+		t.Fatalf("o motor não recebeu o RCON: %+v", engineServer)
 	}
 }
 

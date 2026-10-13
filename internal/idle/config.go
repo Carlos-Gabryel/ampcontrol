@@ -370,15 +370,10 @@ func buildServer(
 		}
 	}
 
-	if detectorUsesRCON(server.Detector) ||
-		detectorUsesRCON(server.FallbackDetector) {
-		if raw.RCON == nil {
-			return Server{}, fmt.Errorf(
-				i18n.Choose("a instância %s usa um detector RCON, mas não possui configuração RCON", "instance %s uses an RCON detector but has no RCON configuration"),
-				instance,
-			)
-		}
-
+	// O bloco rcon é carregado sempre que existir, para que a detecção possa
+	// ser trocada para um método RCON depois (ex.: /ampconfig). A presença
+	// só é obrigatória quando o detector configurado usa RCON.
+	if raw.RCON != nil {
 		server.RCONAddress = strings.TrimSpace(
 			raw.RCON.Address,
 		)
@@ -389,6 +384,16 @@ func buildServer(
 		server.RCONCredential = strings.TrimSpace(
 			raw.RCON.PasswordCredential,
 		)
+	}
+
+	if detectorUsesRCON(server.Detector) ||
+		detectorUsesRCON(server.FallbackDetector) {
+		if raw.RCON == nil {
+			return Server{}, fmt.Errorf(
+				i18n.Choose("a instância %s usa um detector RCON, mas não possui configuração RCON", "instance %s uses an RCON detector but has no RCON configuration"),
+				instance,
+			)
+		}
 
 		if server.RCONAddress == "" {
 			return Server{}, fmt.Errorf(

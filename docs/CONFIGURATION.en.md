@@ -62,7 +62,7 @@ The normal path requires no JSON editing: the installer and `/ampconfig idle-add
 | `amp_palworld_rcon` | `amp_players` | `palworld_rcon` |
 | `amp_project_zomboid_rcon` | `amp_players` | `project_zomboid_rcon` |
 
-RCON methods are only accepted for instances that already have an RCON address and credential configured (see [RCON](#rcon)).
+RCON methods are only accepted for instances that already have an RCON address and credential configured (see [RCON](#rcon)). The `rcon` block in `idle.json` is loaded even when the current detector is `amp_players`, so you can fill it in first and switch the method later.
 
 ### `idle.json` format
 
