@@ -6,7 +6,7 @@ Contributions are welcome. Before a large change, open a discussion describing t
 
 ## Environment
 
-1. Install Go 1.26.6 or newer.
+1. Install Go 1.26.9 or newer.
 2. Create a branch from main.
 3. Never use real credentials or IDs in tests, examples, or commits.
 4. Preserve compatibility with existing installations whenever possible.
