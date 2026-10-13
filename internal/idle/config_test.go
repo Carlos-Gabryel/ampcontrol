@@ -403,6 +403,73 @@ func TestProjectIdleConfigLoads(
 	}
 }
 
+func TestLoadKeepsRCONBlockForNonRCONDetector(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	path := writeTestConfig(
+		t,
+		`{
+			"servers": [
+				{
+					"instance": "Pal01",
+					"display_name": "Palworld",
+					"enabled": true,
+					"mode": "active",
+					"detector": "amp_players",
+					"rcon": {
+						"address": " 127.0.0.1:25575 ",
+						"password_credential": "pal01-rcon-password"
+					}
+				},
+				{
+					"instance": "Valheim01",
+					"display_name": "Valheim",
+					"enabled": true,
+					"mode": "active",
+					"detector": "amp_players"
+				}
+			]
+		}`,
+	)
+
+	config, err := Load(
+		path,
+	)
+	if err != nil {
+		t.Fatalf(
+			"configuração deveria ser aceita: %v",
+			err,
+		)
+	}
+
+	pal, ok := config.FindServer("Pal01")
+	if !ok {
+		t.Fatal("Pal01 deveria existir")
+	}
+	if pal.RCONAddress != "127.0.0.1:25575" ||
+		pal.RCONPasswordCredentialName() != "pal01-rcon-password" {
+		t.Fatalf(
+			"bloco rcon deveria ser carregado mesmo com detector amp_players: %+v",
+			pal,
+		)
+	}
+
+	valheim, ok := config.FindServer("Valheim01")
+	if !ok {
+		t.Fatal("Valheim01 deveria existir")
+	}
+	if valheim.RCONAddress != "" ||
+		valheim.RCONPasswordCredentialName() != "" ||
+		valheim.RCONPasswordEnv != "" {
+		t.Fatalf(
+			"servidor sem bloco rcon não deveria ter RCON: %+v",
+			valheim,
+		)
+	}
+}
+
 func writeTestConfig(
 	t *testing.T,
 	content string,
