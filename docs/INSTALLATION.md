@@ -55,7 +55,24 @@ Valide o login diretamente no AMP antes de executar o instalador. Não reutilize
 
 ## 4. Executar o instalador
 
-### Pelo pacote de release (recomendado, não precisa de Go)
+### Com um comando (recomendado)
+
+```bash
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo bash
+```
+
+Para repassar opções ao instalador ou fixar uma versão:
+
+```bash
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo bash -s -- --language en-US
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo env AMPCONTROL_VERSION=v1.0.8 bash
+```
+
+O `get.sh` baixa a release mais recente para a arquitetura do servidor (amd64 ou arm64), confere o SHA-256 contra o `checksums.txt`, executa o instalador do pacote com o terminal como entrada (as perguntas funcionam mesmo com `curl | bash`) e apaga os arquivos temporários. Não precisa de Go.
+
+Quem prefere ler antes de executar pode baixar o script (`curl -fsSLO https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh`), inspecioná-lo e rodar `sudo bash get.sh`, ou usar o método manual abaixo.
+
+### Pelo pacote de release (não precisa de Go)
 
 Escolha a versão mais recente na página de [Releases](https://github.com/Carlos-Gabryel/ampcontrol/releases) e ajuste `VERSION` e `ARCH`:
 

@@ -142,7 +142,9 @@ printf '== %s\n' "$(msg 'Reinstalação a partir do pacote de release, sem Go e 
 ! command -v go >/dev/null 2>&1 ||
     fail "$(msg 'Go está instalado; o cenário do pacote de release perderia o sentido' 'Go is installed; the release package scenario would be meaningless')"
 PACKAGE_DIRECTORY="$(mktemp -d)"
-trap 'rm -rf -- "$PACKAGE_DIRECTORY"' EXIT
+RELEASE_DIRECTORY="$(mktemp -d)"
+BAD_RELEASE_DIRECTORY="$(mktemp -d)"
+trap 'rm -rf -- "$PACKAGE_DIRECTORY" "$RELEASE_DIRECTORY" "$BAD_RELEASE_DIRECTORY"' EXIT
 # Pacote de release: scripts, packaging, config, docs e o binário; sem go.mod.
 for entry in scripts packaging config docs; do
     cp -r "$SCRIPT_DIRECTORY/../$entry" "$PACKAGE_DIRECTORY/$entry"
@@ -152,5 +154,35 @@ run_installer "$(printf '\n'; discord_and_amp_answers "$TOKEN_FIRST")" "$PACKAGE
 check_installation "$TOKEN_FIRST"
 cmp "$PACKAGE_DIRECTORY/ampcontrol" /usr/lib/ampcontrol/ampcontrol ||
     fail "$(msg 'o binário instalado não é o do pacote de release' 'the installed binary is not the release package binary')"
+
+printf '== %s\n' "$(msg 'Instalação com um comando (get.sh) a partir de uma release local' 'One-command install (get.sh) from a local release')"
+RELEASE_VERSION=v0.0.0-test
+RELEASE_PACKAGE="ampcontrol_${RELEASE_VERSION}_linux_amd64"
+mkdir -p "$RELEASE_DIRECTORY/$RELEASE_VERSION" "$RELEASE_DIRECTORY/stage"
+cp -r "$PACKAGE_DIRECTORY" "$RELEASE_DIRECTORY/stage/$RELEASE_PACKAGE"
+tar -C "$RELEASE_DIRECTORY/stage" -czf "$RELEASE_DIRECTORY/$RELEASE_VERSION/$RELEASE_PACKAGE.tar.gz" "$RELEASE_PACKAGE"
+(cd "$RELEASE_DIRECTORY/$RELEASE_VERSION" && sha256sum ./*.tar.gz >checksums.txt)
+# Mesmo tratamento do build-release.sh: versão embutida no get.sh.
+sed "s/@AMPCONTROL_VERSION@/$RELEASE_VERSION/g" "$SCRIPT_DIRECTORY/get.sh" >"$RELEASE_DIRECTORY/get.sh"
+
+get_command="$(printf 'cat %q | AMPCONTROL_DOWNLOAD_BASE=%q bash -s -- --language pt-BR --no-start' \
+    "$RELEASE_DIRECTORY/get.sh" "file://$RELEASE_DIRECTORY")"
+printf '%s\n' "$(printf '\n'; discord_and_amp_answers "$TOKEN_SECOND")" | script -qec "$get_command" /dev/null
+check_installation "$TOKEN_SECOND"
+cmp "$PACKAGE_DIRECTORY/ampcontrol" /usr/lib/ampcontrol/ampcontrol ||
+    fail "$(msg 'o binário instalado não é o do pacote baixado pelo get.sh' 'the installed binary is not the package downloaded by get.sh')"
+
+# Checksum errado: o get.sh aborta antes de tocar na instalação.
+mkdir -p "$BAD_RELEASE_DIRECTORY/$RELEASE_VERSION"
+cp "$RELEASE_DIRECTORY/$RELEASE_VERSION/$RELEASE_PACKAGE.tar.gz" "$BAD_RELEASE_DIRECTORY/$RELEASE_VERSION/"
+printf 'x' >>"$BAD_RELEASE_DIRECTORY/$RELEASE_VERSION/$RELEASE_PACKAGE.tar.gz"
+cp "$RELEASE_DIRECTORY/$RELEASE_VERSION/checksums.txt" "$BAD_RELEASE_DIRECTORY/$RELEASE_VERSION/"
+if bad_output="$(AMPCONTROL_DOWNLOAD_BASE="file://$BAD_RELEASE_DIRECTORY" bash "$RELEASE_DIRECTORY/get.sh" --language pt-BR --no-start </dev/null 2>&1)"; then
+    fail "$(msg 'o get.sh aceitou um pacote com checksum errado' 'get.sh accepted a package with a wrong checksum')"
+fi
+[[ "$bad_output" == *checksum* ]] ||
+    fail "$(msg 'a recusa não menciona o checksum' 'the rejection does not mention the checksum'): $bad_output"
+cmp "$PACKAGE_DIRECTORY/ampcontrol" /usr/lib/ampcontrol/ampcontrol ||
+    fail "$(msg 'a instalação mudou apesar do checksum errado' 'the installation changed despite the wrong checksum')"
 
 printf '%s\n' "$(msg 'Ensaio do instalador: OK' 'Installer rehearsal: OK')"
