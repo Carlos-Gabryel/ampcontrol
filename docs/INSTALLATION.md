@@ -168,6 +168,17 @@ sudo ampcontrol-maintenance rollback
 
 Os backups ficam em `/var/backups/ampcontrol`. Não remova o último backup antes de validar Discord, painel, Idle e RCON.
 
+### Desinstalar
+
+```bash
+sudo ampcontrol-maintenance uninstall          # mantém configuração, dados e usuário
+sudo ampcontrol-maintenance uninstall --purge  # remove tudo do AmpControl
+```
+
+O comando lista o que será removido e o que será mantido e pede para digitar `remover` (use `--yes` para pular a pergunta). Sem `--purge`, ele para e desabilita o serviço e remove a unit e seus drop-ins, a regra do sudoers, o wrapper `ampcontrol-amp`, `/usr/lib/ampcontrol` e o próprio `ampcontrol-maintenance`. Ficam `/etc/ampcontrol`, as credenciais criptografadas (`/etc/credstore.encrypted/ampcontrol.*`), `/var/lib/ampcontrol`, `/var/backups/ampcontrol` e o usuário `ampcontrol`; reinstalar reaproveita esses dados. Com `--purge`, tudo isso também é removido, inclusive o usuário e o grupo `ampcontrol`.
+
+O AMP, o usuário `amp`, as instâncias de jogo e o `ampinstmgr` nunca são tocados.
+
 ## 8. Migrar uma instalação antiga
 
 Instalações antigas em `/opt/ampcontrol`, baseadas em `.env`, devem usar o migrador transacional:
