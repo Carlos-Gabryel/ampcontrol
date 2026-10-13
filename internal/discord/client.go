@@ -63,6 +63,7 @@ type Client struct {
 	idleRegistrationMu      sync.RWMutex
 	idleServerRegistrar     IdleServerRegistrar
 	idleDetectionManager    IdleDetectionManager
+	idleTimeoutManager      IdleTimeoutManager
 	idleDiagnosticsProvider IdleDiagnosticsProvider
 	idleRegistered          map[string]string
 	gameOverrides           map[string]string

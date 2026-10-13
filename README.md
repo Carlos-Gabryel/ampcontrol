@@ -202,6 +202,7 @@ Instalações antigas em `/opt/ampcontrol` possuem uma [migração transacional 
 | `/ampconfig configurar` | Personaliza nome, jogo, endereço, máximo de jogadores e detector. |
 | `/ampconfig ocultar` / `exibir` | Controla a presença de uma instância no Discord. |
 | `/ampconfig idle-adicionar` | Cadastra uma instância no Idle automático. |
+| `/ampconfig idle-tempo` | Define o tempo global sem jogadores até o Idle desligar as instâncias. |
 
 A referência completa está no [guia de configuração](docs/CONFIGURATION.md).
 

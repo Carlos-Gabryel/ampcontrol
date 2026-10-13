@@ -51,10 +51,11 @@ func New() (*App, error) {
 
 	operationManager := operation.NewManager()
 
-	idleConfig, err := idle.LoadCombinedWithDetectionOverrides(
+	idleConfig, err := idle.LoadCombinedWithOverrides(
 		idleObserverConfigPath,
 		idleAdditionalServersPath,
 		idleDetectionOverridesPath,
+		idleTimeoutOverridePath,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(

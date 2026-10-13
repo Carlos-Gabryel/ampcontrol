@@ -31,6 +31,11 @@ type IdleDetectionManager interface {
 	ResetIdleDetectionMethod(ctx context.Context, instance string) (IdleDetectionSettings, error)
 }
 
+type IdleTimeoutManager interface {
+	IdleTimeoutMinutes() (int, bool)
+	SetIdleTimeoutMinutes(ctx context.Context, minutes int) (int, error)
+}
+
 type IdleDiagnosticsSnapshot struct {
 	Running           bool
 	StartedAt         time.Time
@@ -64,6 +69,9 @@ func (c *Client) SetIdleServerRegistrar(
 	if manager, ok := registrar.(IdleDetectionManager); ok {
 		c.idleDetectionManager = manager
 	}
+	if manager, ok := registrar.(IdleTimeoutManager); ok {
+		c.idleTimeoutManager = manager
+	}
 	if diagnostics, ok := registrar.(IdleDiagnosticsProvider); ok {
 		c.idleDiagnosticsProvider = diagnostics
 	}
@@ -75,6 +83,12 @@ func (c *Client) idleDetectionConfigurator() IdleDetectionManager {
 	c.idleRegistrationMu.RLock()
 	defer c.idleRegistrationMu.RUnlock()
 	return c.idleDetectionManager
+}
+
+func (c *Client) idleTimeoutConfigurator() IdleTimeoutManager {
+	c.idleRegistrationMu.RLock()
+	defer c.idleRegistrationMu.RUnlock()
+	return c.idleTimeoutManager
 }
 
 func instanceNameMap(instances []string) map[string]string {

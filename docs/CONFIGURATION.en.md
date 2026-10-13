@@ -104,6 +104,8 @@ Full example (also in [`config/idle.example.json`](../config/idle.example.json))
 | `detector` | — | Required with `enabled: true`: `amp_players`, `palworld_rcon`, or `project_zomboid_rcon` |
 | `fallback_detector` | — | Detector used when the primary one cannot count players |
 | `idle_timeout_minutes` | `default_idle_timeout_minutes` | Time without players before stopping |
+
+> `/ampconfig idle-timeout minutes:<n>` sets a global override (1 to 1440), stored in `data/idle_timeout_override.json`. It applies live to all instances and takes precedence over `idle_timeout_minutes`.
 | `startup_grace_minutes` | `5` | Grace period after the game starts |
 | `rcon.address` | — | RCON `host:port`, required with an RCON detector |
 | `rcon.password_credential` | — | Name of the systemd credential holding the RCON password |

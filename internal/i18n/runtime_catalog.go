@@ -31,6 +31,8 @@ var englishText = map[string]string{
 	"Instância AMP selecionada não foi encontrada":                                                          "Selected AMP instance was not found",
 	"Inventário AMP mudou, mas os comandos não puderam ser atualizados":                                     "AMP inventory changed, but commands could not be updated",
 	"Método de detecção atualizado em tempo real":                                                           "Detection method updated at runtime",
+	"Tempo de Idle atualizado em tempo real":                                                                "Idle timeout updated at runtime",
+	"Não foi possível alterar o tempo de Idle":                                                              "Could not change the Idle timeout",
 	"Modo active: limite atingido; parada automática será tentada":                                          "Active mode: limit reached; automatic stop will be attempted",
 	"Modo active: parada automática concluída":                                                              "Active mode: automatic stop completed",
 	"Modo observe registrou uma parada concluída inesperadamente":                                           "Observe mode recorded an unexpected completed stop",
