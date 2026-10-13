@@ -57,6 +57,9 @@ func (c *Client) handleAMPConfigCommand(
 	case "idle-adicionar", "idle-add":
 		c.handleAMPIdleRegistrationCommand(event, data)
 
+	case "idle-tempo", "idle-timeout":
+		c.handleAMPIdleTimeoutCommand(event, data)
+
 	case "configurar", "configure":
 		c.handleAMPInstanceSettingsCommand(event, data)
 
@@ -72,6 +75,47 @@ func (c *Client) handleAMPConfigCommand(
 			"⚠️ Subcomando de configuração não reconhecido.",
 		)
 	}
+}
+
+func (c *Client) handleAMPIdleTimeoutCommand(
+	event *events.ApplicationCommandInteractionCreate,
+	data disgoDiscord.SlashCommandInteractionData,
+) {
+	if !c.deferAMPInteraction(event) {
+		return
+	}
+
+	minutes, exists := optIntAny(data, "minutos", "minutes")
+	if !exists {
+		c.updateInteractionMessage(event, i18n.Choose("⚠️ Os minutos não foram informados.", "⚠️ The minutes were not provided."))
+		return
+	}
+	manager := c.idleTimeoutConfigurator()
+	if manager == nil {
+		c.updateInteractionMessage(event, i18n.Choose("❌ O gerenciador do Idle não está disponível.", "❌ The Idle manager is not available."))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ampDiscoveryTimeout)
+	applied, err := manager.SetIdleTimeoutMinutes(ctx, minutes)
+	cancel()
+	if err != nil {
+		c.log.Error().Err(err).Int("minutes", minutes).Msg("Não foi possível alterar o tempo de Idle")
+		c.updateInteractionMessage(event, fmt.Sprintf(
+			i18n.Choose("❌ Não foi possível alterar o tempo de Idle.\nErro: `%s`", "❌ Could not change the Idle timeout.\nError: `%s`"),
+			sanitizeAMPError(err),
+		))
+		return
+	}
+
+	c.updateInteractionMessage(event, fmt.Sprintf(
+		i18n.Choose(
+			"✅ Tempo de Idle atualizado: as instâncias serão desligadas após **%d minutos** sem jogadores.",
+			"✅ Idle timeout updated: instances will be stopped after **%d minutes** without players.",
+		),
+		applied,
+	))
+	c.deleteInteractionResponseLater(event, 20*time.Second)
 }
 
 func (c *Client) handleAMPInstanceSettingsCommand(
@@ -244,11 +288,16 @@ func (c *Client) handleAMPInstanceSettingsDetailsCommand(
 			}
 		}
 	}
+	idleLine := ""
+	if timeoutManager := c.idleTimeoutConfigurator(); timeoutManager != nil {
+		minutes, _ := timeoutManager.IdleTimeoutMinutes()
+		idleLine = fmt.Sprintf("\nIdle: %d min", minutes)
+	}
 	c.updateInteractionMessage(event, fmt.Sprintf(
 		i18n.Choose("⚙️ **Configuração de %s**\nInstância: `%s`\nJogo: `%s`\nMáximo: `%s`\nEndereço: `%s`\nDetector: `%s`\nRCON: `%s`\nPersonalização: `%t`", "⚙️ **Configuration for %s**\nInstance: `%s`\nGame: `%s`\nMaximum: `%s`\nAddress: `%s`\nDetector: `%s`\nRCON: `%s`\nCustomized: `%t`"),
 		ampInstanceDisplayName(instance), instance.Name, instance.Game, maximum,
 		dashboardInstanceAddress(setting, c.gameServerAddress), detector, rcon, customized,
-	))
+	)+idleLine)
 	c.deleteInteractionResponseLater(event, 30*time.Second)
 }
 

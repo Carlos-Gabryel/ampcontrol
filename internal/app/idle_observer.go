@@ -21,6 +21,7 @@ import (
 const idleObserverConfigPath = "config/idle.json"
 const idleAdditionalServersPath = "data/idle_servers.json"
 const idleDetectionOverridesPath = "data/idle_detection_overrides.json"
+const idleTimeoutOverridePath = "data/idle_timeout_override.json"
 const idleObserverStatePath = "data/idle_state.json"
 
 var errIdleObservationOnly = errors.New(
@@ -629,10 +630,11 @@ func (o *idleObserver) RegisterIdleServer(
 	if err != nil {
 		return err
 	}
-	next, err := idle.LoadCombinedWithDetectionOverrides(
+	next, err := idle.LoadCombinedWithOverrides(
 		idleObserverConfigPath,
 		idleAdditionalServersPath,
 		idleDetectionOverridesPath,
+		idleTimeoutOverridePath,
 	)
 	if err != nil {
 		return fmt.Errorf(i18n.Choose("o cadastro foi salvo, mas a configuração combinada falhou: %w", "the registration was saved, but the combined configuration failed: %w"), err)
@@ -754,6 +756,11 @@ func (o *idleObserver) ResetIdleDetectionMethod(
 	if err != nil {
 		return discordClient.IdleDetectionSettings{}, err
 	}
+	timeoutMinutes, err := idle.LoadIdleTimeoutOverride(idleTimeoutOverridePath)
+	if err != nil {
+		return discordClient.IdleDetectionSettings{}, err
+	}
+	next = idle.ApplyIdleTimeoutOverride(next, timeoutMinutes)
 	current := o.configSnapshot()
 	if err := o.engine.ReplaceConfig(next); err != nil {
 		return discordClient.IdleDetectionSettings{}, err
@@ -766,6 +773,52 @@ func (o *idleObserver) ResetIdleDetectionMethod(
 	o.publishConfig(next)
 	settings, _ := o.IdleDetectionSettings(instance)
 	return settings, nil
+}
+
+// IdleTimeoutMinutes devolve o tempo de Idle global e se ele vem de um override persistido.
+func (o *idleObserver) IdleTimeoutMinutes() (int, bool) {
+	if minutes, err := idle.LoadIdleTimeoutOverride(idleTimeoutOverridePath); err == nil && minutes > 0 {
+		return minutes, true
+	}
+	if o != nil {
+		if servers := o.configSnapshot().Servers; len(servers) > 0 && servers[0].IdleTimeout > 0 {
+			return int(servers[0].IdleTimeout / time.Minute), false
+		}
+	}
+	return 15, false
+}
+
+// SetIdleTimeoutMinutes aplica em tempo real e persiste o tempo de Idle global.
+func (o *idleObserver) SetIdleTimeoutMinutes(_ context.Context, minutes int) (int, error) {
+	if o == nil || o.engine == nil {
+		return 0, errors.New(i18n.Choose("o motor de Idle não está disponível", "the Idle engine is not available"))
+	}
+	if minutes < idle.MinIdleTimeoutMinutes || minutes > idle.MaxIdleTimeoutMinutes {
+		return 0, fmt.Errorf(
+			i18n.Choose("o tempo de Idle deve ficar entre %d e %d minutos", "the Idle timeout must be between %d and %d minutes"),
+			idle.MinIdleTimeoutMinutes,
+			idle.MaxIdleTimeoutMinutes,
+		)
+	}
+
+	o.registrationMu.Lock()
+	defer o.registrationMu.Unlock()
+
+	current := o.configSnapshot()
+	next := idle.ApplyIdleTimeoutOverride(current, minutes)
+	if err := o.engine.ReplaceConfig(next); err != nil {
+		return 0, fmt.Errorf(i18n.Choose("não foi possível aplicar o tempo de Idle ao motor: %w", "could not apply the Idle timeout to the engine: %w"), err)
+	}
+	if err := idle.SaveIdleTimeoutOverride(idleTimeoutOverridePath, minutes); err != nil {
+		_ = o.engine.ReplaceConfig(current)
+		return 0, err
+	}
+
+	o.publishConfig(next)
+	o.log.Info().
+		Int("minutes", minutes).
+		Msg("Tempo de Idle atualizado em tempo real")
+	return minutes, nil
 }
 
 func parseIdleDetectionMethod(method string) (idle.Detector, idle.Detector, error) {

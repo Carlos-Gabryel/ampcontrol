@@ -198,6 +198,22 @@ func TestAMPConfigCommandDefaultsToAdministrators(t *testing.T) {
 	if !foundDiagnostics {
 		t.Fatal("ampconfig deveria oferecer o diagnóstico privado")
 	}
+	foundIdleTimeout := false
+	for _, option := range command.Options {
+		sub, ok := option.(disgoDiscord.ApplicationCommandOptionSubCommand)
+		if !ok || sub.Name != "idle-tempo" {
+			continue
+		}
+		foundIdleTimeout = true
+		minutes, ok := sub.Options[0].(disgoDiscord.ApplicationCommandOptionInt)
+		if !ok || !minutes.Required || minutes.MinValue == nil || *minutes.MinValue != 1 ||
+			minutes.MaxValue == nil || *minutes.MaxValue != 1440 {
+			t.Fatal("idle-tempo deveria exigir minutos entre 1 e 1440")
+		}
+	}
+	if !foundIdleTimeout {
+		t.Fatal("ampconfig deveria oferecer idle-tempo")
+	}
 	if !foundConfigure || !foundDetails || !foundRestore {
 		t.Fatal("ampconfig deveria oferecer gerenciamento completo das instâncias")
 	}

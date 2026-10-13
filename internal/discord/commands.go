@@ -225,6 +225,8 @@ func buildAMPConfigCommand(
 	maximumAddressLength := 120
 	minimumPlayers := 1
 	maximumPlayers := 100000
+	minimumIdleMinutes := 1
+	maximumIdleMinutes := 1440
 	return discord.SlashCommandCreate{
 		Name:        "ampconfig",
 		Description: l("Configura a apresentação das instâncias do AmpControl", "Configures AmpControl instance presentation"),
@@ -310,9 +312,22 @@ func buildAMPConfigCommand(
 			buildAMPControlSubCommand(
 				l("idle-adicionar", "idle-add"),
 				l("Adiciona uma instância ao Idle automático", "Adds an instance to automatic Idle"),
-				l("Instância que usará Idle ativo após 15 minutos", "Instance to use active Idle after 15 minutes"),
+				l("Instância que passará a usar o Idle automático", "Instance that will use automatic Idle"),
 				idleCandidateChoices,
 			),
+			discord.ApplicationCommandOptionSubCommand{
+				Name:        l("idle-tempo", "idle-timeout"),
+				Description: l("Define o tempo sem jogadores até o Idle desligar as instâncias", "Sets how long without players before Idle stops instances"),
+				Options: []discord.ApplicationCommandOption{
+					discord.ApplicationCommandOptionInt{
+						Name:        l("minutos", "minutes"),
+						Description: l("Minutos sem jogadores (vale para todas as instâncias)", "Minutes without players (applies to all instances)"),
+						Required:    true,
+						MinValue:    &minimumIdleMinutes,
+						MaxValue:    &maximumIdleMinutes,
+					},
+				},
+			},
 			discord.ApplicationCommandOptionSubCommand{
 				Name:        l("listar", "list"),
 				Description: l("Lista as instâncias ocultas do Discord", "Lists instances hidden from Discord"),

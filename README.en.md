@@ -171,6 +171,7 @@ The updater verifies the release checksum, validates the current configuration w
 | `/ampconfig configure` | Sets display name, game, address, maximum players, and detector. |
 | `/ampconfig hide` / `show` | Controls whether an instance appears in Discord. |
 | `/ampconfig idle-add` | Registers an instance for automatic Idle. |
+| `/ampconfig idle-timeout` | Sets the global time without players before Idle stops instances. |
 
 See the [configuration reference](docs/CONFIGURATION.en.md).
 
