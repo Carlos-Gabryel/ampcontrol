@@ -85,6 +85,35 @@ jobs:
         run: python3 scripts/check-docs.py
 
 
+  arm64:
+    name: arm64 smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build linux/arm64 binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath \
+            -ldflags="-s -w -X main.version=ci-arm64" \
+            -o "$RUNNER_TEMP/ampcontrol-arm64" ./cmd/ampcontrol
+
+      - name: Install QEMU user emulation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-user-static
+
+      - name: Run the arm64 binary under QEMU
+        run: bash scripts/test-arm64.sh "$RUNNER_TEMP/ampcontrol-arm64" qemu-aarch64-static
+
   installer:
     name: Installer rehearsal
     runs-on: ubuntu-latest
