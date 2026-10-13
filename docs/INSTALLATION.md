@@ -26,6 +26,8 @@ O instalador precisa de terminal interativo e deve ser executado na raiz do repo
 5. Conceda ao bot somente estas permissões no canal do painel: View Channel, Send Messages, Embed Links, Attach Files, Read Message History e Manage Messages.
 6. Não conceda Administrator ao bot. O AmpControl não precisa dessa permissão global.
 
+O instalador (`scripts/install.sh`) mostra o link de convite pronto, montado a partir do token, com estes escopos e permissões e o servidor já selecionado, depois de pedir o token e o ID do servidor; por isso os passos 4 e 5 podem ser pulados. O link é só texto: abra-o em qualquer dispositivo logado no Discord (PC ou celular), o que importa em servidores sem interface gráfica.
+
 O projeto usa interações e não lê mensagens comuns, portanto não requer Message Content Intent.
 
 Ative o Developer Mode no cliente Discord e copie:

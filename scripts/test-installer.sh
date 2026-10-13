@@ -65,7 +65,7 @@ run_installer() {
     fi
     local command_line
     command_line="$(printf '%q ' "$script_path" --language pt-BR "${extra[@]}" --no-start)"
-    printf '%s\n' "$answers" | script -qec "$command_line" /dev/null
+    printf '%s\n' "$answers" | script -qec "$command_line" /dev/null | tee "${INSTALLER_LOG:-/dev/null}"
 }
 
 discord_and_amp_answers() {
@@ -131,7 +131,16 @@ check_installation() {
 }
 
 printf '== %s\n' "$(msg 'Instalação nova' 'Fresh installation')"
+INSTALLER_LOG="$(mktemp)"
 run_installer "$(printf '1\n'; discord_and_amp_answers "$TOKEN_FIRST")"
+EXPECTED_INVITE="https://discord.com/oauth2/authorize?client_id=123456789012345678&scope=bot+applications.commands&permissions=125952&guild_id=${GUILD_ID}&disable_guild_select=true"
+grep -qF "$EXPECTED_INVITE" "$INSTALLER_LOG" ||
+    fail "$(msg 'o instalador não mostrou o link de convite esperado' 'the installer did not show the expected invite link')"
+if grep -qF "$TOKEN_FIRST" "$INSTALLER_LOG"; then
+    fail "$(msg 'o instalador imprimiu o token' 'the installer printed the token')"
+fi
+rm -f -- "$INSTALLER_LOG"
+unset INSTALLER_LOG
 check_installation "$TOKEN_FIRST"
 
 printf '== %s\n' "$(msg 'Reexecução para trocar o token, mantendo o Idle' 'Re-run to rotate the token, keeping Idle')"

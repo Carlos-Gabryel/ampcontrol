@@ -25,6 +25,8 @@ The installer requires an interactive terminal and must run from the repository 
 5. In the dashboard channel, grant only: View Channel, Send Messages, Embed Links, Attach Files, Read Message History, and Manage Messages.
 6. Do not grant the bot Administrator. AmpControl does not need that global permission.
 
+The installer (`scripts/install.sh`) prints a ready-made invite link built from the token, with these scopes and permissions and the server preselected, after asking for the token and server ID, so steps 4 and 5 can be skipped. The link is plain text: open it on any device logged into Discord (PC or phone), which matters on headless servers.
+
 AmpControl uses interactions and does not read regular messages, so Message Content Intent is unnecessary.
 
 Enable Developer Mode in Discord and collect:
