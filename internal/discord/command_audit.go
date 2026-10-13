@@ -91,6 +91,15 @@ func (c *Client) commandAuditDecision(
 	return true, i18n.Choose("Recebido", "Received")
 }
 
+// commandAuditOptionValue formata qualquer tipo de opção; String() entra em
+// pânico em opções numéricas ou booleanas.
+func commandAuditOptionValue(option disgoDiscord.SlashCommandOption) string {
+	if option.Type == disgoDiscord.ApplicationCommandOptionTypeString {
+		return option.String()
+	}
+	return string(option.Value)
+}
+
 func newCommandAuditRecord(
 	event *events.ApplicationCommandInteractionCreate,
 	data disgoDiscord.SlashCommandInteractionData,
@@ -106,7 +115,7 @@ func newCommandAuditRecord(
 
 	server := ""
 	for _, name := range optionNames {
-		value := data.Options[name].String()
+		value := commandAuditOptionValue(data.Options[name])
 		if name == "servidor" || name == "server" {
 			server = value
 			continue
