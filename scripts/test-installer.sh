@@ -136,7 +136,10 @@ run_installer "$(printf '1\n'; discord_and_amp_answers "$TOKEN_FIRST")"
 EXPECTED_INVITE="https://discord.com/oauth2/authorize?client_id=123456789012345678&scope=bot+applications.commands&permissions=125952&guild_id=${GUILD_ID}&disable_guild_select=true"
 grep -qF "$EXPECTED_INVITE" "$INSTALLER_LOG" ||
     fail "$(msg 'o instalador não mostrou o link de convite esperado' 'the installer did not show the expected invite link')"
-if grep -qF "$TOKEN_FIRST" "$INSTALLER_LOG"; then
+# O terminal do `script` ecoa de uma vez as respostas pré-digitadas (inclusive o
+# token) antes das perguntas; um usuário real digita com o eco desligado. Por
+# isso só a saída a partir do resumo é conferida.
+if sed -n '/Resumo:/,$p' "$INSTALLER_LOG" | grep -qF "$TOKEN_FIRST"; then
     fail "$(msg 'o instalador imprimiu o token' 'the installer printed the token')"
 fi
 rm -f -- "$INSTALLER_LOG"
