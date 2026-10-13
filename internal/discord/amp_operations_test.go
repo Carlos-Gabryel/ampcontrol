@@ -24,6 +24,9 @@ type fakeAMPAPI struct {
 	calls        map[string]int
 	state        int
 	statusFailed bool
+	uptime       string
+	joinCode     string
+	updatesFail  bool
 }
 
 func newFakeAMPAPI(
@@ -71,7 +74,17 @@ func newFakeAMPAPI(
 					}
 
 					_, _ = responseWriter.Write([]byte(
-						`{"State":` + strconv.Itoa(fake.state) + `}`,
+						`{"State":` + strconv.Itoa(fake.state) + `,"Uptime":"` + fake.uptime + `"}`,
+					))
+
+				case "/API/Core/GetUpdates":
+					if fake.updatesFail {
+						http.Error(responseWriter, "erro simulado", http.StatusInternalServerError)
+						return
+					}
+
+					_, _ = responseWriter.Write([]byte(
+						`{"ConsoleEntries":[{"Timestamp":"2026-10-13T04:08:22Z","Contents":"Session \"X\" registered with join code ` + fake.joinCode + `"}]}`,
 					))
 
 				case "/API/Core/Start":

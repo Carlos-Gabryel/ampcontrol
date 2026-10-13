@@ -48,9 +48,10 @@ Create an AMP user exclusively for the bot, with access to the instances the bot
 | `Core.Login` | authentication on ADS and on each instance |
 | `ADSModule.GetInstances` | instance inventory |
 | `Core.GetStatus`, `Core.GetModuleInfo` | state, players, and game information |
+| `Core.GetUpdates` | console read, used only to show the Valheim join code |
 | `Core.Start`, `Core.Stop` | start and stop the game process (including from Idle) |
 
-Grant only the permissions matching these actions. Starting, stopping, restarting, and updating the whole **instance** do not go through the API: they use `ampinstmgr` through the restricted wrapper installed with `sudo`.
+Grant only the permissions matching these actions. To show the Valheim join code, the user also needs permission to view the console of those instances; without it the join code line simply does not appear. The console is read only while the code is unknown and, afterwards, at most every 5 minutes. Starting, stopping, restarting, and updating the whole **instance** do not go through the API: they use `ampinstmgr` through the restricted wrapper installed with `sudo`.
 
 Validate the login in AMP before installation and do not reuse the primary administrator account.
 

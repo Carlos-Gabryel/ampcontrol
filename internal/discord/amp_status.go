@@ -18,6 +18,7 @@ type ampInstanceStatusView struct {
 	PlayerError       error
 	PlayerMaxOverride int
 	Address           string
+	JoinCode          string
 }
 
 func (c *Client) collectAMPInstanceStatuses(
@@ -38,6 +39,7 @@ func (c *Client) collectAMPInstanceStatuses(
 		}
 
 		if !instance.Running {
+			c.clearJoinCode(instance.Name)
 			continue
 		}
 
@@ -93,6 +95,11 @@ func (c *Client) collectAMPInstanceStatuses(
 
 			statuses[statusIndex].ApplicationStatus =
 				&statusCopy
+
+			if isValheimGame(statuses[statusIndex].Instance.Game) {
+				statuses[statusIndex].JoinCode =
+					c.resolveJoinCode(currentInstance, status)
+			}
 
 			counts, countsErr := status.PlayerCounts()
 			if countsErr != nil {

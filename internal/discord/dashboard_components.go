@@ -72,9 +72,13 @@ func buildAMPServerContainer(status ampInstanceStatusView, defaultAddress string
 		i18n.Choose("### Status do servidor\n**%s**", "### Server status\n**%s**"),
 		state,
 	))
+	joinCodeBlock := ""
+	if status.JoinCode != "" {
+		joinCodeBlock = fmt.Sprintf(i18n.Choose("\n\n### Código de convite\n`%s`", "\n\n### Join code\n`%s`"), status.JoinCode)
+	}
 	details := disgoDiscord.NewTextDisplay(fmt.Sprintf(
-		i18n.Choose("### Endereço do servidor\n`%s`\n\n### Desempenho\n**CPU**　　**Memória**　　**Tempo online**\n`%s`　　`%s`　　`%s`\n\n### Jogadores\n`%s`", "### Server address\n`%s`\n\n### Performance\n**CPU**　　**Memory**　　**Uptime**\n`%s`　　`%s`　　`%s`\n\n### Players\n`%s`"),
-		address, cpu, memory, uptime, players,
+		i18n.Choose("### Endereço do servidor\n`%s`%s\n\n### Desempenho\n**CPU**　　**Memória**　　**Tempo online**\n`%s`　　`%s`　　`%s`\n\n### Jogadores\n`%s`", "### Server address\n`%s`%s\n\n### Performance\n**CPU**　　**Memory**　　**Uptime**\n`%s`　　`%s`　　`%s`\n\n### Players\n`%s`"),
+		address, joinCodeBlock, cpu, memory, uptime, players,
 	))
 
 	phase := amp.ApplicationPhaseUnknown
@@ -255,7 +259,11 @@ func (c *Client) handleDashboardDetails(event *events.ComponentInteractionCreate
 		WithAuthor(ampInstanceDisplayName(instance), "", "").
 		AddField("Status", icon+" "+state, true).
 		AddField(i18n.Choose("Jogo", "Game"), instance.Game, true).
-		AddField(i18n.Choose("Endereço", "Address"), dashboardInstanceAddress(setting, c.gameServerAddress), false).
+		AddField(i18n.Choose("Endereço", "Address"), dashboardInstanceAddress(setting, c.gameServerAddress), false)
+	if status.JoinCode != "" {
+		embed = embed.AddField(i18n.Choose("Código de convite", "Join code"), status.JoinCode, false)
+	}
+	embed = embed.
 		AddField("CPU", cpu, true).
 		AddField(i18n.Choose("Memória", "Memory"), memory, true).
 		AddField(i18n.Choose("Tempo online", "Uptime"), uptime, true).

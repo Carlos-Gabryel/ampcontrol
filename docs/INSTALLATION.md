@@ -49,9 +49,10 @@ Crie no AMP um usuário exclusivo para o bot, com acesso às instâncias que o b
 | `Core.Login` | autenticação no ADS e em cada instância |
 | `ADSModule.GetInstances` | inventário das instâncias |
 | `Core.GetStatus`, `Core.GetModuleInfo` | estado, jogadores e informações do jogo |
+| `Core.GetUpdates` | leitura do console, usada somente para exibir o código de convite do Valheim |
 | `Core.Start`, `Core.Stop` | iniciar e parar o processo do jogo (inclusive pelo Idle) |
 
-Conceda somente as permissões correspondentes a essas ações. Iniciar, parar, reiniciar e atualizar a **instância** inteira não passam pela API: são feitos pelo `ampinstmgr`, através do wrapper restrito instalado com o `sudo`.
+Conceda somente as permissões correspondentes a essas ações. Para exibir o código de convite do Valheim, o usuário também precisa de permissão para ver o console dessas instâncias; sem ela, a linha do código simplesmente não aparece. O console é lido só enquanto o código é desconhecido e, depois, no máximo a cada 5 minutos. Iniciar, parar, reiniciar e atualizar a **instância** inteira não passam pela API: são feitos pelo `ampinstmgr`, através do wrapper restrito instalado com o `sudo`.
 
 Valide o login diretamente no AMP antes de executar o instalador. Não reutilize a conta principal do administrador.
 

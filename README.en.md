@@ -21,7 +21,7 @@ AmpControl connects [CubeCoders AMP](https://cubecoders.com/AMP) to Discord. Com
 
 | Feature | Purpose |
 | --- | --- |
-| 🖥️ **Interactive dashboards** | One card per server with state, game, address, CPU, memory, uptime, and player count. |
+| 🖥️ **Interactive dashboards** | One card per server with state, game, address, Valheim join code, CPU, memory, uptime, and player count. |
 | 🎛️ **Discord controls** | Start, stop, restart, shut down, and update instances through buttons and `/amp`. |
 | 💤 **Automatic Idle** | Stops an empty game process after the configured inactivity period. |
 | 🛡️ **Active-game protection** | Prevents regular users from interrupting servers with active or unconfirmed players. |
