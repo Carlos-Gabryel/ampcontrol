@@ -46,6 +46,17 @@ UNPADDED_ID="$(printf 1234567890123456789 | base64 | tr -d '=')"
 [[ -z "$(discord_application_id_from_token 'abc.def')" ]] ||
     fail "$(msg 'token inválido deveria não gerar ID' 'invalid token should yield no ID')"
 
+# Validação do token do bot (instalador).
+# shellcheck disable=SC1090
+source <(sed -n '/^valid_discord_bot_token()/,/^}/p' "$PROJECT_DIRECTORY/scripts/install.sh")
+valid_discord_bot_token 'MTIzNDU2Nzg5MDEyMzQ1Njc4.fake-first.token_1234' ||
+    fail "$(msg 'token de bot válido foi rejeitado' 'a valid bot token was rejected')"
+for bad_token in '9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c' "$(printf 'a1%.0s' {1..32})" 'abc.def' \
+    'MTIzNDU2Nzg5MDEyMzQ1Njc4..x' 'MTIzNDU2Nzg5MDEyMzQ1Njc4.only-two'; do
+    ! valid_discord_bot_token "$bad_token" ||
+        fail "$(msg 'valor que não é token de bot foi aceito' 'a non-bot-token value was accepted')"
+done
+
 mkdir -p "$TEMP_DIRECTORY/instances/Game01" "$TEMP_DIRECTORY/instances/ADS01"
 cat >"$TEMP_DIRECTORY/ampinstmgr" <<'EOF'
 #!/usr/bin/env bash

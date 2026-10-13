@@ -70,9 +70,12 @@ run_installer() {
 
 discord_and_amp_answers() {
     local token="$1"
+    local bad_token="${2:-}"
     printf '%s\n' "$GUILD_ID" "$PANEL_ID" "$AUDIT_ID" "$OWNER_ID" '' '' '' \
-        '' '' 'http://amp.example.invalid:8080' 'jogos.example.invalid' \
-        "$token" "$token" "$AMP_PASSWORD" "$AMP_PASSWORD" 's'
+        '' '' 'http://amp.example.invalid:8080' 'jogos.example.invalid'
+    # Valor inválido opcional: digitado duas vezes, validado após a confirmação.
+    [[ -z "$bad_token" ]] || printf '%s\n' "$bad_token" "$bad_token"
+    printf '%s\n' "$token" "$token" "$AMP_PASSWORD" "$AMP_PASSWORD" 's'
 }
 
 decrypted() {
@@ -132,7 +135,9 @@ check_installation() {
 
 printf '== %s\n' "$(msg 'Instalação nova' 'Fresh installation')"
 INSTALLER_LOG="$(mktemp)"
-run_installer "$(printf '1\n'; discord_and_amp_answers "$TOKEN_FIRST")"
+run_installer "$(printf '1\n'; discord_and_amp_answers "$TOKEN_FIRST" '9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c')"
+grep -qF 'não parece um token de bot' "$INSTALLER_LOG" ||
+    fail "$(msg 'o instalador não rejeitou o valor que não é token de bot' 'the installer did not reject the non-bot-token value')"
 EXPECTED_INVITE="https://discord.com/oauth2/authorize?client_id=123456789012345678&scope=bot+applications.commands&permissions=125952&guild_id=${GUILD_ID}&disable_guild_select=true"
 grep -qF "$EXPECTED_INVITE" "$INSTALLER_LOG" ||
     fail "$(msg 'o instalador não mostrou o link de convite esperado' 'the installer did not show the expected invite link')"

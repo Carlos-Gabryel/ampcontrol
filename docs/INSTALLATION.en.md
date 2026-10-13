@@ -19,7 +19,7 @@ The installer requires an interactive terminal and must run from the repository 
 ## 2. Create the Discord application
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications), create an application, and add a bot.
-2. Store its token in a password manager. Never place it in an issue, commit, screenshot, or TOML file.
+2. The token comes from **Bot → Reset Token**, not the Client Secret or Public Key; the installer rejects other values. Store it in a password manager. Never place it in an issue, commit, screenshot, or TOML file.
 3. Under **Installation**, enable Guild Install.
 4. Generate an installation link with the `bot` and `applications.commands` scopes.
 5. In the dashboard channel, grant only: View Channel, Send Messages, Embed Links, Attach Files, Read Message History, and Manage Messages.
