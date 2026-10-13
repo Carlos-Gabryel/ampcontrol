@@ -67,6 +67,9 @@ type Client struct {
 	idleRegistered          map[string]string
 	gameOverrides           map[string]string
 	playerCountResolver     PlayerCountResolver
+	joinCodeMu              sync.Mutex
+	joinCodes               map[string]joinCodeEntry
+	joinCodeNow             func() time.Time
 	log                     zerolog.Logger
 }
 

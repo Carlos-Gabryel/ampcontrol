@@ -63,6 +63,7 @@ var englishText = map[string]string{
 	"Não foi possível cadastrar a instância no motor de Idle":                                               "Could not register the instance in the Idle engine",
 	"Não foi possível carregar o painel durante a limpeza do canal":                                         "Could not load the dashboard while cleaning the channel",
 	"Não foi possível consultar o estado da aplicação":                                                      "Could not query the application state",
+	"Não foi possível ler o console para obter o código de convite":                                         "Could not read the console to get the join code",
 	"Não foi possível enviar a confirmação de Idle do motor genérico":                                       "Could not send the generic Idle engine confirmation",
 	"Não foi possível enviar a falha de parada do motor de Idle":                                            "Could not send the Idle engine stop failure",
 	"Não foi possível enviar o aviso de inatividade do motor de Idle":                                       "Could not send the Idle engine inactivity warning",

@@ -21,7 +21,7 @@ O AmpControl conecta o [AMP, da CubeCoders](https://cubecoders.com/AMP), ao Disc
 
 | Recurso | O que ele faz |
 | --- | --- |
-| 🖥️ **Painéis interativos** | Exibe um cartão por servidor com estado, jogo, endereço, CPU, memória, tempo online e jogadores. |
+| 🖥️ **Painéis interativos** | Exibe um cartão por servidor com estado, jogo, endereço, código de convite do Valheim, CPU, memória, tempo online e jogadores. |
 | 🎛️ **Controle pelo Discord** | Permite iniciar, parar, reiniciar, desligar e atualizar instâncias usando botões e comandos `/amp`. |
 | 💤 **Idle automático** | Encerra o processo do jogo quando o servidor fica vazio pelo período configurado. |
 | 🛡️ **Proteção de partidas** | Impede que usuários comuns interrompam servidores com jogadores ativos ou contagem incerta. |
