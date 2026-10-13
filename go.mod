@@ -1,6 +1,6 @@
 module github.com/Carlos-Gabryel/ampcontrol
 
-go 1.26.6
+go 1.26.9
 
 require (
 	github.com/disgoorg/disgo v0.19.6
