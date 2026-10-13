@@ -67,4 +67,7 @@ done
     cd "$DIST_DIRECTORY"
     sha256sum ./*.tar.gz >checksums.txt
 )
+# get.sh publicado na release, com a versão embutida.
+sed "s/@AMPCONTROL_VERSION@/$VERSION/g" "$PROJECT_DIRECTORY/scripts/get.sh" >"$DIST_DIRECTORY/get.sh"
+chmod 0755 "$DIST_DIRECTORY/get.sh"
 printf '%s %s\n' "$(msg 'Artefatos criados em' 'Artifacts created at')" "$DIST_DIRECTORY"

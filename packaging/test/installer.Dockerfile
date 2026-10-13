@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        systemd systemd-sysv sudo python3 util-linux ca-certificates \
+        systemd systemd-sysv sudo python3 util-linux ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
 STOPSIGNAL SIGRTMIN+3

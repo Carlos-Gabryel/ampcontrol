@@ -35,6 +35,17 @@ expect_failure() {
     fi
 }
 
+# ID da aplicação extraído do token do Discord (instalador).
+# shellcheck disable=SC1090
+source <(sed -n '/^discord_application_id_from_token()/,/^}/p' "$PROJECT_DIRECTORY/scripts/install.sh")
+[[ "$(discord_application_id_from_token 'MTIzNDU2Nzg5MDEyMzQ1Njc4.x.y')" == "123456789012345678" ]] ||
+    fail "$(msg 'ID da aplicação não extraído do token' 'application ID not derived from the token')"
+UNPADDED_ID="$(printf 1234567890123456789 | base64 | tr -d '=')"
+[[ "$(discord_application_id_from_token "$UNPADDED_ID.x.y")" == "1234567890123456789" ]] ||
+    fail "$(msg 'ID da aplicação sem padding não extraído' 'unpadded application ID not derived')"
+[[ -z "$(discord_application_id_from_token 'abc.def')" ]] ||
+    fail "$(msg 'token inválido deveria não gerar ID' 'invalid token should yield no ID')"
+
 mkdir -p "$TEMP_DIRECTORY/instances/Game01" "$TEMP_DIRECTORY/instances/ADS01"
 cat >"$TEMP_DIRECTORY/ampinstmgr" <<'EOF'
 #!/usr/bin/env bash

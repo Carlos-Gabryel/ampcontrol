@@ -254,6 +254,21 @@ validate_discord_id() {
     [[ "$1" =~ ^[0-9]{15,20}$ ]] || fail "$2 $(msg 'não parece ser um ID válido do Discord' 'does not look like a valid Discord ID')"
 }
 
+# O primeiro segmento do token do bot é o ID da aplicação em base64 (muitas
+# vezes sem padding, às vezes URL-safe). Imprime o ID ou nada.
+discord_application_id_from_token() {
+    local segment="${1%%.*}"
+    local decoded=""
+    segment="${segment//-/+}"
+    segment="${segment//_//}"
+    while ((${#segment} % 4 != 0)); do segment+="="; done
+    decoded="$(printf '%s' "$segment" | base64 -d 2>/dev/null || true)"
+    if [[ "$decoded" =~ ^[0-9]{17,20}$ ]]; then
+        printf '%s' "$decoded"
+    fi
+    return 0
+}
+
 toml_escape() {
     local value="$1"
     value="${value//\\/\\\\}"
@@ -411,6 +426,21 @@ printf '\n%s\n' "$(msg 'Resumo:' 'Summary:')"
 printf '  AMP: %s %s, %s %s\n' "$(msg 'usuário Linux' 'Linux user')" "$AMP_SYSTEM_USER" "$(msg 'gerenciador' 'manager')" "$AMP_MANAGER_PATH"
 printf '  Discord: %s %s, %s %s, %s %s\n' "$(msg 'servidor' 'server')" "$DISCORD_GUILD_ID" "$(msg 'painel' 'dashboard')" "$DISCORD_PANEL_CHANNEL_ID" "$(msg 'auditoria' 'audit')" "$DISCORD_AUDIT_CHANNEL_ID"
 printf '  %s: %s\n' "$(msg 'Instalação' 'Installation')" "$LIB_DIRECTORY"
+
+# Permissões 125952 = View Channel (1024) + Send Messages (2048) + Manage
+# Messages (8192) + Embed Links (16384) + Attach Files (32768) + Read Message
+# History (65536), conforme docs/INSTALLATION.md, seção 2.
+BOT_INVITE_URL=""
+BOT_APPLICATION_ID="$(discord_application_id_from_token "$DISCORD_TOKEN")"
+if [[ -n "$BOT_APPLICATION_ID" ]]; then
+    BOT_INVITE_URL="https://discord.com/oauth2/authorize?client_id=${BOT_APPLICATION_ID}&scope=bot+applications.commands&permissions=125952"
+    if [[ -n "$DISCORD_GUILD_ID" ]]; then
+        BOT_INVITE_URL+="&guild_id=${DISCORD_GUILD_ID}&disable_guild_select=true"
+    fi
+    printf '\n%s\n  %s\n' "$(msg 'Convite do bot (abra em qualquer navegador logado no Discord, pode ser no PC ou celular; adicione o bot ao servidor antes de continuar):' 'Bot invite (open it in any browser logged into Discord, on a PC or phone; add the bot to the server before continuing):')" "$BOT_INVITE_URL"
+else
+    printf '\n%s\n' "$(msg 'Não foi possível montar o convite pelo token; gere-o em https://discord.com/developers/applications (OAuth2 → escopos bot e applications.commands).' 'Could not build the invite from the token; generate it at https://discord.com/developers/applications (OAuth2 → bot and applications.commands scopes).')"
+fi
 read -r -p "$(msg 'Continuar com a instalação? [s/N]: ' 'Continue with the installation? [y/N]: ')" CONFIRMATION
 [[ "$CONFIRMATION" =~ ^[sSyY]$ ]] || { printf '%s\n' "$(msg 'Instalação cancelada.' 'Installation canceled.')"; exit 10; }
 
@@ -608,4 +638,7 @@ if [[ "$START_SERVICE" == true ]]; then
 printf '\n%s\n' "$(msg 'AmpControl instalado e em execução.' 'AmpControl installed and running.')"
 else
 printf '\n%s\n' "$(msg 'AmpControl instalado. Inicie com: systemctl enable --now ampcontrol.service' 'AmpControl installed. Start it with: systemctl enable --now ampcontrol.service')"
+fi
+if [[ -n "$BOT_INVITE_URL" ]]; then
+    printf '%s: %s\n' "$(msg 'Convite do bot' 'Bot invite')" "$BOT_INVITE_URL"
 fi

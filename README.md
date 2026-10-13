@@ -101,6 +101,14 @@ Os comandos podem ser restritos a um único canal. O botão administrativo que a
 - Go 1.26.9 ou superior, salvo ao instalar um binário de release;
 - aplicação Discord criada pelo próprio administrador.
 
+Instalação com um comando (baixa a última release, confere o SHA-256 e executa o instalador):
+
+```bash
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo bash
+```
+
+Opções e versão fixa estão no [guia de instalação](docs/INSTALLATION.md#4-executar-o-instalador). Para instalar a partir do código-fonte:
+
 ```bash
 git clone https://github.com/Carlos-Gabryel/ampcontrol.git
 cd ampcontrol

@@ -25,6 +25,8 @@ The installer requires an interactive terminal and must run from the repository 
 5. In the dashboard channel, grant only: View Channel, Send Messages, Embed Links, Attach Files, Read Message History, and Manage Messages.
 6. Do not grant the bot Administrator. AmpControl does not need that global permission.
 
+The installer (`scripts/install.sh`) prints a ready-made invite link built from the token, with these scopes and permissions and the server preselected, after asking for the token and server ID, so steps 4 and 5 can be skipped. The link is plain text: open it on any device logged into Discord (PC or phone), which matters on headless servers.
+
 AmpControl uses interactions and does not read regular messages, so Message Content Intent is unnecessary.
 
 Enable Developer Mode in Discord and collect:
@@ -54,7 +56,24 @@ Validate the login in AMP before installation and do not reuse the primary admin
 
 ## 4. Run the installer
 
-### From the release package (recommended, no Go needed)
+### With one command (recommended)
+
+```bash
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo bash
+```
+
+To pass options to the installer or pin a version:
+
+```bash
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo bash -s -- --language en-US
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo env AMPCONTROL_VERSION=v1.0.8 bash
+```
+
+`get.sh` downloads the latest release for the server architecture (amd64 or arm64), verifies its SHA-256 against `checksums.txt`, runs the package installer with the terminal as input (the questions work even with `curl | bash`), and removes the temporary files. No Go needed.
+
+If you prefer to read it before running it, download the script (`curl -fsSLO https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh`), inspect it, and run `sudo bash get.sh`, or use the manual method below.
+
+### From the release package (no Go needed)
 
 Pick the latest version on the [Releases](https://github.com/Carlos-Gabryel/ampcontrol/releases) page and adjust `VERSION` and `ARCH`:
 

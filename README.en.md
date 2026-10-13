@@ -88,6 +88,14 @@ Commands may be restricted to this channel. The AMP management link and `/ampcon
 - Go 1.26.9+ unless installing a release binary;
 - a Discord application created by the administrator.
 
+One-command install (downloads the latest release, verifies its SHA-256, and runs the installer):
+
+```bash
+curl -fsSL https://github.com/Carlos-Gabryel/ampcontrol/releases/latest/download/get.sh | sudo bash
+```
+
+Options and version pinning are in the [installation guide](docs/INSTALLATION.en.md#4-run-the-installer). To install from source:
+
 ```bash
 git clone https://github.com/Carlos-Gabryel/ampcontrol.git
 cd ampcontrol
