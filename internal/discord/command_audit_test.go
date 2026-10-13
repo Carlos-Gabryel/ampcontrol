@@ -80,6 +80,30 @@ func TestInferCommandAuditFinalState(t *testing.T) {
 	}
 }
 
+func TestInferCommandAuditFinalStateAfterLeavingIdle(t *testing.T) {
+	// Mensagens reais de sucesso do /amp iniciar (pt-BR e en-US).
+	for _, result := range []string{
+		"✅ O jogo de **Fabrica de Monstro** foi iniciado e saiu do modo Idle.",
+		"✅ The game for **Fabrica de Monstro** was started and left Idle mode.",
+	} {
+		if actual := inferCommandAuditFinalState(
+			"/amp iniciar",
+			result,
+			commandAuditPhaseCompleted,
+		); actual != "Online" {
+			t.Fatalf("estado após iniciar (%q): obtido %q, esperado \"Online\"", result, actual)
+		}
+	}
+
+	if actual := inferCommandAuditFinalState(
+		"/amp parar",
+		"✅ Valheim entrou em modo Idle.",
+		commandAuditPhaseCompleted,
+	); actual != "Idle" {
+		t.Fatalf("estado após parar: obtido %q, esperado \"Idle\"", actual)
+	}
+}
+
 func TestFormatCommandAuditDuration(t *testing.T) {
 	tests := map[time.Duration]string{
 		250 * time.Millisecond:                    "menos de 1 s",

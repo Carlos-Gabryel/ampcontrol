@@ -419,6 +419,9 @@ func inferCommandAuditFinalState(
 	}
 
 	lower := strings.ToLower(result)
+	// "saiu do modo Idle" (início bem-sucedido) não significa que o estado
+	// final é Idle.
+	lower = strings.NewReplacer("saiu do modo idle", "", "left idle mode", "").Replace(lower)
 	if strings.Contains(lower, "offline") {
 		return "Offline"
 	}

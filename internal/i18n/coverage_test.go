@@ -22,6 +22,7 @@ var formatVerb = regexp.MustCompile(`%[-+# 0]*(\[\d+\])?(\d+|\*)?(\.(\d+|\*))?[a
 var portugueseAllowedInEnglish = map[string]string{
 	"já possui uma operação em andamento": "marcador comparado com a resposta, junto com o equivalente em inglês",
 	"transição":                           "marcador comparado com a resposta, junto com o equivalente em inglês",
+	"saiu do modo idle":                   "marcador removido da resposta antes de inferir o estado final, junto com o equivalente em inglês",
 	"Em transição":                        "estado interno traduzido na saída por Text",
 	"— Como usar os comandos":             "constante; cada uso passa por i18n.Choose",
 	"memória":                             "nome de métrica do AMP usado na busca, não é exibido",
