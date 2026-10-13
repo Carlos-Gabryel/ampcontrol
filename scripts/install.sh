@@ -344,8 +344,7 @@ if ! AMP_INVENTORY_OUTPUT="$(sudo -n -u "$AMP_SYSTEM_USER" "$AMP_MANAGER_PATH" -
     fail "$(msg 'não foi possível consultar o AMP como' 'could not query AMP as') $AMP_SYSTEM_USER: $AMP_INVENTORY_OUTPUT"
 fi
 AMP_INSTANCE_COUNT="$(grep -c 'Instance Name' <<<"$AMP_INVENTORY_OUTPUT" || true)"
-AMP_ADS_COUNT="$(grep -cE 'Instance Name[^A-Za-z0-9._-]+ADS01[[:space:]]*$' <<<"$AMP_INVENTORY_OUTPUT" || true)"
-printf '%s %s (%s %s, %s %s).\n' "$AMP_INSTANCE_COUNT" "$(msg 'instância(s) AMP encontrada(s)' 'AMP instance(s) found')" "$((AMP_INSTANCE_COUNT - AMP_ADS_COUNT))" "$(msg 'de jogo' 'game')" "$AMP_ADS_COUNT" "$(msg 'controlador ADS' 'ADS controller')"
+printf '%s %s\n' "$AMP_INSTANCE_COUNT" "$(msg 'instância(s) AMP encontrada(s), incluindo o controlador ADS.' 'AMP instance(s) found, including the ADS controller.')"
 unset AMP_INVENTORY_OUTPUT
 
 PRESERVE_EXISTING_IDLE=false
@@ -366,7 +365,7 @@ mapfile -t DETECTED_INSTANCES < <(
 )
 SELECTED_IDLE_INSTANCES=()
 if [[ "$PRESERVE_EXISTING_IDLE" == false ]] && ((${#DETECTED_INSTANCES[@]} > 0)); then
-    printf '\n%s\n' "$(msg 'Instâncias disponíveis para Idle automático:' 'Instances available for automatic Idle:')"
+    printf '\n%s\n' "$(msg 'Instâncias disponíveis para Idle automático (o controlador ADS01 fica de fora):' 'Instances available for automatic Idle (the ADS01 controller is left out):')"
     for index in "${!DETECTED_INSTANCES[@]}"; do
         printf '  %d) %s\n' "$((index + 1))" "${DETECTED_INSTANCES[$index]}"
     done
