@@ -197,4 +197,59 @@ fi
 cmp "$PACKAGE_DIRECTORY/ampcontrol" /usr/lib/ampcontrol/ampcontrol ||
     fail "$(msg 'a instalação mudou apesar do checksum errado' 'the installation changed despite the wrong checksum')"
 
+assert_amp_untouched() {
+    [[ -x /usr/bin/ampinstmgr ]] || fail "$(msg 'ampinstmgr foi tocado pela desinstalação' 'ampinstmgr was touched by the uninstall')"
+    id amp >/dev/null 2>&1 || fail "$(msg 'o usuário amp foi removido' 'the amp user was removed')"
+    [[ -d /home/amp/.ampdata/instances/Palworld01 && -d /home/amp/.ampdata/instances/Valheim01 ]] ||
+        fail "$(msg 'as instâncias do AMP foram tocadas' 'AMP instances were touched')"
+}
+
+assert_program_removed() {
+    ! systemctl cat ampcontrol.service >/dev/null 2>&1 || fail "$(msg 'a unit do serviço ainda existe' 'the service unit still exists')"
+    local removed
+    for removed in /etc/systemd/system/ampcontrol.service /etc/systemd/system/ampcontrol.service.d \
+        /etc/sudoers.d/ampcontrol /usr/local/bin/ampcontrol-amp /usr/lib/ampcontrol /usr/local/sbin/ampcontrol-maintenance; do
+        [[ ! -e "$removed" ]] || fail "$(msg 'ainda existe após a desinstalação' 'still exists after uninstall'): $removed"
+    done
+}
+
+printf '== %s\n' "$(msg 'Desinstalação cancelada não remove nada' 'A cancelled uninstall removes nothing')"
+MAINTENANCE=/usr/local/sbin/ampcontrol-maintenance
+if printf 'nao\n' | AMPCONTROL_LANGUAGE=pt-BR "$MAINTENANCE" uninstall >/dev/null 2>&1; then
+    fail "$(msg 'a desinstalação aceitou uma confirmação errada' 'uninstall accepted a wrong confirmation')"
+fi
+if printf 'no\n' | AMPCONTROL_LANGUAGE=en-US "$MAINTENANCE" uninstall --purge >/dev/null 2>&1; then
+    fail "$(msg 'a desinstalação aceitou uma confirmação errada' 'uninstall accepted a wrong confirmation')"
+fi
+if AMPCONTROL_LANGUAGE=pt-BR "$MAINTENANCE" uninstall </dev/null >/dev/null 2>&1; then
+    fail "$(msg 'a desinstalação seguiu sem confirmação' 'uninstall went ahead without confirmation')"
+fi
+check_installation "$TOKEN_SECOND"
+assert_amp_untouched
+
+printf '== %s\n' "$(msg 'Desinstalação mantendo configuração e dados' 'Uninstall keeping configuration and data')"
+AMPCONTROL_LANGUAGE=pt-BR "$MAINTENANCE" uninstall --yes
+assert_program_removed
+[[ -f /etc/ampcontrol/config.toml && -d /var/lib/ampcontrol/data && -d /var/backups/ampcontrol ]] ||
+    fail "$(msg 'configuração, dados ou backups não foram mantidos' 'configuration, data or backups were not kept')"
+[[ -f /etc/credstore.encrypted/ampcontrol.discord_token ]] ||
+    fail "$(msg 'a credencial criptografada não foi mantida' 'the encrypted credential was not kept')"
+id ampcontrol >/dev/null 2>&1 || fail "$(msg 'o usuário ampcontrol não foi mantido' 'the ampcontrol user was not kept')"
+assert_amp_untouched
+
+printf '== %s\n' "$(msg 'Reinstalação reaproveitando os dados mantidos' 'Reinstall reusing the kept data')"
+run_installer "$(printf '\n'; discord_and_amp_answers "$TOKEN_FIRST")"
+check_installation "$TOKEN_FIRST"
+
+printf '== %s\n' "$(msg 'Desinstalação com --purge' 'Uninstall with --purge')"
+AMPCONTROL_LANGUAGE=pt-BR "$MAINTENANCE" uninstall --purge --yes
+assert_program_removed
+for removed in /etc/ampcontrol /var/lib/ampcontrol /var/backups/ampcontrol \
+    /etc/credstore.encrypted/ampcontrol.discord_token /etc/credstore.encrypted/ampcontrol.amp_password; do
+    [[ ! -e "$removed" ]] || fail "$(msg 'ainda existe após --purge' 'still exists after --purge'): $removed"
+done
+! id ampcontrol >/dev/null 2>&1 || fail "$(msg 'o usuário ampcontrol ainda existe' 'the ampcontrol user still exists')"
+! getent group ampcontrol >/dev/null || fail "$(msg 'o grupo ampcontrol ainda existe' 'the ampcontrol group still exists')"
+assert_amp_untouched
+
 printf '%s\n' "$(msg 'Ensaio do instalador: OK' 'Installer rehearsal: OK')"

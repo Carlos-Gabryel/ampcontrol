@@ -154,6 +154,17 @@ Stopping or restarting the service (including during an update) does not interru
 
 Backups are stored under `/var/backups/ampcontrol`. Keep the latest backup until Discord, dashboards, Idle, and RCON have been validated.
 
+### Uninstall
+
+```bash
+sudo ampcontrol-maintenance uninstall          # keeps configuration, data and user
+sudo ampcontrol-maintenance uninstall --purge  # removes everything AmpControl created
+```
+
+The command lists what will be removed and what will be kept, and asks you to type `remove` (use `--yes` to skip the prompt). Without `--purge` it stops and disables the service and removes the unit and its drop-ins, the sudoers rule, the `ampcontrol-amp` wrapper, `/usr/lib/ampcontrol` and `ampcontrol-maintenance` itself. It keeps `/etc/ampcontrol`, the encrypted credentials (`/etc/credstore.encrypted/ampcontrol.*`), `/var/lib/ampcontrol`, `/var/backups/ampcontrol` and the `ampcontrol` user; reinstalling reuses that data. With `--purge`, all of that is removed too, including the `ampcontrol` user and group.
+
+AMP, the `amp` user, game instances and `ampinstmgr` are never touched.
+
 ## 8. Migrate a legacy installation
 
 Legacy `/opt/ampcontrol` installations based on `.env` should use the transactional migrator:

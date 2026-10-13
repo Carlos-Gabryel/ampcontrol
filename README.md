@@ -151,6 +151,8 @@ sudo ampcontrol-maintenance status
 sudo ampcontrol-maintenance rollback
 ```
 
+Para desinstalar: `sudo ampcontrol-maintenance uninstall` (mantém configuração e dados) ou `--purge` (remove tudo); veja a [documentação](docs/INSTALLATION.md#desinstalar). O AMP nunca é tocado.
+
 Instalações antigas em `/opt/ampcontrol` possuem uma [migração transacional documentada](docs/INSTALLATION.md#8-migrar-uma-instalação-antiga), com pré-validação somente leitura e restauração automática em caso de falha.
 
 ## ⌨️ Comandos
