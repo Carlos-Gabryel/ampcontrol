@@ -12,10 +12,10 @@ Este guia instala uma cópia nova do AmpControl sem alterar as instâncias de jo
 - Git;
 - Python 3 (leitura segura da configuração legada);
 - `curl`, `tar` e `sha256sum` para atualizações;
-- Go 1.26.9 ou superior, salvo se usar `--binary`;
+- Go 1.26.9 ou superior, somente ao instalar a partir do código-fonte (o pacote de release e `--binary` dispensam Go);
 - um servidor Discord e permissão para adicionar aplicações.
 
-O instalador precisa de terminal interativo e deve ser executado na raiz do repositório.
+O instalador precisa de terminal interativo e deve ser executado na raiz do repositório ou do pacote de release extraído.
 
 ## 2. Criar a aplicação Discord
 
@@ -54,6 +54,25 @@ Conceda somente as permissões correspondentes a essas ações. Iniciar, parar, 
 Valide o login diretamente no AMP antes de executar o instalador. Não reutilize a conta principal do administrador.
 
 ## 4. Executar o instalador
+
+### Pelo pacote de release (recomendado, não precisa de Go)
+
+Escolha a versão mais recente na página de [Releases](https://github.com/Carlos-Gabryel/ampcontrol/releases) e ajuste `VERSION` e `ARCH`:
+
+```bash
+VERSION=v1.0.7   # use a versão mais recente da página de Releases
+ARCH=amd64       # ou arm64
+curl -fLO "https://github.com/Carlos-Gabryel/ampcontrol/releases/download/$VERSION/ampcontrol_${VERSION}_linux_${ARCH}.tar.gz"
+curl -fLO "https://github.com/Carlos-Gabryel/ampcontrol/releases/download/$VERSION/checksums.txt"
+sha256sum -c --ignore-missing checksums.txt
+tar -xzf "ampcontrol_${VERSION}_linux_${ARCH}.tar.gz"
+cd "ampcontrol_${VERSION}_linux_${ARCH}"
+sudo ./scripts/install.sh
+```
+
+O pacote já traz o binário compilado e o instalador o usa automaticamente.
+
+### A partir do código-fonte (requer Go 1.26.9+)
 
 ```bash
 git clone https://github.com/Carlos-Gabryel/ampcontrol.git

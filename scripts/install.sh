@@ -46,7 +46,7 @@ show_usage() {
 Usage: sudo ./scripts/install.sh [--language pt-BR|en-US] [--binary PATH] [--no-start] [--migrate-legacy DIRECTORY]
 
   --language         selects the installation language
-  --binary PATH      installs an already compiled binary
+  --binary PATH      installs an already compiled binary (a release package's own binary is used automatically)
   --no-start         installs without enabling or starting the service
   --migrate-legacy   imports a legacy installation, usually /opt/ampcontrol
 EOF
@@ -54,7 +54,7 @@ EOF
 Uso: sudo ./scripts/install.sh [--language pt-BR|en-US] [--binary CAMINHO] [--no-start] [--migrate-legacy DIRETÓRIO]
 
   --language         seleciona o idioma da instalação
-  --binary CAMINHO   instala um binário já compilado
+  --binary CAMINHO   instala um binário já compilado (o binário do pacote de release é usado automaticamente)
   --no-start         instala sem habilitar ou iniciar o serviço
   --migrate-legacy   importa uma instalação antiga, normalmente /opt/ampcontrol
 EOF
@@ -125,6 +125,16 @@ else
 fi
 readonly INSTALL_LANGUAGE
 export AMPCONTROL_LANGUAGE="$INSTALL_LANGUAGE"
+
+# O pacote de release traz o binário pronto e não traz go.mod; um clone do git
+# traz go.mod e compila. Sem binário, é preciso Go: falha antes das perguntas.
+if [[ -z "$BINARY_SOURCE" && ! -e "$PROJECT_DIRECTORY/go.mod" && -f "$PROJECT_DIRECTORY/ampcontrol" && -x "$PROJECT_DIRECTORY/ampcontrol" ]]; then
+    BINARY_SOURCE="$PROJECT_DIRECTORY/ampcontrol"
+    printf '%s: %s\n' "$(msg 'Usando o binário do pacote de release' 'Using the release package binary')" "$BINARY_SOURCE"
+fi
+if [[ -z "$BINARY_SOURCE" ]]; then
+    command -v go >/dev/null 2>&1 || fail "$(msg 'Go não foi encontrado; instale Go 1.26.9+ ou use --binary' 'Go was not found; install Go 1.26.9+ or use --binary')"
+fi
 
 command -v systemctl >/dev/null 2>&1 || fail "$(msg 'dependência ausente' 'missing dependency'): systemctl"
 # systemd-creds e LoadCredentialEncrypted só existem a partir do systemd 250.
