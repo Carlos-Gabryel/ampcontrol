@@ -89,6 +89,30 @@ Mensagens transitórias são removidas após o tempo configurado. Cada cartão o
 | 🟡 | **Idle** | Instância ligada, mas processo do jogo parado para economizar recursos. |
 | 🔴 | **Offline** | Instância AMP desligada. |
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/card-online.png" alt="Card do Valheim online, com endereço e código de convite" width="260"><br><sub>🟢 Online, com o código de convite do Valheim</sub></td>
+    <td align="center"><img src="docs/images/card-idle.png" alt="Card do Satisfactory em Idle" width="260"><br><sub>🟡 Idle: instância ligada, jogo parado</sub></td>
+    <td align="center"><img src="docs/images/card-offline.png" alt="Card do Palworld offline" width="260"><br><sub>🔴 Offline</sub></td>
+  </tr>
+</table>
+
+Um `/amp iniciar` (ou o botão **Iniciar** do card) responde só para quem pediu e acompanha a operação até o fim:
+
+<p>
+  <img src="docs/images/command-start.png" alt="Resposta Iniciando Fabrica de Monstro" width="410"><br>
+  <img src="docs/images/command-start-done.png" alt="Resposta de sucesso ao iniciar" width="410">
+</p>
+
+O Idle avisa antes de encerrar o jogo e diz como voltar a jogar; cada comando fica registrado no canal privado de auditoria:
+
+<p>
+  <img src="docs/images/idle-notice.png" alt="Avisos do Idle automático no Discord" width="410"><br>
+  <img src="docs/images/audit.png" alt="Registro de auditoria de um comando" width="410">
+</p>
+
+<sub>Capturas de uma instalação real, com endereços e identificadores ocultados.</sub>
+
 Os comandos podem ser restritos a um único canal. O botão administrativo que abre a instância no AMP e os comandos `/ampconfig` ficam disponíveis somente para quem foi autorizado.
 
 ## 🚀 Instalação rápida

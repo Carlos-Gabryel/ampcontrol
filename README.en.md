@@ -76,6 +76,30 @@ The selected channel contains a pinned user guide followed by one interactive ca
 | 🟡 | **Idle** | AMP is running, but the game process is stopped to save resources. |
 | 🔴 | **Offline** | The AMP instance is shut down. |
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/card-online.png" alt="Online Valheim card with address and join code" width="260"><br><sub>🟢 Online, with the Valheim join code</sub></td>
+    <td align="center"><img src="docs/images/card-idle.png" alt="Satisfactory card in Idle" width="260"><br><sub>🟡 Idle: instance up, game stopped</sub></td>
+    <td align="center"><img src="docs/images/card-offline.png" alt="Offline Palworld card" width="260"><br><sub>🔴 Offline</sub></td>
+  </tr>
+</table>
+
+`/amp iniciar` (or the card's **Start** button) replies only to the requester and follows the operation to the end:
+
+<p>
+  <img src="docs/images/command-start.png" alt="Starting Fabrica de Monstro reply" width="410"><br>
+  <img src="docs/images/command-start-done.png" alt="Successful start reply" width="410">
+</p>
+
+Idle warns before stopping the game and explains how to play again; every command is recorded in the private audit channel:
+
+<p>
+  <img src="docs/images/idle-notice.png" alt="Automatic Idle notices in Discord" width="410"><br>
+  <img src="docs/images/audit.png" alt="Audit entry for a command" width="410">
+</p>
+
+<sub>Screenshots from a real installation in pt-BR, with addresses and identifiers hidden. With `language = "en-US"` the bot replies in English.</sub>
+
 Commands may be restricted to this channel. The AMP management link and `/ampconfig` remain administrative.
 
 ## 🚀 Quick installation
