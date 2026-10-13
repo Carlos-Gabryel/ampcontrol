@@ -166,6 +166,8 @@ AMPCONTROL_LANGUAGE=pt-BR "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --help 
 "$PROJECT_DIRECTORY/scripts/migration-preflight.sh" --language en-US --help | grep -q -- '^Usage:'
 "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'rollback'
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'latest stable GitHub release'
+"$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'uninstall \[--purge\] \[--yes\]'
+AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'never touched'
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Missing01 >"$TEMP_DIRECTORY/english-error.out" 2>&1 || true
 grep -q "instance 'Missing01' does not exist" "$TEMP_DIRECTORY/english-error.out" || fail "$(msg 'mensagem em inglês do wrapper não foi aplicada' 'the wrapper English message was not applied')"
 

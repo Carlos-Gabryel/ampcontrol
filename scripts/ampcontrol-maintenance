@@ -11,6 +11,13 @@ readonly MAINTENANCE_PATH="/usr/local/sbin/ampcontrol-maintenance"
 readonly SERVICE_PATH="/etc/systemd/system/ampcontrol.service"
 readonly STATE_DIRECTORY="/var/lib/ampcontrol/update-state"
 readonly BACKUP_ROOT="/var/backups/ampcontrol"
+readonly SERVICE_USER="ampcontrol"
+readonly SERVICE_GROUP="ampcontrol"
+readonly CONFIG_DIRECTORY="/etc/ampcontrol"
+readonly DATA_DIRECTORY="/var/lib/ampcontrol"
+readonly CREDENTIAL_DIRECTORY="/etc/credstore.encrypted"
+readonly SUDOERS_PATH="/etc/sudoers.d/ampcontrol"
+readonly DROPIN_DIRECTORY="/etc/systemd/system/ampcontrol.service.d"
 
 TEMP_DIRECTORY=""
 LANGUAGE="${AMPCONTROL_LANGUAGE:-}"
@@ -36,16 +43,26 @@ Usage:
   sudo ampcontrol-maintenance update [vVERSION]
   sudo ampcontrol-maintenance rollback [BACKUP_DIRECTORY]
   sudo ampcontrol-maintenance status
+  sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
 Without a version, update installs the latest stable GitHub release.
+uninstall removes the service, binaries and sudoers rule but keeps the
+configuration, credentials, data, backups and the service user; --purge also
+removes those. AMP and game instances are never touched. --yes skips the
+confirmation prompt.
 EOF
     else cat <<'EOF'
 Uso:
   sudo ampcontrol-maintenance update [vVERSÃO]
   sudo ampcontrol-maintenance rollback [DIRETÓRIO_DE_BACKUP]
   sudo ampcontrol-maintenance status
+  sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
 Sem uma versão, update instala a release estável mais recente do GitHub.
+uninstall remove o serviço, os binários e a regra do sudoers, mas mantém a
+configuração, as credenciais, os dados, os backups e o usuário do serviço;
+--purge remove também esses itens. O AMP e as instâncias de jogo nunca são
+tocados. --yes pula a pergunta de confirmação.
 EOF
     fi
 }
@@ -185,6 +202,113 @@ show_status() {
     fi
 }
 
+# Desinstala o AmpControl. Só toca em caminhos do próprio AmpControl; nunca no
+# AMP, no usuário amp, nas instâncias ou no ampinstmgr. Itens ausentes são
+# ignorados, então rodar de novo é seguro.
+uninstall_ampcontrol() {
+    local purge=0 assume_yes=0 argument
+    for argument in "$@"; do
+        case "$argument" in
+            --purge) purge=1 ;;
+            --yes|-y) assume_yes=1 ;;
+            *) usage >&2; exit 2 ;;
+        esac
+    done
+
+    local -a credentials=()
+    local credential
+    if [[ -d "$CREDENTIAL_DIRECTORY" ]]; then
+        for credential in "$CREDENTIAL_DIRECTORY"/ampcontrol.*; do
+            if [[ -e "$credential" ]]; then credentials+=("$credential"); fi
+        done
+    fi
+
+    printf '%s
+' "$(msg 'Será removido:' 'Will be removed:')"
+    printf '  %s (+ %s)
+' "$SERVICE_PATH" "$DROPIN_DIRECTORY"
+    printf '  %s
+  %s
+  %s
+  %s
+' "$SUDOERS_PATH" "$WRAPPER_PATH" "$LIB_DIRECTORY" "$MAINTENANCE_PATH"
+    if ((purge)); then
+        printf '  %s
+  %s
+  %s
+' "$CONFIG_DIRECTORY" "$DATA_DIRECTORY" "$BACKUP_ROOT"
+        for credential in "${credentials[@]}"; do printf '  %s
+' "$credential"; done
+        printf '  %s %s:%s
+' "$(msg 'usuário/grupo' 'user/group')" "$SERVICE_USER" "$SERVICE_GROUP"
+    else
+        printf '
+%s
+' "$(msg 'Será mantido (a reinstalação reaproveita tudo isto):' 'Will be kept (reinstalling reuses all of this):')"
+        printf '  %s
+  %s
+  %s
+' "$CONFIG_DIRECTORY" "$DATA_DIRECTORY" "$BACKUP_ROOT"
+        for credential in "${credentials[@]}"; do printf '  %s
+' "$credential"; done
+        printf '  %s %s:%s
+' "$(msg 'usuário/grupo' 'user/group')" "$SERVICE_USER" "$SERVICE_GROUP"
+        printf '%s
+' "$(msg 'Use --purge para remover também a configuração, as credenciais, os dados, os backups e o usuário.' 'Use --purge to also remove the configuration, credentials, data, backups and user.')"
+    fi
+    printf '
+%s
+
+' "$(msg 'O AMP, o usuário amp e as instâncias de jogo NÃO são tocados.' 'AMP, the amp user and game instances are NOT touched.')"
+
+    if ((! assume_yes)); then
+        local word answer=""
+        word="$(msg 'remover' 'remove')"
+        printf '%s ' "$(msg "Digite '$word' para confirmar:" "Type '$word' to confirm:")"
+        read -r answer || true
+        if [[ "${answer,,}" != "$word" ]]; then
+            printf '
+'
+            fail "$(msg 'desinstalação cancelada; nada foi removido' 'uninstall cancelled; nothing was removed')"
+        fi
+    fi
+
+    systemctl stop ampcontrol.service 2>/dev/null || true
+    systemctl disable ampcontrol.service >/dev/null 2>&1 || true
+    rm -f -- "$SERVICE_PATH"
+    rm -rf -- "$DROPIN_DIRECTORY"
+    systemctl daemon-reload || true
+    systemctl reset-failed ampcontrol.service >/dev/null 2>&1 || true
+    # Só o arquivo do AmpControl; outros arquivos do sudoers.d ficam como estão.
+    rm -f -- "$SUDOERS_PATH"
+    rm -f -- "$WRAPPER_PATH"
+    rm -rf -- "$LIB_DIRECTORY"
+
+    if ((purge)); then
+        rm -rf -- "$CONFIG_DIRECTORY" "$DATA_DIRECTORY" "$BACKUP_ROOT"
+        if ((${#credentials[@]})); then
+            rm -f -- "${credentials[@]}"
+            rmdir -- "$CREDENTIAL_DIRECTORY" 2>/dev/null || true
+        fi
+        if getent passwd "$SERVICE_USER" >/dev/null; then
+            userdel "$SERVICE_USER" || true
+        fi
+        if getent group "$SERVICE_GROUP" >/dev/null; then
+            groupdel "$SERVICE_GROUP" || true
+        fi
+    fi
+
+    # Por último: o próprio script (o bash já o abriu, então segue rodando).
+    rm -f -- "$MAINTENANCE_PATH"
+
+    printf '%s
+' "$(msg 'AmpControl desinstalado.' 'AmpControl uninstalled.')"
+    if ((! purge)); then
+        printf '%s
+' "$(msg "Mantidos: $CONFIG_DIRECTORY, $DATA_DIRECTORY, $BACKUP_ROOT e o usuário $SERVICE_USER. Reinstalar reaproveita esses dados." "Kept: $CONFIG_DIRECTORY, $DATA_DIRECTORY, $BACKUP_ROOT and the $SERVICE_USER user. Reinstalling reuses this data.")"
+    fi
+}
+
 case "${1:-}" in
     update)
         require_root
@@ -202,6 +326,10 @@ case "${1:-}" in
     status)
         require_root
         show_status
+        ;;
+    uninstall)
+        require_root
+        uninstall_ampcontrol "${@:2}"
         ;;
     -h|--help|help)
         usage
