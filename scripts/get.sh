@@ -32,6 +32,7 @@ main() {
         if [[ "$GET_LANGUAGE" == "en-US" ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi
     }
 
+    # shellcheck disable=SC2317,SC2329 # chamada pelo trap
     cleanup() {
         if [[ -n "$TEMP_DIRECTORY" && -d "$TEMP_DIRECTORY" ]]; then
             rm -rf -- "$TEMP_DIRECTORY"
