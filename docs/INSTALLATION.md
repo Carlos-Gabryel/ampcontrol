@@ -9,7 +9,7 @@ Este guia instala uma cópia nova do AmpControl sem alterar as instâncias de jo
 - Linux com systemd **250 ou superior** (`systemd-creds` e `LoadCredentialEncrypted`), por exemplo Ubuntu 24.04 ou Debian 12. Ubuntu 22.04 e Debian 11 trazem versões anteriores e não são suportados. Confira com `systemctl --version`;
 - AMP instalado na mesma máquina;
 - usuário com `sudo`;
-- Git;
+- Git, somente ao instalar a partir do código-fonte;
 - Python 3 (leitura segura da configuração legada);
 - `curl`, `tar` e `sha256sum` para atualizações;
 - Go 1.26.9 ou superior, somente ao instalar a partir do código-fonte (o pacote de release e `--binary` dispensam Go);

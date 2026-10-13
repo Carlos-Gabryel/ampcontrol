@@ -9,7 +9,7 @@ This guide installs AmpControl without modifying game instances. Use a maintenan
 - Linux with systemd **250 or later** (`systemd-creds` and `LoadCredentialEncrypted`), e.g. Ubuntu 24.04 or Debian 12. Ubuntu 22.04 and Debian 11 ship older versions and are not supported. Check with `systemctl --version`;
 - AMP installed on the same host;
 - a user with `sudo` access;
-- Git and Python 3;
+- Python 3, plus Git only when installing from source;
 - `curl`, `tar`, and `sha256sum` for updates;
 - Go 1.26.9+, only when installing from source (the release package and `--binary` do not need Go);
 - a Discord server where you may install applications.
