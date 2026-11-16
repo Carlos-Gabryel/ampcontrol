@@ -154,6 +154,12 @@ unset INSTALLER_LOG
 check_installation "$TOKEN_FIRST"
 systemctl is-enabled --quiet ampcontrol-update.timer ||
     fail "$(msg 'o timer de atualização automática não ficou habilitado' 'the automatic update timer was not enabled')"
+for heartbeat_unit in ampcontrol-heartbeat.service ampcontrol-heartbeat.timer; do
+    [[ -f "/etc/systemd/system/$heartbeat_unit" ]] ||
+        fail "$(msg 'unit do heartbeat ausente' 'missing heartbeat unit'): $heartbeat_unit"
+done
+! systemctl is-enabled --quiet ampcontrol-heartbeat.timer ||
+    fail "$(msg 'o timer do heartbeat não deveria estar habilitado' 'the heartbeat timer should not be enabled')"
 # Binário de teste não é uma release vX.Y.Z: o auto-update não faz nada.
 AMPCONTROL_LATEST_VERSION=v9.9.9 /usr/local/sbin/ampcontrol-maintenance auto-update | grep -qiE 'stable release|release estável' ||
     fail "$(msg 'o auto-update não ignorou um binário de desenvolvimento' 'auto-update did not skip a development binary')"
@@ -221,7 +227,8 @@ assert_program_removed() {
     local removed
     for removed in /etc/systemd/system/ampcontrol.service /etc/systemd/system/ampcontrol.service.d \
         /etc/sudoers.d/ampcontrol /usr/local/bin/ampcontrol-amp /usr/lib/ampcontrol /usr/local/sbin/ampcontrol-maintenance \
-        /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer; do
+        /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer \
+        /etc/systemd/system/ampcontrol-heartbeat.service /etc/systemd/system/ampcontrol-heartbeat.timer; do
         [[ ! -e "$removed" ]] || fail "$(msg 'ainda existe após a desinstalação' 'still exists after uninstall'): $removed"
     done
 }
