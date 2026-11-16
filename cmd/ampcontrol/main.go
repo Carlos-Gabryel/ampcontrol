@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Carlos-Gabryel/ampcontrol/internal/app"
+	discordClient "github.com/Carlos-Gabryel/ampcontrol/internal/discord"
 	"github.com/Carlos-Gabryel/ampcontrol/internal/i18n"
 )
 
@@ -17,6 +19,11 @@ var version = "dev"
 // shutdownTimeout cobre a operação manual mais longa (14 minutos) com folga;
 // a unidade systemd usa TimeoutStopSec maior que este valor.
 const shutdownTimeout = 15 * time.Minute
+
+// ExitDiscordAuthFailed é o status de saída quando o Discord recusa o token
+// (4004). A unit systemd o lista em RestartPreventExitStatus para não ficar
+// reiniciando em loop.
+const ExitDiscordAuthFailed = 78
 
 func main() {
 	if len(os.Args) == 2 {
@@ -56,10 +63,19 @@ func main() {
 	if err != nil {
 		fmt.Println(i18n.T(i18n.DiscordError))
 		fmt.Println(err)
+		if errors.Is(err, discordClient.ErrAuthenticationFailed) {
+			os.Exit(ExitDiscordAuthFailed)
+		}
 		os.Exit(1)
 	}
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case <-application.Discord.AuthFailed():
+		// O gateway parou de reconectar por causa do 4004: sem sair, o
+		// processo ficaria vivo e desconectado.
+		os.Exit(ExitDiscordAuthFailed)
+	}
 	// Devolve o comportamento padrão dos sinais: um segundo Ctrl+C encerra
 	// na hora, sem esperar as operações.
 	cancel()

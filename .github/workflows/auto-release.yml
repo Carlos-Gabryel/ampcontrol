@@ -29,8 +29,14 @@ jobs:
         run: |
           last="$(git describe --tags --abbrev=0 --match 'v*')"
           echo "last=$last" >> "$GITHUB_OUTPUT"
+          # Só lança sozinho quando TODOS os commits desde a última tag são do
+          # Dependabot; qualquer commit humano fica para uma release manual.
+          humans="$(git log --format='%an' "$last"..HEAD | grep -vxF 'dependabot[bot]' || true)"
           if git diff --quiet "$last" HEAD -- go.mod go.sum; then
             echo "no dependency changes since $last"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif [[ -n "$humans" ]]; then
+            echo "commits by people since $last ($(sort -u <<<"$humans" | paste -sd, -)); leaving the release to a maintainer"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "dependency changes since $last"

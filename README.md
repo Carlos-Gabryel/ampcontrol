@@ -192,6 +192,15 @@ journalctl -u ampcontrol-update.service                # histórico
 
 Instalações antigas em `/opt/ampcontrol` possuem uma [migração transacional documentada](docs/INSTALLATION.md#8-migrar-uma-instalação-antiga), com pré-validação somente leitura e restauração automática em caso de falha.
 
+### Trocar o token do bot
+
+Use quando o Discord invalidou o token (por exemplo, após **Reset Token**): o log mostra `4004`/`Authentication failed` e o serviço fica parado com status 78 em vez de reiniciar em loop.
+
+1. No Developer Portal, abra sua aplicação → **Bot** → **Reset Token** e copie o novo token.
+2. No servidor, rode `sudo ampcontrol-maintenance set-token` e cole o token (a digitação não aparece).
+
+O comando confere o token com o Discord antes de alterar qualquer coisa, reinicia o bot e, se ele não conectar, restaura o token anterior.
+
 ## ⌨️ Comandos
 
 ### Para todos os usuários

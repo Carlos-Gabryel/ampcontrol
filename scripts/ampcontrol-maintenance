@@ -45,6 +45,7 @@ Usage:
   sudo ampcontrol-maintenance update [vVERSION]
   sudo ampcontrol-maintenance auto-update
   sudo ampcontrol-maintenance rollback [BACKUP_DIRECTORY]
+  sudo ampcontrol-maintenance set-token
   sudo ampcontrol-maintenance status
   sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
@@ -57,12 +58,17 @@ uninstall removes the service, binaries and sudoers rule but keeps the
 configuration, credentials, data, backups and the service user; --purge also
 removes those. AMP and game instances are never touched. --yes skips the
 confirmation prompt.
+set-token replaces the Discord bot token (e.g. after Reset Token in the
+Developer Portal): it reads the token without echo (or from stdin), checks it
+with Discord, restarts the bot and restores the old token if it does not
+connect.
 EOF
     else cat <<'EOF'
 Uso:
   sudo ampcontrol-maintenance update [vVERSÃO]
   sudo ampcontrol-maintenance auto-update
   sudo ampcontrol-maintenance rollback [DIRETÓRIO_DE_BACKUP]
+  sudo ampcontrol-maintenance set-token
   sudo ampcontrol-maintenance status
   sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
@@ -75,6 +81,9 @@ uninstall remove o serviço, os binários e a regra do sudoers, mas mantém a
 configuração, as credenciais, os dados, os backups e o usuário do serviço;
 --purge remove também esses itens. O AMP e as instâncias de jogo nunca são
 tocados. --yes pula a pergunta de confirmação.
+set-token troca o token do bot do Discord (ex.: depois de Reset Token no
+Developer Portal): lê o token sem eco (ou da entrada padrão), confere com o
+Discord, reinicia o bot e restaura o token antigo se ele não conectar.
 EOF
     fi
 }
@@ -93,6 +102,36 @@ latest_version() {
     curl -fsSL -H 'Accept: application/vnd.github+json' \
         "https://api.github.com/repos/$REPOSITORY/releases/latest" |
         python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])'
+}
+
+# Mesmas funções de scripts/install.sh (discord_application_id_from_token,
+# valid_discord_bot_token e discord_token_help): mantenha as duas cópias iguais.
+discord_application_id_from_token() {
+    local segment="${1%%.*}"
+    local decoded=""
+    segment="${segment//-/+}"
+    segment="${segment//_//}"
+    while ((${#segment} % 4 != 0)); do segment+="="; done
+    decoded="$(printf '%s' "$segment" | base64 -d 2>/dev/null || true)"
+    if [[ "$decoded" =~ ^[0-9]{17,20}$ ]]; then
+        printf '%s' "$decoded"
+    fi
+    return 0
+}
+
+# Token de bot válido: três segmentos não vazios separados por ponto e o
+# primeiro decodifica para o ID da aplicação. Nunca imprime o valor.
+valid_discord_bot_token() {
+    local token="$1"
+    local first="" second="" third="" rest=""
+    [[ "$token" == *.*.* ]] || return 1
+    IFS=. read -r first second third rest <<<"$token"
+    [[ -n "$first" && -n "$second" && -n "$third" && -z "$rest" ]] || return 1
+    [[ -n "$(discord_application_id_from_token "$token")" ]]
+}
+
+discord_token_help() {
+    msg 'Isto não parece um token de bot. Use Developer Portal → sua aplicação → Bot → Reset Token (não use Client Secret nem Public Key). O token tem três partes separadas por ponto.' 'This does not look like a bot token. Use Developer Portal → your application → Bot → Reset Token (do not use the Client Secret or Public Key). The token has three parts separated by dots.'
 }
 
 # Diretório de estado do root: nunca seguir link simbólico.
@@ -306,6 +345,81 @@ auto_update() {
     rm -f -- "$failed_marker"
 }
 
+# Troca o token do bot: valida o formato, confirma com o Discord ANTES de
+# mexer em qualquer coisa, grava a credencial criptografada e só dá o trabalho
+# por feito se o bot conectar; senão restaura a credencial anterior.
+set_token() {
+    local token="" header_file="" status_code="" curl_status=0
+    local destination="$CREDENTIAL_DIRECTORY/ampcontrol.discord_token"
+    # AMPCONTROL_DISCORD_API existe só para os testes.
+    local api="${AMPCONTROL_DISCORD_API:-https://discord.com/api/v10}"
+
+    if [[ -t 0 ]]; then
+        read -rsp "$(msg 'Novo token do bot do Discord: ' 'New Discord bot token: ')" token || true
+        printf '
+' >&2
+    else
+        IFS= read -r token || true
+    fi
+    token="${token//[[:space:]]/}"
+    if ! valid_discord_bot_token "$token"; then
+        token=""
+        fail "$(discord_token_help)"
+    fi
+
+    # O token vai num arquivo 0600 (umask 077) e não no argv, onde o ps o mostraria.
+    [[ -n "$TEMP_DIRECTORY" ]] || TEMP_DIRECTORY="$(mktemp -d)"
+    header_file="$TEMP_DIRECTORY/discord-header"
+    printf 'Authorization: Bot %s
+' "$token" > "$header_file"
+    status_code="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -H @"$header_file" "$api/users/@me")" || curl_status=$?
+    rm -f -- "$header_file"
+    if ((curl_status != 0)); then
+        token=""
+        fail "$(msg 'não foi possível falar com o Discord para verificar o token; nada foi alterado' 'could not reach Discord to verify the token; nothing was changed')"
+    fi
+    if [[ "$status_code" == 401 ]]; then
+        token=""
+        fail "$(msg 'o Discord recusou este token; nada foi alterado' 'Discord rejected this token; nothing was changed')"
+    fi
+    if [[ "$status_code" != 200 ]]; then
+        token=""
+        fail "$(msg "resposta inesperada do Discord (HTTP $status_code); nada foi alterado" "unexpected Discord response (HTTP $status_code); nothing was changed")"
+    fi
+
+    local backup="" temporary="$destination.new"
+    install -d -o root -g root -m 0700 "$CREDENTIAL_DIRECTORY"
+    if [[ -e "$destination" ]]; then
+        backup="$destination.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+        cp -a -- "$destination" "$backup"
+        chmod 0600 "$backup"
+    fi
+    printf '%s' "$token" | systemd-creds encrypt --with-key=host --name=discord_token - "$temporary" >/dev/null
+    token=""
+    chown root:root "$temporary"
+    chmod 0600 "$temporary"
+    mv -f -- "$temporary" "$destination"
+
+    systemctl reset-failed ampcontrol.service || true
+    local started
+    started="$(date +%s)"
+    systemctl restart ampcontrol.service || true
+    printf '%s
+' "$(msg "Verificando a conexão com o Discord (até ${AMPCONTROL_HEALTH_CHECK_SECONDS:-120} s)..." "Checking the Discord connection (up to ${AMPCONTROL_HEALTH_CHECK_SECONDS:-120} s)...")"
+    if ! { wait_for_stable_service && verify_discord_health "$started"; }; then
+        if [[ -n "$backup" ]]; then
+            cp -a -- "$backup" "$destination"
+        else
+            rm -f -- "$destination"
+        fi
+        systemctl reset-failed ampcontrol.service || true
+        systemctl restart ampcontrol.service || true
+        fail "$(msg 'o bot não conectou com o novo token; o token antigo foi restaurado' 'the bot did not connect with the new token; the old token was restored')"
+    fi
+    printf '%s
+' "$(msg 'Token atualizado e bot conectado ao Discord.' 'Token updated and the bot is connected to Discord.')"
+}
+
 show_status() {
     printf '%s: ' "$(msg 'Versão instalada' 'Installed version')"
     "$BINARY_PATH" --version
@@ -440,6 +554,10 @@ case "${1:-}" in
         fi
         [[ -n "$backup" ]] || fail "$(msg 'nenhum backup foi informado ou registrado' 'no backup was provided or recorded')"
         restore_backup "$backup"
+        ;;
+    set-token)
+        require_root
+        set_token
         ;;
     status)
         require_root

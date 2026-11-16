@@ -161,6 +161,15 @@ journalctl -u ampcontrol-update.service                # history
 
 > **Coming from v1.0.13 or earlier:** run `sudo ampcontrol-maintenance update` **twice**. The first run uses the old maintenance script, which installs the new version but does not know about the timer; the second run uses the new script and turns automatic updates on. Check with `systemctl is-enabled ampcontrol-update.timer`.
 
+### Replacing the bot token
+
+Use this when Discord invalidated the token (for example after **Reset Token**): the log shows `4004`/`Authentication failed` and the service stays stopped with status 78 instead of restarting in a loop.
+
+1. In the Developer Portal, open your application → **Bot** → **Reset Token** and copy the new token.
+2. On the server, run `sudo ampcontrol-maintenance set-token` and paste the token (typing is hidden).
+
+The command checks the token with Discord before changing anything, restarts the bot and, if it does not connect, restores the previous token.
+
 ## ⌨️ Commands
 
 ### All users
