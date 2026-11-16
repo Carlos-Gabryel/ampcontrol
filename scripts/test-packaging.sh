@@ -258,6 +258,55 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
     ! health || fail 'inactive service was accepted'
 ) || fail "$(msg 'verify_discord_health incorreto' 'verify_discord_health is wrong')"
 
+(
+    # shellcheck disable=SC2317,SC2034,SC2329
+    {
+        msg() { printf '%s' "$2"; }
+        fail() { printf 'Error: %s\n' "$1" >&2; exit 1; }
+        install() { :; }
+        chown() { :; }
+        sleep() { :; }
+        wait_for_stable_service() { return "${FAKE_STABLE_STATUS:-0}"; }
+        verify_discord_health() { return "${FAKE_HEALTH_STATUS:-0}"; }
+        systemctl() { printf 'systemctl %s\n' "$*" >> "$SET_TOKEN_CALLS"; }
+        systemd-creds() { { printf 'enc:'; cat; } > "${*: -1}"; }
+        curl() { printf '%s' "${FAKE_HTTP_CODE:-200}"; return "${FAKE_CURL_STATUS:-0}"; }
+    }
+    eval "$(sed -n '/^discord_application_id_from_token() {/,/^}/p;/^valid_discord_bot_token() {/,/^}/p;/^discord_token_help() {/,/^}/p;/^set_token() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
+    SET_TOKEN_CALLS="$TEMP_DIRECTORY/set-token-calls"
+    CREDENTIAL_DIRECTORY="$TEMP_DIRECTORY/credstore"
+    TEMP_DIRECTORY="$TEMP_DIRECTORY/set-token-work"
+    mkdir -p "$CREDENTIAL_DIRECTORY" "$TEMP_DIRECTORY"
+    credential="$CREDENTIAL_DIRECTORY/ampcontrol.discord_token"
+    good_token='MTIzNDU2Nzg5MDEyMzQ1Njc4.fake-first.token_1234'
+    reset_credential() { printf 'enc:old' > "$credential"; rm -f -- "$credential".bak-* "$credential.new"; : > "$SET_TOKEN_CALLS"; }
+    run_set_token() { ( printf '%s\n' "$1" | set_token ) >/dev/null 2>&1; }
+
+    reset_credential
+    ! run_set_token 'not-a-token' || fail 'invalid token format was accepted'
+    [[ "$(<"$credential")" == enc:old && ! -s "$SET_TOKEN_CALLS" ]] || fail 'invalid format changed something'
+
+    reset_credential
+    ! FAKE_HTTP_CODE=401 run_set_token "$good_token" || fail 'token rejected by Discord was accepted'
+    [[ "$(<"$credential")" == enc:old && ! -s "$SET_TOKEN_CALLS" ]] || fail 'rejected token changed something'
+    compgen -G "$credential.bak-*" >/dev/null && fail 'rejected token created a backup'
+
+    reset_credential
+    ! FAKE_CURL_STATUS=6 run_set_token "$good_token" || fail 'network error was accepted'
+    [[ "$(<"$credential")" == enc:old ]] || fail 'network error changed the credential'
+
+    reset_credential
+    run_set_token "  $good_token  " || fail 'valid token was rejected'
+    [[ "$(<"$credential")" == "enc:$good_token" ]] || fail 'credential was not replaced'
+    [[ "$(cat "$credential".bak-*)" == enc:old ]] || fail 'backup of the old credential is missing'
+    grep -q 'systemctl restart ampcontrol.service' "$SET_TOKEN_CALLS" || fail 'service was not restarted'
+
+    reset_credential
+    ! FAKE_HEALTH_STATUS=1 run_set_token "$good_token" || fail 'failed health check returned success'
+    [[ "$(<"$credential")" == enc:old ]] || fail 'old credential was not restored after health failure'
+    [[ "$(grep -c 'systemctl restart' "$SET_TOKEN_CALLS")" == 2 ]] || fail 'service was not restarted after restoring'
+) || fail "$(msg 'set-token incorreto' 'set-token is wrong')"
+
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Missing01 >"$TEMP_DIRECTORY/english-error.out" 2>&1 || true
 grep -q "instance 'Missing01' does not exist" "$TEMP_DIRECTORY/english-error.out" || fail "$(msg 'mensagem em inglês do wrapper não foi aplicada' 'the wrapper English message was not applied')"
 

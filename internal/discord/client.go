@@ -17,6 +17,7 @@ import (
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 )
 
@@ -72,6 +73,8 @@ type Client struct {
 	joinCodes               map[string]joinCodeEntry
 	joinCodeNow             func() time.Time
 	log                     zerolog.Logger
+	authFailed              chan struct{}
+	authFailedOnce          sync.Once
 }
 
 // PlayerCountResolver aplica os detectores específicos configurados para
@@ -110,6 +113,31 @@ type ClientConfig struct {
 	CommandServerCooldown   time.Duration
 }
 
+// ErrAuthenticationFailed indica que o Discord recusou o token do bot (4004).
+var ErrAuthenticationFailed = errors.New("discord authentication failed (4004)")
+
+// isAuthenticationFailure informa se err é o fechamento 4004 do gateway.
+func isAuthenticationFailure(err error) bool {
+	if errors.Is(err, ErrAuthenticationFailed) {
+		return true
+	}
+	var closeError *websocket.CloseError
+	return errors.As(err, &closeError) &&
+		closeError.Code == gateway.CloseEventCodeAuthenticationFailed.Code
+}
+
+// AuthFailed é fechado quando o Discord recusa o token depois da conexão
+// inicial; o processo deve sair com ExitDiscordAuthFailed.
+func (c *Client) AuthFailed() <-chan struct{} {
+	return c.authFailed
+}
+
+func (c *Client) reportAuthenticationFailure() {
+	c.log.Error().
+		Msg("Token do Discord recusado (4004). Gere um novo token no Developer Portal e rode: sudo ampcontrol-maintenance set-token")
+	c.authFailedOnce.Do(func() { close(c.authFailed) })
+}
+
 func New(
 	token string,
 	ampClient *amp.APIClient,
@@ -128,12 +156,20 @@ func New(
 		return nil, fmt.Errorf(i18n.Choose("cargos administrativos inválidos: %w", "invalid administrator roles: %w"), err)
 	}
 
+	client := &Client{authFailed: make(chan struct{})}
 	disgoClient, err := disgo.New(
 		token,
 		bot.WithGatewayConfigOpts(
 			gateway.WithIntents(
 				gateway.IntentGuilds,
 			),
+			// Chamado quando o gateway fecha sem reconectar (ex.: 4004). Sem
+			// isto o processo ficaria vivo e desconectado, sem aviso.
+			gateway.WithCloseHandler(func(_ gateway.Gateway, err error, _ bool) {
+				if isAuthenticationFailure(err) {
+					client.reportAuthenticationFailure()
+				}
+			}),
 		),
 	)
 	if err != nil {
@@ -150,7 +186,8 @@ func New(
 		discord.AllowedMentions{},
 	)
 
-	client := &Client{
+	*client = Client{
+		authFailed:             client.authFailed,
 		bot:                    disgoClient,
 		ampClient:              ampClient,
 		inventory:              config.Inventory,
@@ -394,6 +431,10 @@ func (c *Client) Start(
 		Msg("Iniciando conexão Discord")
 
 	if err := c.bot.OpenGateway(ctx); err != nil {
+		if isAuthenticationFailure(err) {
+			c.reportAuthenticationFailure()
+			return fmt.Errorf("%w: %w", ErrAuthenticationFailed, err)
+		}
 		return err
 	}
 

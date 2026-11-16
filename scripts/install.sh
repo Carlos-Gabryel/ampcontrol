@@ -271,7 +271,9 @@ discord_application_id_from_token() {
     return 0
 }
 
-# Token de bot válido: três segmentos não vazios separados por ponto e o
+# Token de bot válido (cópia em scripts/ampcontrol-maintenance, junto com
+# discord_application_id_from_token e discord_token_help: mantenha iguais):
+# três segmentos não vazios separados por ponto e o
 # primeiro decodifica para o ID da aplicação. Nunca imprime o valor.
 valid_discord_bot_token() {
     local token="$1"
