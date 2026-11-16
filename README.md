@@ -188,6 +188,8 @@ systemctl list-timers ampcontrol-update.timer          # próxima execução
 journalctl -u ampcontrol-update.service                # histórico
 ```
 
+> **Vindo da v1.0.13 ou anterior:** rode `sudo ampcontrol-maintenance update` **duas vezes**. A primeira usa o script de manutenção antigo, que instala a versão nova mas não conhece o timer; a segunda já usa o script novo e liga a atualização automática. Confira com `systemctl is-enabled ampcontrol-update.timer`.
+
 Instalações antigas em `/opt/ampcontrol` possuem uma [migração transacional documentada](docs/INSTALLATION.md#8-migrar-uma-instalação-antiga), com pré-validação somente leitura e restauração automática em caso de falha.
 
 ## ⌨️ Comandos
