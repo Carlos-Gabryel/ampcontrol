@@ -227,7 +227,8 @@ assert_program_removed() {
     local removed
     for removed in /etc/systemd/system/ampcontrol.service /etc/systemd/system/ampcontrol.service.d \
         /etc/sudoers.d/ampcontrol /usr/local/bin/ampcontrol-amp /usr/lib/ampcontrol /usr/local/sbin/ampcontrol-maintenance \
-        /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer \n        /etc/systemd/system/ampcontrol-heartbeat.service /etc/systemd/system/ampcontrol-heartbeat.timer; do
+        /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer \
+        /etc/systemd/system/ampcontrol-heartbeat.service /etc/systemd/system/ampcontrol-heartbeat.timer; do
         [[ ! -e "$removed" ]] || fail "$(msg 'ainda existe após a desinstalação' 'still exists after uninstall'): $removed"
     done
 }

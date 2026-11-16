@@ -318,8 +318,6 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
         HEARTBEAT_ENV_PATH="$HB_ROOT/heartbeat.env"
         HEARTBEAT_FILE="$HB_ROOT/discord-heartbeat"
         HEARTBEAT_MAX_AGE=180
-        TEMP_DIRECTORY="$HB_ROOT/tmp"
-        mkdir -p "$TEMP_DIRECTORY"
         CURL_ARGS="$HB_ROOT/curl-args"
         CURL_BODY="$HB_ROOT/curl-body"
         CURL_HEADER="$HB_ROOT/curl-header"
@@ -345,13 +343,14 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
     }
     eval "$(sed -n '/^read_heartbeat_config() {/,/^}/p;/^heartbeat() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
     secret='s3cr3t-hb-token'
-    printf 'HEARTBEAT_URL=https://example.test/hook\nHEARTBEAT_TOKEN="%s"\n$(touch %s/pwned)\n' "$secret" "$HB_ROOT" > "$HEARTBEAT_ENV_PATH"
+    write_config() { printf 'HEARTBEAT_URL=https://example.test/hook\nHEARTBEAT_TOKEN="%s"\n%s\n' "$secret" "\$(touch $HB_ROOT/pwned)" > "$HEARTBEAT_ENV_PATH"; }
+    write_config
     send() { rm -f -- "$CURL_ARGS" "$CURL_BODY"; heartbeat 2>"$HB_ROOT/stderr"; }
 
     rm -f -- "$HEARTBEAT_ENV_PATH"
     send || fail 'missing config should exit 0'
     [[ ! -e "$CURL_ARGS" ]] || fail 'POST sent without configuration'
-    printf 'HEARTBEAT_URL=https://example.test/hook\nHEARTBEAT_TOKEN="%s"\n$(touch %s/pwned)\n' "$secret" "$HB_ROOT" > "$HEARTBEAT_ENV_PATH"
+    write_config
     [[ ! -e "$HB_ROOT/pwned" ]] || fail 'config file was executed'
 
     FAKE_STATE=inactive send >/dev/null || fail 'inactive service heartbeat failed'
