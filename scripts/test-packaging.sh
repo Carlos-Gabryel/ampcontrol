@@ -273,10 +273,10 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
         curl() { printf '%s' "${FAKE_HTTP_CODE:-200}"; return "${FAKE_CURL_STATUS:-0}"; }
     }
     eval "$(sed -n '/^discord_application_id_from_token() {/,/^}/p;/^valid_discord_bot_token() {/,/^}/p;/^discord_token_help() {/,/^}/p;/^set_token() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
-    SET_TOKEN_CALLS="$TEMP_DIRECTORY/set-token-calls"
-    CREDENTIAL_DIRECTORY="$TEMP_DIRECTORY/credstore"
-    TEMP_DIRECTORY="$TEMP_DIRECTORY/set-token-work"
-    mkdir -p "$CREDENTIAL_DIRECTORY" "$TEMP_DIRECTORY"
+    SET_TOKEN_ROOT="$TEMP_DIRECTORY/set-token"
+    SET_TOKEN_CALLS="$SET_TOKEN_ROOT/calls"
+    CREDENTIAL_DIRECTORY="$SET_TOKEN_ROOT/credstore"
+    mkdir -p "$CREDENTIAL_DIRECTORY"
     credential="$CREDENTIAL_DIRECTORY/ampcontrol.discord_token"
     good_token='MTIzNDU2Nzg5MDEyMzQ1Njc4.fake-first.token_1234'
     reset_credential() { printf 'enc:old' > "$credential"; rm -f -- "$credential".bak-* "$credential.new"; : > "$SET_TOKEN_CALLS"; }
