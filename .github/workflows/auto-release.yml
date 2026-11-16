@@ -41,7 +41,7 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         uses: actions/setup-go@v7
         with:
-          go-version: stable
+          go-version: '1.26.x'
           check-latest: true
           cache-dependency-path: go.sum
 
