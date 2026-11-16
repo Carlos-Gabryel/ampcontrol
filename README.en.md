@@ -159,6 +159,8 @@ systemctl list-timers ampcontrol-update.timer          # next run
 journalctl -u ampcontrol-update.service                # history
 ```
 
+> **Coming from v1.0.13 or earlier:** run `sudo ampcontrol-maintenance update` **twice**. The first run uses the old maintenance script, which installs the new version but does not know about the timer; the second run uses the new script and turns automatic updates on. Check with `systemctl is-enabled ampcontrol-update.timer`.
+
 ## ⌨️ Commands
 
 ### All users
