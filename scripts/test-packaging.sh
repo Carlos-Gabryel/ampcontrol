@@ -202,6 +202,7 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
         UPDATE_CALLS="$TEMP_DIRECTORY/update-calls"
         : > "$UPDATE_CALLS"
         update_ampcontrol() { printf '%s\n' "$1" >> "$UPDATE_CALLS"; return "${FAKE_UPDATE_STATUS:-0}"; }
+        install_heartbeat_units() { :; }
         cleanup() { :; }
         ensure_state_directory() { mkdir -p "$STATE_DIRECTORY"; }
         systemctl() { [[ "$*" == 'is-enabled --quiet ampcontrol.service' ]] && return "${FAKE_SERVICE_DISABLED:-0}"; return 1; }
@@ -306,6 +307,99 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
     [[ "$(<"$credential")" == enc:old ]] || fail 'old credential was not restored after health failure'
     [[ "$(grep -c 'systemctl restart' "$SET_TOKEN_CALLS")" == 2 ]] || fail 'service was not restarted after restoring'
 ) || fail "$(msg 'set-token incorreto' 'set-token is wrong')"
+
+# Heartbeat: leitura segura da configuração, estado do serviço, sinal de vida e POST com stubs.
+(
+    # shellcheck disable=SC2317,SC2034,SC2329
+    {
+        msg() { printf '%s' "$2"; }
+        HB_ROOT="$TEMP_DIRECTORY/heartbeat"
+        mkdir -p "$HB_ROOT"
+        HEARTBEAT_ENV_PATH="$HB_ROOT/heartbeat.env"
+        HEARTBEAT_FILE="$HB_ROOT/discord-heartbeat"
+        HEARTBEAT_MAX_AGE=180
+        TEMP_DIRECTORY="$HB_ROOT/tmp"
+        mkdir -p "$TEMP_DIRECTORY"
+        CURL_ARGS="$HB_ROOT/curl-args"
+        CURL_BODY="$HB_ROOT/curl-body"
+        CURL_HEADER="$HB_ROOT/curl-header"
+        systemctl() {
+            case "$*" in
+                *ActiveState*) printf '%s\n' "${FAKE_STATE:-active}" ;;
+                *ExecMainStatus*) printf '%s\n' "${FAKE_EXIT:-0}" ;;
+            esac
+        }
+        date() { printf '%s\n' "${FAKE_NOW:-1000000}"; }
+        curl() {
+            local previous="" argument
+            : > "$CURL_ARGS"
+            for argument in "$@"; do
+                printf '%s\n' "$argument" >> "$CURL_ARGS"
+                [[ "$previous" == --data ]] && printf '%s' "$argument" > "$CURL_BODY"
+                [[ "$previous" == -H && "$argument" == @* ]] && cp -- "${argument#@}" "$CURL_HEADER"
+                previous="$argument"
+            done
+            printf '%s' "${FAKE_HTTP_CODE:-204}"
+            return "${FAKE_CURL_STATUS:-0}"
+        }
+    }
+    eval "$(sed -n '/^read_heartbeat_config() {/,/^}/p;/^heartbeat() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
+    secret='s3cr3t-hb-token'
+    printf 'HEARTBEAT_URL=https://example.test/hook\nHEARTBEAT_TOKEN="%s"\n$(touch %s/pwned)\n' "$secret" "$HB_ROOT" > "$HEARTBEAT_ENV_PATH"
+    send() { rm -f -- "$CURL_ARGS" "$CURL_BODY"; heartbeat 2>"$HB_ROOT/stderr"; }
+
+    rm -f -- "$HEARTBEAT_ENV_PATH"
+    send || fail 'missing config should exit 0'
+    [[ ! -e "$CURL_ARGS" ]] || fail 'POST sent without configuration'
+    printf 'HEARTBEAT_URL=https://example.test/hook\nHEARTBEAT_TOKEN="%s"\n$(touch %s/pwned)\n' "$secret" "$HB_ROOT" > "$HEARTBEAT_ENV_PATH"
+    [[ ! -e "$HB_ROOT/pwned" ]] || fail 'config file was executed'
+
+    FAKE_STATE=inactive send >/dev/null || fail 'inactive service heartbeat failed'
+    grep -q '"status": "error"' "$CURL_BODY" && grep -q 'inactive' "$CURL_BODY" || fail 'inactive service was not reported as error'
+    FAKE_STATE=failed FAKE_EXIT=78 send >/dev/null || fail 'token failure heartbeat failed'
+    grep -q 'set-token' "$CURL_BODY" || fail 'exit status 78 did not mention set-token'
+
+    rm -f -- "$HEARTBEAT_FILE"
+    send >/dev/null || fail 'never connected heartbeat failed'
+    grep -q '"status": "error"' "$CURL_BODY" || fail 'missing heartbeat file was not an error'
+    printf '%s\n' $((1000000 - 600)) > "$HEARTBEAT_FILE"
+    send >/dev/null || fail 'stale heartbeat send failed'
+    grep -q '"status": "error"' "$CURL_BODY" && grep -q '10 min' "$CURL_BODY" || fail 'stale heartbeat file was not an error'
+    printf '%s\n' $((1000000 - 30)) > "$HEARTBEAT_FILE"
+    send >/dev/null || fail 'fresh heartbeat send failed'
+    grep -q '"status": "ok"' "$CURL_BODY" && grep -q '"message": ""' "$CURL_BODY" || fail 'fresh heartbeat was not ok'
+    grep -qx 'https://example.test/hook' "$CURL_ARGS" || fail 'URL was not passed to curl'
+    grep -qx 'Content-Type: application/json' "$CURL_ARGS" || fail 'Content-Type missing'
+    [[ "$(<"$CURL_HEADER")" == "Authorization: Bearer $secret" ]] || fail 'Authorization header file is wrong'
+    ! grep -q -- "$secret" "$CURL_ARGS" "$CURL_BODY" || fail 'token leaked into curl argv or body'
+
+    FAKE_HTTP_CODE=500 send >/dev/null 2>&1 && fail 'non-2xx was accepted'
+    FAKE_CURL_STATUS=7 send >/dev/null 2>&1 && fail 'curl failure was accepted'
+    [[ -s "$HB_ROOT/stderr" ]] || fail 'failure printed nothing to stderr'
+    exit 0
+) || fail "$(msg 'heartbeat incorreto' 'heartbeat is wrong')"
+
+# Units do heartbeat embutidas: só reescreve se mudou e nunca liga o timer.
+(
+    # shellcheck disable=SC2317,SC2034,SC2329
+    {
+        HEARTBEAT_SERVICE_PATH="$TEMP_DIRECTORY/units/ampcontrol-heartbeat.service"
+        HEARTBEAT_TIMER_PATH="$TEMP_DIRECTORY/units/ampcontrol-heartbeat.timer"
+        mkdir -p "$TEMP_DIRECTORY/units"
+        SYSTEMCTL_CALLS="$TEMP_DIRECTORY/units/calls"
+        : > "$SYSTEMCTL_CALLS"
+        systemctl() { printf '%s\n' "$*" >> "$SYSTEMCTL_CALLS"; }
+    }
+    eval "$(sed -n '/^install_heartbeat_units() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
+    install_heartbeat_units
+    grep -q 'ExecStart=/usr/local/sbin/ampcontrol-maintenance heartbeat$' "$HEARTBEAT_SERVICE_PATH" || fail 'service ExecStart wrong'
+    grep -q 'Type=oneshot' "$HEARTBEAT_SERVICE_PATH" || fail 'service is not oneshot'
+    grep -q 'OnCalendar=\*:0/15' "$HEARTBEAT_TIMER_PATH" || fail 'timer schedule wrong'
+    [[ "$(<"$SYSTEMCTL_CALLS")" == daemon-reload ]] || fail 'units were not reloaded exactly once'
+    install_heartbeat_units
+    [[ "$(wc -l < "$SYSTEMCTL_CALLS" | tr -d ' ')" == 1 ]] || fail 'unchanged units triggered a reload'
+    ! grep -q enable "$SYSTEMCTL_CALLS" || fail 'timer was enabled automatically'
+) || fail "$(msg 'units do heartbeat incorretas' 'heartbeat units are wrong')"
 
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Missing01 >"$TEMP_DIRECTORY/english-error.out" 2>&1 || true
 grep -q "instance 'Missing01' does not exist" "$TEMP_DIRECTORY/english-error.out" || fail "$(msg 'mensagem em inglês do wrapper não foi aplicada' 'the wrapper English message was not applied')"

@@ -59,6 +59,7 @@ type Client struct {
 	lastDashboardError      string
 	preferencesMu           sync.RWMutex
 	preferencesPath         string
+	heartbeatPath           string
 	preferences             discordPreferences
 	gameOverridesMu         sync.RWMutex
 	idleRegistrationMu      sync.RWMutex
@@ -105,6 +106,7 @@ type ClientConfig struct {
 	GameServerAddress       string
 	StatusStatePath         string
 	PreferencesPath         string
+	HeartbeatPath           string
 	GameOverrides           map[string]string
 	PlayerCountResolver     PlayerCountResolver
 	Inventory               amp.InstanceDiscoverer
@@ -207,6 +209,7 @@ func New(
 		gameServerAddress:      strings.TrimSpace(config.GameServerAddress),
 		statusStatePath:        config.StatusStatePath,
 		preferencesPath:        config.PreferencesPath,
+		heartbeatPath:          config.HeartbeatPath,
 		preferences:            preferences,
 		idleRegistered:         instanceNameMap(config.IdleRegisteredInstances),
 		statusRefreshRequests:  make(chan struct{}, 1),
@@ -439,6 +442,19 @@ func (c *Client) Start(
 	}
 
 	go c.runStatusDashboard(ctx)
+	if c.heartbeatPath != "" {
+		go runHeartbeat(
+			ctx,
+			c.heartbeatPath,
+			heartbeatInterval,
+			func() bool {
+				return c.bot.Gateway != nil && c.bot.Gateway.Status() == gateway.StatusReady
+			},
+			func(err error) {
+				c.log.Warn().Err(err).Msg(i18n.Choose("Não foi possível gravar o sinal de vida do Discord", "Could not write the Discord heartbeat signal"))
+			},
+		)
+	}
 
 	return nil
 }
