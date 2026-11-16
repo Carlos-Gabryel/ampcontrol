@@ -222,11 +222,41 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
     [[ ! -e "$STATE_DIRECTORY/auto-update-failed" ]] || fail 'failure marker written on success'
     if FAKE_UPDATE_STATUS=1 AMPCONTROL_LATEST_VERSION=v1.10.1 auto_update >/dev/null 2>&1; then fail 'failed update returned success'; fi
     [[ "$(<"$STATE_DIRECTORY/auto-update-failed")" == v1.10.1 ]] || fail 'failure marker missing'
-    AMPCONTROL_LATEST_VERSION=v1.10.1 auto_update | grep -q 'failed before' || fail 'failed version was retried'
-    [[ "$(calls)" == 2 ]] || fail 'failed version triggered another update'
+    if FAKE_UPDATE_STATUS=1 AMPCONTROL_LATEST_VERSION=v1.10.1 auto_update >/dev/null 2>&1; then fail 'second failed update returned success'; fi
+    [[ "$(calls)" == 3 ]] || fail 'first failure was not retried on the next run'
+    AMPCONTROL_LATEST_VERSION=v1.10.1 auto_update | grep -q 'failed twice' || fail 'twice-failed version was not skipped'
+    [[ "$(calls)" == 3 ]] || fail 'twice-failed version triggered another update'
     AMPCONTROL_LATEST_VERSION=v1.10.2 auto_update >/dev/null
-    [[ "$(calls)" == 3 && ! -e "$STATE_DIRECTORY/auto-update-failed" ]] || fail 'newer release after a failure was not installed'
+    [[ "$(calls)" == 4 && ! -e "$STATE_DIRECTORY/auto-update-failed" ]] || fail 'newer release after a failure was not installed'
 ) || fail "$(msg 'lógica do auto-update incorreta' 'auto-update logic is wrong')"
+
+(
+    # shellcheck disable=SC2317,SC2034,SC2329
+    {
+        msg() { printf '%s' "$2"; }
+        JOURNAL_CALLS="$TEMP_DIRECTORY/journal-calls"
+        service_journal_since() { printf 'x\n' >> "$JOURNAL_CALLS"; printf '%s\n' "$FAKE_JOURNAL"; }
+        systemctl() { printf '%s' "${FAKE_ACTIVE:-active}"; }
+        sleep() { :; }
+    }
+    eval "$(sed -n '/^verify_discord_health() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
+    export AMPCONTROL_HEALTH_CHECK_SECONDS=10
+    health() { : > "$JOURNAL_CALLS"; verify_discord_health 0 2>/dev/null; }
+    FAKE_JOURNAL='{"level":"info","message":"Discord conectado"}'
+    health || fail 'healthy bot was rejected'
+    FAKE_JOURNAL='{"level":"info","message":"Discord connected"}'
+    health || fail 'English connected line was rejected'
+    FAKE_JOURNAL='{"level":"info","message":"started"}'
+    ! health || fail 'bot that never connected was accepted'
+    FAKE_JOURNAL=$'{"message":"Discord conectado"}\n{"message":"Discord conectado"}'
+    ! health || fail 'reconnect loop was accepted'
+    FAKE_JOURNAL='ERROR error while parsing gateway message name=bot err="unknown channel with type 20"'
+    ! health || fail 'gateway error was accepted'
+    [[ "$(wc -l < "$JOURNAL_CALLS" | tr -d ' ')" == 1 ]] || fail 'gateway error did not fail fast'
+    FAKE_JOURNAL='{"message":"Discord conectado"}'
+    FAKE_ACTIVE=failed
+    ! health || fail 'inactive service was accepted'
+) || fail "$(msg 'verify_discord_health incorreto' 'verify_discord_health is wrong')"
 
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Missing01 >"$TEMP_DIRECTORY/english-error.out" 2>&1 || true
 grep -q "instance 'Missing01' does not exist" "$TEMP_DIRECTORY/english-error.out" || fail "$(msg 'mensagem em inglês do wrapper não foi aplicada' 'the wrapper English message was not applied')"

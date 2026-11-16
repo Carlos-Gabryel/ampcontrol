@@ -50,8 +50,9 @@ Usage:
 
 Without a version, update installs the latest stable GitHub release.
 auto-update is run daily by ampcontrol-update.timer: it installs the latest
-stable release only if it is newer, rolling back on failure and skipping a
-version that failed. Disable with: systemctl disable --now ampcontrol-update.timer
+stable release only if it is newer, rolling back on failure (it also waits up to 2 minutes for the bot to connect to
+Discord without gateway errors or reconnect loops) and skipping a version that
+failed twice. Disable with: systemctl disable --now ampcontrol-update.timer
 uninstall removes the service, binaries and sudoers rule but keeps the
 configuration, credentials, data, backups and the service user; --purge also
 removes those. AMP and game instances are never touched. --yes skips the
@@ -67,8 +68,9 @@ Uso:
 
 Sem uma versão, update instala a release estável mais recente do GitHub.
 auto-update roda todo dia pelo ampcontrol-update.timer: instala a release
-estável mais recente só se for mais nova, faz rollback em caso de falha e
-ignora uma versão que já falhou. Desative com: systemctl disable --now ampcontrol-update.timer
+estável mais recente só se for mais nova, faz rollback em caso de falha (também espera até 2 minutos o bot conectar ao
+Discord sem erros de gateway nem loop de reconexão) e ignora uma versão que
+já falhou duas vezes. Desative com: systemctl disable --now ampcontrol-update.timer
 uninstall remove o serviço, os binários e a regra do sudoers, mas mantém a
 configuração, as credenciais, os dados, os backups e o usuário do serviço;
 --purge remove também esses itens. O AMP e as instâncias de jogo nunca são
@@ -127,6 +129,40 @@ wait_for_stable_service() {
         restarts="$(systemctl show ampcontrol.service --property=NRestarts --value)"
         [[ "$state" == active && "$restarts" == "$baseline" ]] || return 1
     done
+}
+
+service_journal_since() {
+    journalctl -u ampcontrol.service --since "@$1" -o cat --no-pager 2>/dev/null || true
+}
+
+# O processo pode ficar vivo com o gateway do Discord em loop de reconexão;
+# por isso exige "Discord conectado" exatamente uma vez e nenhum erro de gateway.
+verify_discord_health() {
+    local since="$1"
+    local seconds="${AMPCONTROL_HEALTH_CHECK_SECONDS:-120}"
+    local elapsed output connected
+    for (( elapsed = 0; elapsed < seconds; elapsed += 5 )); do
+        sleep 5
+        output="$(service_journal_since "$since")"
+        if grep -Eiq 'error while parsing gateway message|failed to reconnect gateway|failed to open gateway' <<<"$output"; then
+            printf '%s\n' "$(msg 'erro no gateway do Discord detectado no journal' 'Discord gateway error detected in the journal')" >&2
+            return 1
+        fi
+        if [[ "$(systemctl show ampcontrol.service --property=ActiveState --value)" != active ]]; then
+            printf '%s\n' "$(msg 'o serviço deixou de estar ativo' 'the service stopped being active')" >&2
+            return 1
+        fi
+    done
+    output="$(service_journal_since "$since")"
+    connected="$(grep -Eic 'Discord (conectado|connected)' <<<"$output" || true)"
+    if ((connected == 0)); then
+        printf '%s\n' "$(msg 'o bot não conectou ao Discord' 'the bot did not connect to Discord')" >&2
+        return 1
+    fi
+    if ((connected > 1)); then
+        printf '%s\n' "$(msg 'o bot reconectou ao Discord repetidamente' 'the bot reconnected to Discord repeatedly')" >&2
+        return 1
+    fi
 }
 
 restore_backup() {
@@ -219,9 +255,14 @@ update_ampcontrol() {
     if [[ "$timer_existed" == false && -f "$UPDATE_TIMER_PATH" ]]; then
         systemctl enable --now ampcontrol-update.timer >/dev/null 2>&1 || true
     fi
-    if ! systemctl restart ampcontrol.service || ! wait_for_stable_service; then
+    local started
+    started="$(date +%s)"
+    if ! systemctl restart ampcontrol.service || ! wait_for_stable_service || {
+        printf '%s\n' "$(msg "Verificando a conexão com o Discord (até ${AMPCONTROL_HEALTH_CHECK_SECONDS:-120} s)..." "Checking the Discord connection (up to ${AMPCONTROL_HEALTH_CHECK_SECONDS:-120} s)...")"
+        ! verify_discord_health "$started"
+    }; then
         restore_backup "$backup"
-        fail "$(msg 'a nova versão não iniciou e o rollback automático foi executado' 'the new version did not start and automatic rollback was performed')"
+        fail "$(msg 'a nova versão não iniciou ou não conectou ao Discord e o rollback automático foi executado' 'the new version did not start or did not connect to Discord and automatic rollback was performed')"
     fi
     printf '%s %s. %s: %s\n' "$(msg 'AmpControl atualizado para' 'AmpControl updated to')" "$version" "$(msg 'Backup' 'Backup')" "$backup"
 }
@@ -244,8 +285,8 @@ auto_update() {
         printf '%s (%s)\n' "$(msg 'AmpControl já está atualizado' 'AmpControl is already up to date')" "$installed"
         return 0
     fi
-    if [[ -f "$failed_marker" && "$(<"$failed_marker")" == "$latest" ]]; then
-        printf '%s\n' "$(msg "A versão $latest já falhou nesta máquina e será ignorada até sair uma release mais nova (a atualização manual com 'update' continua permitida)." "Version $latest failed before on this machine and is skipped until a newer release is published (manual 'update' is still allowed).")"
+    if [[ -f "$failed_marker" ]] && (( $(grep -cxF -- "$latest" "$failed_marker" || true) >= 2 )); then
+        printf '%s\n' "$(msg "A versão $latest já falhou duas vezes nesta máquina e será ignorada até sair uma release mais nova (a atualização manual com 'update' continua permitida)." "Version $latest failed twice on this machine and is skipped until a newer release is published (manual 'update' is still allowed).")"
         return 0
     fi
     printf '%s %s -> %s\n' "$(msg 'Atualização automática:' 'Automatic update:')" "$installed" "$latest"
@@ -258,8 +299,8 @@ auto_update() {
     set -e
     if ((status != 0)); then
         ensure_state_directory
-        printf '%s\n' "$latest" > "$failed_marker"
-        printf '%s\n' "$(msg "A atualização automática para $latest falhou e foi revertida; essa versão será ignorada." "Automatic update to $latest failed and was rolled back; this version will be skipped.")" >&2
+        printf '%s\n' "$latest" >> "$failed_marker"
+        printf '%s\n' "$(msg "A atualização automática para $latest falhou e foi revertida; a versão é ignorada após duas falhas." "Automatic update to $latest failed and was rolled back; the version is skipped after two failures.")" >&2
         return "$status"
     fi
     rm -f -- "$failed_marker"

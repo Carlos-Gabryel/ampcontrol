@@ -179,7 +179,7 @@ Para desinstalar: `sudo ampcontrol-maintenance uninstall` (mantém configuraçã
 
 ### Atualização automática
 
-Um timer do systemd (`ampcontrol-update.timer`) verifica diariamente, às 05:00 (±1h), se há uma release estável mais nova e a instala sozinho. Ele só instala versões estáveis mais novas que a atual, valida a configuração com o novo binário, faz backup e rollback automático se o serviço não subir, e pula uma versão que já falhou até sair uma mais nova (o `update` manual continua permitido).
+Um timer do systemd (`ampcontrol-update.timer`) verifica diariamente, às 05:00 (±1h), se há uma release estável mais nova e a instala sozinho. Ele só instala versões estáveis mais novas que a atual, valida a configuração com o novo binário, faz backup e rollback automático se o serviço não subir ou se o bot não conectar ao Discord em até 2 min (sem erros de gateway nem loop de reconexão), e pula uma versão que já falhou duas vezes até sair uma mais nova (o `update` manual continua permitido).
 
 ```bash
 sudo systemctl disable --now ampcontrol-update.timer   # desativar
