@@ -14,7 +14,7 @@ LoadCredentialEncrypted=discord_token:/etc/credstore.encrypted/ampcontrol.discor
 LoadCredentialEncrypted=amp_password:/etc/credstore.encrypted/ampcontrol.amp_password
 Restart=on-failure
 RestartSec=5s
-# 78 = o Discord recusou o token (4004); reiniciar n�o resolve. Use: sudo ampcontrol-maintenance set-token
+# 78 = o Discord recusou o token (4004); reiniciar não resolve. Use: sudo ampcontrol-maintenance set-token
 RestartPreventExitStatus=78
 # No stop/restart, o SIGTERM vai só para o bot, que espera as operações em
 # andamento (ex.: atualização pelo ampinstmgr) terminarem antes de sair; o
