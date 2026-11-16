@@ -233,6 +233,11 @@ auto_update() {
         printf '%s\n' "$(msg 'Versão instalada não é uma release estável (vX.Y.Z); atualização automática ignorada.' 'Installed version is not a stable release (vX.Y.Z); automatic update skipped.')"
         return 0
     fi
+    # Serviço desabilitado de propósito (ex.: instalado com --no-start): não ligar por conta própria.
+    if ! systemctl is-enabled --quiet ampcontrol.service; then
+        printf '%s\n' "$(msg 'ampcontrol.service não está habilitado; atualização automática ignorada.' 'ampcontrol.service is not enabled; automatic update skipped.')"
+        return 0
+    fi
     latest="$(latest_version)" || fail "$(msg 'não foi possível consultar a última release' 'could not query the latest release')"
     [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "$(msg 'versão inválida' 'invalid version'): $latest"
     if [[ "$latest" == "$installed" || "$(printf '%s\n%s\n' "$installed" "$latest" | sort -V | tail -n1)" != "$latest" ]]; then

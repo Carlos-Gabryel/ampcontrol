@@ -661,10 +661,12 @@ install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol
 install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.service" "$UPDATE_SERVICE_PATH"
 install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.timer" "$UPDATE_TIMER_PATH"
 systemctl daemon-reload
+# O timer fica ligado sempre; o auto-update não faz nada enquanto o
+# ampcontrol.service não estiver habilitado (instalação com --no-start).
+systemctl enable --now ampcontrol-update.timer >/dev/null
+printf '%s\n' "$(msg 'Atualização automática ativada (diária). Para desativar: sudo systemctl disable --now ampcontrol-update.timer' 'Automatic updates are on (daily). To disable: sudo systemctl disable --now ampcontrol-update.timer')"
 if [[ "$START_SERVICE" == true ]]; then
     systemctl enable ampcontrol.service >/dev/null
-    systemctl enable --now ampcontrol-update.timer >/dev/null
-    printf '%s\n' "$(msg 'Atualização automática ativada (diária). Para desativar: sudo systemctl disable --now ampcontrol-update.timer' 'Automatic updates are on (daily). To disable: sudo systemctl disable --now ampcontrol-update.timer')"
     systemctl restart ampcontrol.service
     if ! wait_for_stable_service; then
         journalctl -u ampcontrol.service -n 20 --no-pager >&2 || true

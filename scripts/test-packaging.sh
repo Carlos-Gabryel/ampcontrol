@@ -192,7 +192,7 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
 "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'auto-update'
 
 (
-    # shellcheck disable=SC2317,SC2034
+    # shellcheck disable=SC2317,SC2034,SC2329
     {
         msg() { printf '%s' "$2"; }
         fail() { printf '%s\n' "$1" >&2; exit 1; }
@@ -203,6 +203,8 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
         : > "$UPDATE_CALLS"
         update_ampcontrol() { printf '%s\n' "$1" >> "$UPDATE_CALLS"; return "${FAKE_UPDATE_STATUS:-0}"; }
         cleanup() { :; }
+        ensure_state_directory() { mkdir -p "$STATE_DIRECTORY"; }
+        systemctl() { [[ "$*" == 'is-enabled --quiet ampcontrol.service' ]] && return "${FAKE_SERVICE_DISABLED:-0}"; return 1; }
     }
     eval "$(sed -n '/^latest_version() {/,/^}/p;/^auto_update() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
     set_installed() { printf '#!/usr/bin/env bash\necho "AmpControl %s"\n' "$1" > "$BINARY_PATH"; chmod +x "$BINARY_PATH"; }
@@ -211,6 +213,8 @@ grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcon
     set_installed dev
     AMPCONTROL_LATEST_VERSION=v9.9.9 auto_update | grep -q 'not a stable release' || fail 'dev build was not skipped'
     set_installed v1.2.3
+    FAKE_SERVICE_DISABLED=1 AMPCONTROL_LATEST_VERSION=v9.9.9 auto_update | grep -q 'is not enabled' || fail 'disabled service was not skipped'
+    [[ "$(calls)" == 0 ]] || fail 'update ran with the service disabled'
     AMPCONTROL_LATEST_VERSION=v1.2.3 auto_update | grep -q 'already up to date' || fail 'equal version was not a no-op'
     AMPCONTROL_LATEST_VERSION=v1.2.2 auto_update | grep -q 'already up to date' || fail 'older release was not a no-op'
     AMPCONTROL_LATEST_VERSION=v1.10.0 auto_update >/dev/null

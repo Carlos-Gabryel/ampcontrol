@@ -220,7 +220,8 @@ assert_program_removed() {
     ! systemctl cat ampcontrol.service >/dev/null 2>&1 || fail "$(msg 'a unit do serviço ainda existe' 'the service unit still exists')"
     local removed
     for removed in /etc/systemd/system/ampcontrol.service /etc/systemd/system/ampcontrol.service.d \
-        /etc/sudoers.d/ampcontrol /usr/local/bin/ampcontrol-amp /usr/lib/ampcontrol /usr/local/sbin/ampcontrol-maintenance \n        /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer; do
+        /etc/sudoers.d/ampcontrol /usr/local/bin/ampcontrol-amp /usr/lib/ampcontrol /usr/local/sbin/ampcontrol-maintenance \
+        /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer; do
         [[ ! -e "$removed" ]] || fail "$(msg 'ainda existe após a desinstalação' 'still exists after uninstall'): $removed"
     done
 }
