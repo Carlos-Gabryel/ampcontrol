@@ -49,7 +49,11 @@ for architecture in amd64 arm64; do
         "$package_directory/"
     cp -a "$PROJECT_DIRECTORY/docs" "$package_directory/docs"
     install -m 0644 "$PROJECT_DIRECTORY/config/ampcontrol.example.toml" "$PROJECT_DIRECTORY/config/ampcontrol.example.en.toml" "$PROJECT_DIRECTORY/config/idle.json" "$package_directory/config/"
-    install -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol.service" "$package_directory/packaging/systemd/"
+    install -m 0644 \
+        "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol.service" \
+        "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.service" \
+        "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.timer" \
+        "$package_directory/packaging/systemd/"
     install -m 0755 \
         "$PROJECT_DIRECTORY/scripts/install.sh" \
         "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" \

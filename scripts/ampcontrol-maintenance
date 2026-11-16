@@ -9,6 +9,8 @@ readonly BINARY_PATH="$LIB_DIRECTORY/ampcontrol"
 readonly WRAPPER_PATH="/usr/local/bin/ampcontrol-amp"
 readonly MAINTENANCE_PATH="/usr/local/sbin/ampcontrol-maintenance"
 readonly SERVICE_PATH="/etc/systemd/system/ampcontrol.service"
+readonly UPDATE_SERVICE_PATH="/etc/systemd/system/ampcontrol-update.service"
+readonly UPDATE_TIMER_PATH="/etc/systemd/system/ampcontrol-update.timer"
 readonly STATE_DIRECTORY="/var/lib/ampcontrol/update-state"
 readonly BACKUP_ROOT="/var/backups/ampcontrol"
 readonly SERVICE_USER="ampcontrol"
@@ -41,11 +43,15 @@ usage() {
     if [[ "$LANGUAGE" == "en-US" ]]; then cat <<'EOF'
 Usage:
   sudo ampcontrol-maintenance update [vVERSION]
+  sudo ampcontrol-maintenance auto-update
   sudo ampcontrol-maintenance rollback [BACKUP_DIRECTORY]
   sudo ampcontrol-maintenance status
   sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
 Without a version, update installs the latest stable GitHub release.
+auto-update is run daily by ampcontrol-update.timer: it installs the latest
+stable release only if it is newer, rolling back on failure and skipping a
+version that failed. Disable with: systemctl disable --now ampcontrol-update.timer
 uninstall removes the service, binaries and sudoers rule but keeps the
 configuration, credentials, data, backups and the service user; --purge also
 removes those. AMP and game instances are never touched. --yes skips the
@@ -54,11 +60,15 @@ EOF
     else cat <<'EOF'
 Uso:
   sudo ampcontrol-maintenance update [vVERSÃO]
+  sudo ampcontrol-maintenance auto-update
   sudo ampcontrol-maintenance rollback [DIRETÓRIO_DE_BACKUP]
   sudo ampcontrol-maintenance status
   sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
 Sem uma versão, update instala a release estável mais recente do GitHub.
+auto-update roda todo dia pelo ampcontrol-update.timer: instala a release
+estável mais recente só se for mais nova, faz rollback em caso de falha e
+ignora uma versão que já falhou. Desative com: systemctl disable --now ampcontrol-update.timer
 uninstall remove o serviço, os binários e a regra do sudoers, mas mantém a
 configuração, as credenciais, os dados, os backups e o usuário do serviço;
 --purge remove também esses itens. O AMP e as instâncias de jogo nunca são
@@ -73,6 +83,11 @@ require_root() {
 }
 
 latest_version() {
+    # AMPCONTROL_LATEST_VERSION existe só para os testes.
+    if [[ -n "${AMPCONTROL_LATEST_VERSION:-}" ]]; then
+        printf '%s\n' "$AMPCONTROL_LATEST_VERSION"
+        return
+    fi
     curl -fsSL -H 'Accept: application/vnd.github+json' \
         "https://api.github.com/repos/$REPOSITORY/releases/latest" |
         python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])'
@@ -144,6 +159,8 @@ validate_staged_binary() {
 update_ampcontrol() {
     local requested="${1:-}"
     local version
+    local timer_existed=false
+    [[ ! -e "$UPDATE_TIMER_PATH" ]] || timer_existed=true
     version="${requested:-$(latest_version)}"
     [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || fail "$(msg 'versão inválida' 'invalid version'): $version"
     local architecture
@@ -185,12 +202,55 @@ update_ampcontrol() {
         restore_backup "$backup"
         fail "$(msg 'a instalação falhou e o backup foi restaurado' 'installation failed and the backup was restored')"
     fi
+    local unit
+    for unit in ampcontrol-update.service ampcontrol-update.timer; do
+        if [[ -f "$package/packaging/systemd/$unit" ]]; then
+            install -o root -g root -m 0644 "$package/packaging/systemd/$unit" "/etc/systemd/system/$unit" || true
+        fi
+    done
     systemctl daemon-reload
+    # Primeira vez que a unit do timer aparece: liga. Se já existia, respeita a escolha do usuário.
+    if [[ "$timer_existed" == false && -f "$UPDATE_TIMER_PATH" ]]; then
+        systemctl enable --now ampcontrol-update.timer >/dev/null 2>&1 || true
+    fi
     if ! systemctl restart ampcontrol.service || ! wait_for_stable_service; then
         restore_backup "$backup"
         fail "$(msg 'a nova versão não iniciou e o rollback automático foi executado' 'the new version did not start and automatic rollback was performed')"
     fi
     printf '%s %s. %s: %s\n' "$(msg 'AmpControl atualizado para' 'AmpControl updated to')" "$version" "$(msg 'Backup' 'Backup')" "$backup"
+}
+
+auto_update() {
+    local installed latest failed_marker="$STATE_DIRECTORY/auto-update-failed"
+    installed="$("$BINARY_PATH" --version 2>/dev/null | sed -n 's/^.*\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' | head -n1)" || true
+    if [[ -z "$installed" ]]; then
+        printf '%s\n' "$(msg 'Versão instalada não é uma release estável (vX.Y.Z); atualização automática ignorada.' 'Installed version is not a stable release (vX.Y.Z); automatic update skipped.')"
+        return 0
+    fi
+    latest="$(latest_version)" || fail "$(msg 'não foi possível consultar a última release' 'could not query the latest release')"
+    [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "$(msg 'versão inválida' 'invalid version'): $latest"
+    if [[ "$latest" == "$installed" || "$(printf '%s\n%s\n' "$installed" "$latest" | sort -V | tail -n1)" != "$latest" ]]; then
+        printf '%s (%s)\n' "$(msg 'AmpControl já está atualizado' 'AmpControl is already up to date')" "$installed"
+        return 0
+    fi
+    if [[ -f "$failed_marker" && "$(<"$failed_marker")" == "$latest" ]]; then
+        printf '%s\n' "$(msg "A versão $latest já falhou nesta máquina e será ignorada até sair uma release mais nova (a atualização manual com 'update' continua permitida)." "Version $latest failed before on this machine and is skipped until a newer release is published (manual 'update' is still allowed).")"
+        return 0
+    fi
+    printf '%s %s -> %s\n' "$(msg 'Atualização automática:' 'Automatic update:')" "$installed" "$latest"
+    local status=0
+    # Subshell porque fail() dá exit; set -e fica ativo dentro dele.
+    set +e
+    ( trap cleanup EXIT; update_ampcontrol "$latest" )
+    status=$?
+    set -e
+    if ((status != 0)); then
+        mkdir -p -- "$STATE_DIRECTORY"
+        printf '%s\n' "$latest" > "$failed_marker"
+        printf '%s\n' "$(msg "A atualização automática para $latest falhou e foi revertida; essa versão será ignorada." "Automatic update to $latest failed and was rolled back; this version will be skipped.")" >&2
+        return "$status"
+    fi
+    rm -f -- "$failed_marker"
 }
 
 show_status() {
@@ -275,7 +335,8 @@ uninstall_ampcontrol() {
 
     systemctl stop ampcontrol.service 2>/dev/null || true
     systemctl disable ampcontrol.service >/dev/null 2>&1 || true
-    rm -f -- "$SERVICE_PATH"
+    systemctl disable --now ampcontrol-update.timer >/dev/null 2>&1 || true
+    rm -f -- "$SERVICE_PATH" "$UPDATE_SERVICE_PATH" "$UPDATE_TIMER_PATH"
     rm -rf -- "$DROPIN_DIRECTORY"
     systemctl daemon-reload || true
     systemctl reset-failed ampcontrol.service >/dev/null 2>&1 || true
@@ -313,6 +374,10 @@ case "${1:-}" in
     update)
         require_root
         update_ampcontrol "${2:-}"
+        ;;
+    auto-update)
+        require_root
+        auto_update
         ;;
     rollback)
         require_root
