@@ -20,6 +20,11 @@ readonly DATA_DIRECTORY="/var/lib/ampcontrol"
 readonly CREDENTIAL_DIRECTORY="/etc/credstore.encrypted"
 readonly SUDOERS_PATH="/etc/sudoers.d/ampcontrol"
 readonly DROPIN_DIRECTORY="/etc/systemd/system/ampcontrol.service.d"
+readonly HEARTBEAT_SERVICE_PATH="/etc/systemd/system/ampcontrol-heartbeat.service"
+readonly HEARTBEAT_TIMER_PATH="/etc/systemd/system/ampcontrol-heartbeat.timer"
+readonly HEARTBEAT_ENV_PATH="$CONFIG_DIRECTORY/heartbeat.env"
+readonly HEARTBEAT_FILE="$DATA_DIRECTORY/data/discord-heartbeat"
+readonly HEARTBEAT_MAX_AGE=180
 
 TEMP_DIRECTORY=""
 LANGUAGE="${AMPCONTROL_LANGUAGE:-}"
@@ -46,6 +51,7 @@ Usage:
   sudo ampcontrol-maintenance auto-update
   sudo ampcontrol-maintenance rollback [BACKUP_DIRECTORY]
   sudo ampcontrol-maintenance set-token
+  sudo ampcontrol-maintenance heartbeat-config URL|--off
   sudo ampcontrol-maintenance status
   sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
@@ -62,6 +68,9 @@ set-token replaces the Discord bot token (e.g. after Reset Token in the
 Developer Portal): it reads the token without echo (or from stdin), checks it
 with Discord, restarts the bot and restores the old token if it does not
 connect.
+heartbeat-config URL turns on an optional alert: every 15 minutes it POSTs a JSON
+{"source","status","message"} to URL (Bearer token, read without echo)
+reporting whether the bot is up and connected to Discord. --off turns it off.
 EOF
     else cat <<'EOF'
 Uso:
@@ -69,6 +78,7 @@ Uso:
   sudo ampcontrol-maintenance auto-update
   sudo ampcontrol-maintenance rollback [DIRETÓRIO_DE_BACKUP]
   sudo ampcontrol-maintenance set-token
+  sudo ampcontrol-maintenance heartbeat-config URL|--off
   sudo ampcontrol-maintenance status
   sudo ampcontrol-maintenance uninstall [--purge] [--yes]
 
@@ -84,6 +94,9 @@ tocados. --yes pula a pergunta de confirmação.
 set-token troca o token do bot do Discord (ex.: depois de Reset Token no
 Developer Portal): lê o token sem eco (ou da entrada padrão), confere com o
 Discord, reinicia o bot e restaura o token antigo se ele não conectar.
+heartbeat-config URL liga um aviso opcional: a cada 15 minutos faz POST de um
+JSON {"source","status","message"} para a URL (token Bearer, lido sem eco)
+informando se o bot está de pé e conectado ao Discord. --off desliga.
 EOF
     fi
 }
@@ -290,6 +303,7 @@ update_ampcontrol() {
         fi
     done
     systemctl daemon-reload
+    install_heartbeat_units || true
     # Primeira vez que a unit do timer aparece: liga. Se já existia, respeita a escolha do usuário.
     if [[ "$timer_existed" == false && -f "$UPDATE_TIMER_PATH" ]]; then
         systemctl enable --now ampcontrol-update.timer >/dev/null 2>&1 || true
@@ -321,6 +335,8 @@ auto_update() {
     latest="$(latest_version)" || fail "$(msg 'não foi possível consultar a última release' 'could not query the latest release')"
     [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "$(msg 'versão inválida' 'invalid version'): $latest"
     if [[ "$latest" == "$installed" || "$(printf '%s\n%s\n' "$installed" "$latest" | sort -V | tail -n1)" != "$latest" ]]; then
+        # Servidor atualizado por um script antigo: garante as units novas.
+        install_heartbeat_units || true
         printf '%s (%s)\n' "$(msg 'AmpControl já está atualizado' 'AmpControl is already up to date')" "$installed"
         return 0
     fi
@@ -420,6 +436,167 @@ set_token() {
 ' "$(msg 'Token atualizado e bot conectado ao Discord.' 'Token updated and the bot is connected to Discord.')"
 }
 
+# Aviso quando o bot cai (opt-in). O AmpControl só envia um sinal genérico:
+# POST $HEARTBEAT_URL com Bearer $HEARTBEAT_TOKEN; quem recebe decide o que fazer.
+# Instala as units do heartbeat (embutidas aqui para que um maintenance antigo,
+# que não conhece units novas do pacote, ainda consiga instalá-las). O timer
+# nunca é habilitado aqui: só o heartbeat-config liga.
+install_heartbeat_units() {
+    local service_content timer_content changed=0
+    service_content="$(cat <<'EOF'
+[Unit]
+Description=AmpControl heartbeat (alert when the bot goes down)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ampcontrol-maintenance heartbeat
+EOF
+)"
+    timer_content="$(cat <<'EOF'
+[Unit]
+Description=AmpControl heartbeat every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+RandomizedDelaySec=60
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
+EOF
+)"
+    if [[ ! -f "$HEARTBEAT_SERVICE_PATH" || "$(<"$HEARTBEAT_SERVICE_PATH")" != "$service_content" ]]; then
+        printf '%s\n' "$service_content" > "$HEARTBEAT_SERVICE_PATH.new"
+        chmod 0644 "$HEARTBEAT_SERVICE_PATH.new"
+        mv -f -- "$HEARTBEAT_SERVICE_PATH.new" "$HEARTBEAT_SERVICE_PATH"
+        changed=1
+    fi
+    if [[ ! -f "$HEARTBEAT_TIMER_PATH" || "$(<"$HEARTBEAT_TIMER_PATH")" != "$timer_content" ]]; then
+        printf '%s\n' "$timer_content" > "$HEARTBEAT_TIMER_PATH.new"
+        chmod 0644 "$HEARTBEAT_TIMER_PATH.new"
+        mv -f -- "$HEARTBEAT_TIMER_PATH.new" "$HEARTBEAT_TIMER_PATH"
+        changed=1
+    fi
+    if ((changed)); then
+        systemctl daemon-reload
+    fi
+}
+
+# Lê KEY=VALUE do arquivo de configuração sem executá-lo (nunca "source").
+# Preenche as variáveis heartbeat_url e heartbeat_token do chamador.
+read_heartbeat_config() {
+    local line value
+    heartbeat_url=""
+    heartbeat_token=""
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        case "$line" in
+            HEARTBEAT_URL=*|HEARTBEAT_TOKEN=*)
+                value="${line#*=}"
+                if [[ "$value" == \"*\" || "$value" == \'*\' ]]; then
+                    value="${value:1:${#value}-2}"
+                fi
+                if [[ "$line" == HEARTBEAT_URL=* ]]; then heartbeat_url="$value"; else heartbeat_token="$value"; fi
+                ;;
+        esac
+    done < "$HEARTBEAT_ENV_PATH"
+}
+
+# Envia o sinal. Sem arquivo de configuração o recurso está desligado: sai em silêncio.
+heartbeat() {
+    [[ -f "$HEARTBEAT_ENV_PATH" ]] || return 0
+    local heartbeat_url="" heartbeat_token=""
+    read_heartbeat_config
+    if [[ -z "$heartbeat_url" || -z "$heartbeat_token" ]]; then
+        printf '%s\n' "$(msg "configuração do heartbeat incompleta em $HEARTBEAT_ENV_PATH" "incomplete heartbeat configuration in $HEARTBEAT_ENV_PATH")" >&2
+        return 1
+    fi
+
+    local status="ok" message="" state exit_status now last="" minutes
+    state="$(systemctl show ampcontrol.service -p ActiveState --value 2>/dev/null)" || state="unknown"
+    if [[ "$state" != active ]]; then
+        status="error"
+        exit_status="$(systemctl show ampcontrol.service -p ExecMainStatus --value 2>/dev/null)" || exit_status=""
+        if [[ "$exit_status" == 78 ]]; then
+            message="$(msg 'o Discord recusou o token (4004); rode: sudo ampcontrol-maintenance set-token' 'Discord rejected the token (4004); run: sudo ampcontrol-maintenance set-token')"
+        else
+            message="$(msg "o serviço ampcontrol não está rodando ($state)" "the ampcontrol service is not running ($state)")"
+        fi
+    else
+        now="$(date +%s)"
+        if [[ -r "$HEARTBEAT_FILE" ]]; then
+            last="$(tr -dc '0-9' < "$HEARTBEAT_FILE")"
+        fi
+        if [[ -z "$last" ]]; then
+            status="error"
+            message="$(msg 'o bot não está conectado ao Discord (nenhum sinal de conexão registrado)' 'the bot is not connected to Discord (no connection signal recorded)')"
+        elif ((now - last > HEARTBEAT_MAX_AGE)); then
+            status="error"
+            minutes=$(((now - last) / 60))
+            message="$(msg "o bot não está conectado ao Discord (último sinal há $minutes min)" "the bot is not connected to Discord (last signal $minutes min ago)")"
+        fi
+    fi
+    message="${message:0:300}"
+
+    local body
+    body="$(python3 -c 'import json,sys; print(json.dumps({"source": "ampcontrol", "status": sys.argv[1], "message": sys.argv[2]}))' "$status" "$message")"
+
+    # O token vai num arquivo 0600 (umask 077) e não no argv, onde o ps o mostraria.
+    [[ -n "$TEMP_DIRECTORY" ]] || TEMP_DIRECTORY="$(mktemp -d)"
+    local header_file="$TEMP_DIRECTORY/heartbeat-header" code="" curl_status=0
+    printf 'Authorization: Bearer %s\n' "$heartbeat_token" > "$header_file"
+    code="$(curl --max-time 15 --retry 2 -sS -o /dev/null -w '%{http_code}' -X POST \
+        -H @"$header_file" -H 'Content-Type: application/json' --data "$body" "$heartbeat_url")" || curl_status=$?
+    rm -f -- "$header_file"
+    heartbeat_token=""
+    if ((curl_status != 0)); then
+        printf '%s\n' "$(msg "heartbeat: não foi possível enviar o sinal (curl saiu com $curl_status)" "heartbeat: could not send the signal (curl exited with $curl_status)")" >&2
+        return 1
+    fi
+    if [[ ! "$code" =~ ^2[0-9][0-9]$ ]]; then
+        printf '%s\n' "$(msg "heartbeat: o receptor respondeu HTTP $code" "heartbeat: the receiver answered HTTP $code")" >&2
+        return 1
+    fi
+    printf '%s\n' "$(msg "heartbeat enviado ($status)" "heartbeat sent ($status)")"
+}
+
+# heartbeat-config URL: liga o aviso. heartbeat-config --off: desliga.
+heartbeat_config() {
+    local url="${1:-}" token=""
+    if [[ "$url" == --off ]]; then
+        systemctl disable --now ampcontrol-heartbeat.timer >/dev/null 2>&1 || true
+        rm -f -- "$HEARTBEAT_ENV_PATH"
+        printf '%s\n' "$(msg 'Aviso de heartbeat desligado.' 'Heartbeat alert turned off.')"
+        return 0
+    fi
+    if [[ ! "$url" =~ ^https://[^[:space:]]+$ ]]; then
+        fail "$(msg 'informe a URL do receptor começando com https://; uso: sudo ampcontrol-maintenance heartbeat-config https://... (ou --off)' 'provide the receiver URL starting with https://; usage: sudo ampcontrol-maintenance heartbeat-config https://... (or --off)')"
+    fi
+    if [[ -t 0 ]]; then
+        read -rsp "$(msg 'Token do receptor: ' 'Receiver token: ')" token || true
+        printf '\n' >&2
+    else
+        IFS= read -r token || true
+    fi
+    token="${token//[[:space:]]/}"
+    [[ -n "$token" ]] || fail "$(msg 'token vazio; nada foi alterado' 'empty token; nothing was changed')"
+
+    install -d -o root -g root -m 0755 "$CONFIG_DIRECTORY"
+    printf 'HEARTBEAT_URL=%s\nHEARTBEAT_TOKEN=%s\n' "$url" "$token" > "$HEARTBEAT_ENV_PATH.new"
+    token=""
+    chown root:root "$HEARTBEAT_ENV_PATH.new"
+    chmod 0600 "$HEARTBEAT_ENV_PATH.new"
+    mv -f -- "$HEARTBEAT_ENV_PATH.new" "$HEARTBEAT_ENV_PATH"
+
+    install_heartbeat_units
+    systemctl enable --now ampcontrol-heartbeat.timer >/dev/null 2>&1 ||
+        fail "$(msg 'não foi possível ligar ampcontrol-heartbeat.timer' 'could not enable ampcontrol-heartbeat.timer')"
+    printf '%s\n' "$(msg 'Aviso de heartbeat ligado (a cada 15 minutos). Enviando um sinal agora...' 'Heartbeat alert turned on (every 15 minutes). Sending a signal now...')"
+    heartbeat || fail "$(msg 'o sinal de teste falhou; confira a URL e o token (a configuração foi salva)' 'the test signal failed; check the URL and token (the configuration was saved)')"
+}
+
 show_status() {
     printf '%s: ' "$(msg 'Versão instalada' 'Installed version')"
     "$BINARY_PATH" --version
@@ -503,7 +680,8 @@ uninstall_ampcontrol() {
     systemctl stop ampcontrol.service 2>/dev/null || true
     systemctl disable ampcontrol.service >/dev/null 2>&1 || true
     systemctl disable --now ampcontrol-update.timer >/dev/null 2>&1 || true
-    rm -f -- "$SERVICE_PATH" "$UPDATE_SERVICE_PATH" "$UPDATE_TIMER_PATH"
+    systemctl disable --now ampcontrol-heartbeat.timer >/dev/null 2>&1 || true
+    rm -f -- "$SERVICE_PATH" "$UPDATE_SERVICE_PATH" "$UPDATE_TIMER_PATH" "$HEARTBEAT_SERVICE_PATH" "$HEARTBEAT_TIMER_PATH"
     rm -rf -- "$DROPIN_DIRECTORY"
     systemctl daemon-reload || true
     systemctl reset-failed ampcontrol.service >/dev/null 2>&1 || true
@@ -558,6 +736,18 @@ case "${1:-}" in
     set-token)
         require_root
         set_token
+        ;;
+    heartbeat)
+        require_root
+        heartbeat
+        ;;
+    heartbeat-config)
+        require_root
+        heartbeat_config "${2:-}"
+        ;;
+    install-units)
+        require_root
+        install_heartbeat_units
         ;;
     status)
         require_root

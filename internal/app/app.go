@@ -100,6 +100,7 @@ func New() (*App, error) {
 			GameServerAddress:      cfg.AMPGameServerAddress,
 			StatusStatePath:        "data/discord_status.json",
 			PreferencesPath:        "data/discord_preferences.json",
+			HeartbeatPath:          "data/discord-heartbeat",
 			GameOverrides:          gameOverrides,
 			PlayerCountResolver:    playerCountResolver,
 			Inventory:              inventory,

@@ -662,6 +662,8 @@ rm -f -- "$TEMP_SUDOERS"
 install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol.service" "$SERVICE_PATH"
 install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.service" "$UPDATE_SERVICE_PATH"
 install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.timer" "$UPDATE_TIMER_PATH"
+# Units do heartbeat (opt-in: o timer não é ligado aqui).
+"$MAINTENANCE_PATH" install-units
 systemctl daemon-reload
 # O timer fica ligado sempre; o auto-update não faz nada enquanto o
 # ampcontrol.service não estiver habilitado (instalação com --no-start).

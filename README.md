@@ -201,6 +201,19 @@ Use quando o Discord invalidou o token (por exemplo, após **Reset Token**): o l
 
 O comando confere o token com o Discord antes de alterar qualquer coisa, reinicia o bot e, se ele não conectar, restaura o token anterior.
 
+### Aviso quando o bot cair (heartbeat)
+
+Opcional e desligado por padrão. Quando ligado, a cada 15 minutos o servidor envia um `POST` para a URL que você escolher, com o cabeçalho `Authorization: Bearer <token>`, `Content-Type: application/json` e o corpo:
+
+```json
+{"source":"ampcontrol","status":"ok","message":""}
+```
+
+`status` é `ok` ou `error`; em caso de erro, `message` (até 300 caracteres) diz o motivo: serviço parado, token recusado pelo Discord ou bot sem conexão com o Discord. O AmpControl não sabe o que acontece depois: qualquer receptor que aceite esse `POST` e responda 2xx serve (por exemplo, um que avise por mensagem).
+
+- Ligar: `sudo ampcontrol-maintenance heartbeat-config https://seu-receptor/...` e cole o token do receptor (a digitação não aparece). O comando liga o timer e envia um sinal de teste.
+- Desligar: `sudo ampcontrol-maintenance heartbeat-config --off`.
+
 ## ⌨️ Comandos
 
 ### Para todos os usuários
