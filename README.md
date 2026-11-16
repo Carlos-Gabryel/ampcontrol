@@ -177,6 +177,17 @@ sudo ampcontrol-maintenance rollback
 
 Para desinstalar: `sudo ampcontrol-maintenance uninstall` (mantém configuração e dados) ou `--purge` (remove tudo); veja a [documentação](docs/INSTALLATION.md#desinstalar). O AMP nunca é tocado.
 
+### Atualização automática
+
+Um timer do systemd (`ampcontrol-update.timer`) verifica diariamente, às 05:00 (±1h), se há uma release estável mais nova e a instala sozinho. Ele só instala versões estáveis mais novas que a atual, valida a configuração com o novo binário, faz backup e rollback automático se o serviço não subir ou se o bot não conectar ao Discord em até 2 min (sem erros de gateway nem loop de reconexão), e pula uma versão que já falhou duas vezes até sair uma mais nova (o `update` manual continua permitido).
+
+```bash
+sudo systemctl disable --now ampcontrol-update.timer   # desativar
+sudo systemctl enable --now ampcontrol-update.timer    # reativar
+systemctl list-timers ampcontrol-update.timer          # próxima execução
+journalctl -u ampcontrol-update.service                # histórico
+```
+
 Instalações antigas em `/opt/ampcontrol` possuem uma [migração transacional documentada](docs/INSTALLATION.md#8-migrar-uma-instalação-antiga), com pré-validação somente leitura e restauração automática em caso de falha.
 
 ## ⌨️ Comandos

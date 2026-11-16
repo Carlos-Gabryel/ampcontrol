@@ -1,0 +1,77 @@
+name: Auto release
+
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: auto-release
+
+jobs:
+  decide:
+    name: Tag dependency changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect dependency changes
+        id: detect
+        run: |
+          last="$(git describe --tags --abbrev=0 --match 'v*')"
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          if git diff --quiet "$last" HEAD -- go.mod go.sum; then
+            echo "no dependency changes since $last"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "dependency changes since $last"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        if: steps.detect.outputs.changed == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+          cache-dependency-path: go.sum
+
+      - name: Gate on vet and tests
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Create next patch tag
+        id: tag
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          LAST: ${{ steps.detect.outputs.last }}
+        run: |
+          if [[ ! "$LAST" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "last tag $LAST is not vX.Y.Z" >&2
+            exit 1
+          fi
+          next="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+          git tag "$next"
+          git push origin "$next"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Release
+    needs: decide
+    if: needs.decide.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.decide.outputs.tag }}

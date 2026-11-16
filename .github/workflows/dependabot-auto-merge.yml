@@ -1,0 +1,31 @@
+name: Dependabot auto-merge
+
+# Only minor and patch updates are auto-merged (majors need a human). Auto-merge
+# relies on the required status checks configured on main (Go and packaging,
+# Localization pt-BR/en-US, arm64 smoke test, Installer rehearsal): GitHub merges
+# only after they pass.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v3
+
+      - name: Enable auto-merge (waits for required checks)
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"

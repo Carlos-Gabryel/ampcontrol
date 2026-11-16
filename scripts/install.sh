@@ -12,6 +12,8 @@ readonly CREDENTIAL_DIRECTORY="/etc/credstore.encrypted"
 readonly WRAPPER_PATH="/usr/local/bin/ampcontrol-amp"
 readonly MAINTENANCE_PATH="/usr/local/sbin/ampcontrol-maintenance"
 readonly SERVICE_PATH="/etc/systemd/system/ampcontrol.service"
+readonly UPDATE_SERVICE_PATH="/etc/systemd/system/ampcontrol-update.service"
+readonly UPDATE_TIMER_PATH="/etc/systemd/system/ampcontrol-update.timer"
 readonly SUDOERS_PATH="/etc/sudoers.d/ampcontrol"
 readonly CREDENTIAL_DROPIN_DIRECTORY="/etc/systemd/system/ampcontrol.service.d"
 readonly CREDENTIAL_DROPIN_PATH="$CREDENTIAL_DROPIN_DIRECTORY/credentials.conf"
@@ -480,7 +482,7 @@ fi
 [[ -f "$BINARY_SOURCE" && -x "$BINARY_SOURCE" ]] || fail "$(msg 'binário inválido' 'invalid binary'): $BINARY_SOURCE"
 
 BACKUP_REQUIRED=false
-for existing_path in "$CONFIG_DIRECTORY" "$STATE_DIRECTORY" "$LIB_DIRECTORY/ampcontrol" "$WRAPPER_PATH" "$MAINTENANCE_PATH" "$SERVICE_PATH" "$SUDOERS_PATH" "$CREDENTIAL_DROPIN_PATH"; do
+for existing_path in "$CONFIG_DIRECTORY" "$STATE_DIRECTORY" "$LIB_DIRECTORY/ampcontrol" "$WRAPPER_PATH" "$MAINTENANCE_PATH" "$SERVICE_PATH" "$UPDATE_SERVICE_PATH" "$UPDATE_TIMER_PATH" "$SUDOERS_PATH" "$CREDENTIAL_DROPIN_PATH"; do
     if [[ -e "$existing_path" ]]; then
         BACKUP_REQUIRED=true
         break
@@ -495,6 +497,8 @@ if [[ "$BACKUP_REQUIRED" == true ]]; then
     [[ ! -e "$WRAPPER_PATH" ]] || cp -a -- "$WRAPPER_PATH" "$BACKUP_DIRECTORY/wrapper"
     [[ ! -e "$MAINTENANCE_PATH" ]] || cp -a -- "$MAINTENANCE_PATH" "$BACKUP_DIRECTORY/maintenance"
     [[ ! -e "$SERVICE_PATH" ]] || cp -a -- "$SERVICE_PATH" "$BACKUP_DIRECTORY/service"
+    [[ ! -e "$UPDATE_SERVICE_PATH" ]] || cp -a -- "$UPDATE_SERVICE_PATH" "$BACKUP_DIRECTORY/update-service"
+    [[ ! -e "$UPDATE_TIMER_PATH" ]] || cp -a -- "$UPDATE_TIMER_PATH" "$BACKUP_DIRECTORY/update-timer"
     [[ ! -e "$SUDOERS_PATH" ]] || cp -a -- "$SUDOERS_PATH" "$BACKUP_DIRECTORY/sudoers"
     [[ ! -e "$CREDENTIAL_DROPIN_PATH" ]] || cp -a -- "$CREDENTIAL_DROPIN_PATH" "$BACKUP_DIRECTORY/credentials.conf"
     printf '%s %s\n' "$(msg 'Backup da instalação anterior criado em' 'Previous installation backup created at')" "$BACKUP_DIRECTORY"
@@ -654,7 +658,13 @@ install -o root -g root -m 0440 "$TEMP_SUDOERS" "$SUDOERS_PATH"
 rm -f -- "$TEMP_SUDOERS"
 
 install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol.service" "$SERVICE_PATH"
+install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.service" "$UPDATE_SERVICE_PATH"
+install -o root -g root -m 0644 "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.timer" "$UPDATE_TIMER_PATH"
 systemctl daemon-reload
+# O timer fica ligado sempre; o auto-update não faz nada enquanto o
+# ampcontrol.service não estiver habilitado (instalação com --no-start).
+systemctl enable --now ampcontrol-update.timer >/dev/null
+printf '%s\n' "$(msg 'Atualização automática ativada (diária). Para desativar: sudo systemctl disable --now ampcontrol-update.timer' 'Automatic updates are on (daily). To disable: sudo systemctl disable --now ampcontrol-update.timer')"
 if [[ "$START_SERVICE" == true ]]; then
     systemctl enable ampcontrol.service >/dev/null
     systemctl restart ampcontrol.service

@@ -148,6 +148,17 @@ To uninstall: `sudo ampcontrol-maintenance uninstall` (keeps configuration and d
 
 The updater verifies the release checksum, validates the current configuration with the staged binary, and creates a backup before replacement. If the service does not stay active for the first 15 seconds (for example, crashing and being restarted by systemd), rollback is automatic. Legacy `/opt/ampcontrol` installations have a [transactional migration procedure](docs/INSTALLATION.en.md#8-migrate-a-legacy-installation).
 
+### Automatic updates
+
+A systemd timer (`ampcontrol-update.timer`) checks daily at 05:00 (±1h) for a newer stable release and installs it by itself. It only installs stable releases newer than the current one, validates the configuration with the new binary, creates a backup and rolls back automatically if the service does not come up or the bot does not connect to Discord within 2 min (no gateway errors or reconnect loops), and skips a version that already failed twice until a newer one is published (manual `update` is still allowed).
+
+```bash
+sudo systemctl disable --now ampcontrol-update.timer   # disable
+sudo systemctl enable --now ampcontrol-update.timer    # re-enable
+systemctl list-timers ampcontrol-update.timer          # next run
+journalctl -u ampcontrol-update.service                # history
+```
+
 ## ⌨️ Commands
 
 ### All users

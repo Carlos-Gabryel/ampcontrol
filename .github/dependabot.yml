@@ -3,9 +3,13 @@ updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     open-pull-requests-limit: 5
     labels: [dependencies]
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
@@ -13,4 +17,6 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     labels: [dependencies]
-
+    groups:
+      github-actions:
+        patterns: ["*"]

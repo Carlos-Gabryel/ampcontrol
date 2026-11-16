@@ -102,6 +102,8 @@ check_installation() {
     ! grep -q 'Valheim01' /var/lib/ampcontrol/data/idle_servers.json || fail "$(msg 'instância não escolhida no Idle' 'instance not chosen for Idle')"
 
     systemd-analyze verify /etc/systemd/system/ampcontrol.service || fail "systemd-analyze verify"
+    systemd-analyze verify /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer ||
+        fail "systemd-analyze verify (auto-update)"
     visudo -cf /etc/sudoers.d/ampcontrol >/dev/null || fail "sudoers"
     local inventory
     inventory="$(sudo -u ampcontrol sudo -n -u amp /usr/local/bin/ampcontrol-amp list)"
@@ -150,6 +152,11 @@ fi
 rm -f -- "$INSTALLER_LOG"
 unset INSTALLER_LOG
 check_installation "$TOKEN_FIRST"
+systemctl is-enabled --quiet ampcontrol-update.timer ||
+    fail "$(msg 'o timer de atualização automática não ficou habilitado' 'the automatic update timer was not enabled')"
+# Binário de teste não é uma release vX.Y.Z: o auto-update não faz nada.
+AMPCONTROL_LATEST_VERSION=v9.9.9 /usr/local/sbin/ampcontrol-maintenance auto-update | grep -qiE 'stable release|release estável' ||
+    fail "$(msg 'o auto-update não ignorou um binário de desenvolvimento' 'auto-update did not skip a development binary')"
 
 printf '== %s\n' "$(msg 'Reexecução para trocar o token, mantendo o Idle' 'Re-run to rotate the token, keeping Idle')"
 run_installer "$(printf '\n'; discord_and_amp_answers "$TOKEN_SECOND")"
@@ -213,7 +220,8 @@ assert_program_removed() {
     ! systemctl cat ampcontrol.service >/dev/null 2>&1 || fail "$(msg 'a unit do serviço ainda existe' 'the service unit still exists')"
     local removed
     for removed in /etc/systemd/system/ampcontrol.service /etc/systemd/system/ampcontrol.service.d \
-        /etc/sudoers.d/ampcontrol /usr/local/bin/ampcontrol-amp /usr/lib/ampcontrol /usr/local/sbin/ampcontrol-maintenance; do
+        /etc/sudoers.d/ampcontrol /usr/local/bin/ampcontrol-amp /usr/lib/ampcontrol /usr/local/sbin/ampcontrol-maintenance \
+        /etc/systemd/system/ampcontrol-update.service /etc/systemd/system/ampcontrol-update.timer; do
         [[ ! -e "$removed" ]] || fail "$(msg 'ainda existe após a desinstalação' 'still exists after uninstall'): $removed"
     done
 }

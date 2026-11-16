@@ -179,6 +179,85 @@ AMPCONTROL_LANGUAGE=pt-BR "$PROJECT_DIRECTORY/scripts/migrate-legacy.sh" --help 
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'latest stable GitHub release'
 "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'uninstall \[--purge\] \[--yes\]'
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'never touched'
+# Atualização automática: unidades empacotadas e lógica do auto-update com stubs.
+for unit in ampcontrol-update.service ampcontrol-update.timer; do
+    [[ -f "$PROJECT_DIRECTORY/packaging/systemd/$unit" ]] || fail "$(msg 'unit ausente' 'missing unit'): $unit"
+    grep -q "$unit" "$PROJECT_DIRECTORY/scripts/build-release.sh" || fail "$(msg 'unit fora do pacote de release' 'unit not in the release package'): $unit"
+    grep -q "$unit" "$PROJECT_DIRECTORY/scripts/install.sh" || fail "$(msg 'unit não instalada pelo instalador' 'unit not installed by the installer'): $unit"
+done
+grep -q 'ExecStart=/usr/local/sbin/ampcontrol-maintenance auto-update' "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.service" ||
+    fail "$(msg 'ExecStart do auto-update incorreto' 'wrong auto-update ExecStart')"
+grep -q 'OnCalendar=\*-\*-\* 05:00' "$PROJECT_DIRECTORY/packaging/systemd/ampcontrol-update.timer" ||
+    fail "$(msg 'agenda do timer incorreta' 'wrong timer schedule')"
+"$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance" --help | grep -q -- 'auto-update'
+
+(
+    # shellcheck disable=SC2317,SC2034,SC2329
+    {
+        msg() { printf '%s' "$2"; }
+        fail() { printf '%s\n' "$1" >&2; exit 1; }
+        STATE_DIRECTORY="$TEMP_DIRECTORY/auto-state"
+        mkdir -p "$STATE_DIRECTORY"
+        BINARY_PATH="$TEMP_DIRECTORY/fake-ampcontrol"
+        UPDATE_CALLS="$TEMP_DIRECTORY/update-calls"
+        : > "$UPDATE_CALLS"
+        update_ampcontrol() { printf '%s\n' "$1" >> "$UPDATE_CALLS"; return "${FAKE_UPDATE_STATUS:-0}"; }
+        cleanup() { :; }
+        ensure_state_directory() { mkdir -p "$STATE_DIRECTORY"; }
+        systemctl() { [[ "$*" == 'is-enabled --quiet ampcontrol.service' ]] && return "${FAKE_SERVICE_DISABLED:-0}"; return 1; }
+    }
+    eval "$(sed -n '/^latest_version() {/,/^}/p;/^auto_update() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
+    set_installed() { printf '#!/usr/bin/env bash\necho "AmpControl %s"\n' "$1" > "$BINARY_PATH"; chmod +x "$BINARY_PATH"; }
+    calls() { wc -l < "$UPDATE_CALLS" | tr -d ' '; }
+
+    set_installed dev
+    AMPCONTROL_LATEST_VERSION=v9.9.9 auto_update | grep -q 'not a stable release' || fail 'dev build was not skipped'
+    set_installed v1.2.3
+    FAKE_SERVICE_DISABLED=1 AMPCONTROL_LATEST_VERSION=v9.9.9 auto_update | grep -q 'is not enabled' || fail 'disabled service was not skipped'
+    [[ "$(calls)" == 0 ]] || fail 'update ran with the service disabled'
+    AMPCONTROL_LATEST_VERSION=v1.2.3 auto_update | grep -q 'already up to date' || fail 'equal version was not a no-op'
+    AMPCONTROL_LATEST_VERSION=v1.2.2 auto_update | grep -q 'already up to date' || fail 'older release was not a no-op'
+    AMPCONTROL_LATEST_VERSION=v1.10.0 auto_update >/dev/null
+    [[ "$(calls)" == 1 && "$(<"$UPDATE_CALLS")" == v1.10.0 ]] || fail 'newer release did not trigger one update (sort -V)'
+    [[ ! -e "$STATE_DIRECTORY/auto-update-failed" ]] || fail 'failure marker written on success'
+    if FAKE_UPDATE_STATUS=1 AMPCONTROL_LATEST_VERSION=v1.10.1 auto_update >/dev/null 2>&1; then fail 'failed update returned success'; fi
+    [[ "$(<"$STATE_DIRECTORY/auto-update-failed")" == v1.10.1 ]] || fail 'failure marker missing'
+    if FAKE_UPDATE_STATUS=1 AMPCONTROL_LATEST_VERSION=v1.10.1 auto_update >/dev/null 2>&1; then fail 'second failed update returned success'; fi
+    [[ "$(calls)" == 3 ]] || fail 'first failure was not retried on the next run'
+    AMPCONTROL_LATEST_VERSION=v1.10.1 auto_update | grep -q 'failed twice' || fail 'twice-failed version was not skipped'
+    [[ "$(calls)" == 3 ]] || fail 'twice-failed version triggered another update'
+    AMPCONTROL_LATEST_VERSION=v1.10.2 auto_update >/dev/null
+    [[ "$(calls)" == 4 && ! -e "$STATE_DIRECTORY/auto-update-failed" ]] || fail 'newer release after a failure was not installed'
+) || fail "$(msg 'lógica do auto-update incorreta' 'auto-update logic is wrong')"
+
+(
+    # shellcheck disable=SC2317,SC2034,SC2329
+    {
+        msg() { printf '%s' "$2"; }
+        JOURNAL_CALLS="$TEMP_DIRECTORY/journal-calls"
+        service_journal_since() { printf 'x\n' >> "$JOURNAL_CALLS"; printf '%s\n' "$FAKE_JOURNAL"; }
+        systemctl() { printf '%s' "${FAKE_ACTIVE:-active}"; }
+        sleep() { :; }
+    }
+    eval "$(sed -n '/^verify_discord_health() {/,/^}/p' "$PROJECT_DIRECTORY/scripts/ampcontrol-maintenance")"
+    export AMPCONTROL_HEALTH_CHECK_SECONDS=10
+    health() { : > "$JOURNAL_CALLS"; verify_discord_health 0 2>/dev/null; }
+    FAKE_JOURNAL='{"level":"info","message":"Discord conectado"}'
+    health || fail 'healthy bot was rejected'
+    FAKE_JOURNAL='{"level":"info","message":"Discord connected"}'
+    health || fail 'English connected line was rejected'
+    FAKE_JOURNAL='{"level":"info","message":"started"}'
+    ! health || fail 'bot that never connected was accepted'
+    FAKE_JOURNAL=$'{"message":"Discord conectado"}\n{"message":"Discord conectado"}'
+    ! health || fail 'reconnect loop was accepted'
+    FAKE_JOURNAL='ERROR error while parsing gateway message name=bot err="unknown channel with type 20"'
+    ! health || fail 'gateway error was accepted'
+    [[ "$(wc -l < "$JOURNAL_CALLS" | tr -d ' ')" == 1 ]] || fail 'gateway error did not fail fast'
+    FAKE_JOURNAL='{"message":"Discord conectado"}'
+    FAKE_ACTIVE=failed
+    ! health || fail 'inactive service was accepted'
+) || fail "$(msg 'verify_discord_health incorreto' 'verify_discord_health is wrong')"
+
 AMPCONTROL_LANGUAGE=en-US "$PROJECT_DIRECTORY/scripts/ampcontrol-amp" start Missing01 >"$TEMP_DIRECTORY/english-error.out" 2>&1 || true
 grep -q "instance 'Missing01' does not exist" "$TEMP_DIRECTORY/english-error.out" || fail "$(msg 'mensagem em inglês do wrapper não foi aplicada' 'the wrapper English message was not applied')"
 
