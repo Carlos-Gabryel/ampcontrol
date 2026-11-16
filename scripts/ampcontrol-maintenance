@@ -93,6 +93,12 @@ latest_version() {
         python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])'
 }
 
+# Diretório de estado do root: nunca seguir link simbólico.
+ensure_state_directory() {
+    [[ ! -L "$STATE_DIRECTORY" ]] || fail "$(msg 'diretório de estado é um link simbólico' 'state directory is a symbolic link'): $STATE_DIRECTORY"
+    install -d -o root -g root -m 0700 "$STATE_DIRECTORY"
+}
+
 backup_current() {
     local version="$1"
     local backup
@@ -103,7 +109,7 @@ backup_current() {
     [[ ! -e "$MAINTENANCE_PATH" ]] || cp -a -- "$MAINTENANCE_PATH" "$backup/ampcontrol-maintenance"
     [[ ! -e "$SERVICE_PATH" ]] || cp -a -- "$SERVICE_PATH" "$backup/ampcontrol.service"
     "$BINARY_PATH" --version > "$backup/version" 2>/dev/null || printf '%s\n' "$(msg 'desconhecida' 'unknown')" > "$backup/version"
-    install -d -o root -g root -m 0700 "$STATE_DIRECTORY"
+    ensure_state_directory
     printf '%s\n' "$backup" > "$STATE_DIRECTORY/latest-backup"
     printf '%s' "$backup"
 }
@@ -246,7 +252,7 @@ auto_update() {
     status=$?
     set -e
     if ((status != 0)); then
-        mkdir -p -- "$STATE_DIRECTORY"
+        ensure_state_directory
         printf '%s\n' "$latest" > "$failed_marker"
         printf '%s\n' "$(msg "A atualização automática para $latest falhou e foi revertida; essa versão será ignorada." "Automatic update to $latest failed and was rolled back; this version will be skipped.")" >&2
         return "$status"
