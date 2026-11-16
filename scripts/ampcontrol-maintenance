@@ -239,9 +239,10 @@ auto_update() {
     fi
     printf '%s %s -> %s\n' "$(msg 'Atualização automática:' 'Automatic update:')" "$installed" "$latest"
     local status=0
-    # Subshell porque fail() dá exit; set -e fica ativo dentro dele.
+    # Subshell porque fail() dá exit. O set +e de fora é herdado, então o
+    # subshell religa o set -e para update_ampcontrol abortar em qualquer erro.
     set +e
-    ( trap cleanup EXIT; update_ampcontrol "$latest" )
+    ( set -e; trap cleanup EXIT; update_ampcontrol "$latest" )
     status=$?
     set -e
     if ((status != 0)); then
